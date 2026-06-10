@@ -232,3 +232,34 @@ Failures from this Gate 0 run:
   retro cite 'items-1-2-3 (all three Sprint Retrospective items processed via the four-type deferral grid this closeout; each classified backlog and actioned into a tracked ticket — fkxnne for Items 1&2' is not a plausible anchor/item id
 - (contradicted_cite) `CHANGELOG.md` updated for any user-visible changes landed this sprint.
   commit cite 'ed13053 (packages/runtime-core/CHANGELOG.md bumped to 0.4.0 documenting agent-block helper exports). NOTE: this monorepo has NO root CHANGELOG.md (only per-package); none was fabricated. The MCP+CLI shared DEEPNOTE_PYTHON interpreter contract is user-documented in packages/mcp/README.md (commit:853205f) since the mcp/cli packages carry no CHANGELOG.' is not a valid sha (7..40 hex chars)
+
+### Item 4: Document the CLI `deepnote run` bare-python interpreter hint in packages/cli/README.md
+
+Card `ohoh63` (this review) shipped the ADR-001 bare-system-python hint on the CLI `deepnote run`
+consumer, completing the code half of the cross-consumer parity story (the MCP half landed in
+`mjporx`). The documentation half is still open: `packages/mcp/README.md` documents the bare-python
+hint and interpreter-resolution precedence (`packages/mcp/README.md:144-147`), but
+`packages/cli/README.md` has no "Python interpreter" section at all, so the newly-shipped CLI hint
+is undocumented for cross-consumer parity. Suggested shape: add a short "Python interpreter"
+subsection to `packages/cli/README.md` mirroring the MCP README — describe interpreter precedence
+(`--python` > `DEEPNOTE_PYTHON` > autodetect) and the bare-system-python warning, matching the MCP
+wording. The reviewer classified this as non-blocking: the card listed CLI README docs as "Optional"
+and the emitted yellow status line is largely self-explanatory, so it does not block any remaining
+S6INREPO card (step 4 `sjwaox` is a version bump + CHANGELOG; the closeout does not depend on it).
+It needs no external prerequisite — `packages/cli/README.md` is in-repo and the hint already
+shipped — so it is captured here for closeout triage rather than a sprint card. It closes the
+documentation half of the ADR-001 parity story.
+
+| Deferral Type   | Description                                                                                                                              | Applies (true/false) |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| backlog         | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. |                      |
+| sprint          | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag.                                            |                      |
+| note-only       | Captured for record; no action; current output is fine as-is.                                                                            |                      |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment).       |                      |
+
+**Source:** ohoh63 review 1
+**Files touched:** packages/cli/README.md
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 4 classified (exactly one deferral type marked `true` above)
+- [ ] Item 4 actioned (action taken matches chosen type)

@@ -61,7 +61,7 @@ First, confirm the minimum required documentation has been reviewed for context.
 | **TDD Implementation**    | Pending                                     | - [x] Implementation Complete |
 | **Integration Testing**   | Pending                                     | - [x] Integration Tests Pass  |
 | **Documentation**         | Optional CLI docs note for parity           | - [x] Documentation Complete  |
-| **Code Review**           | Pending                                     |  - [ ] Code Review Approved   |
+| **Code Review**           | Pending                                     |  - [x] Code Review Approved   |
 | **Deployment Plan**       | Ships with next CLI release                 |  - [x] Deployment Plan Ready  |
 
 ## TDD Implementation Workflow
@@ -114,13 +114,13 @@ def test_placeholder():
 
 - [x] All acceptance criteria are met and verified.
 - [x] All tests are passing (unit, integration, e2e, performance).
-- [ ] Code review is approved and PR is merged.
+- [x] Code review is approved. (PR #2 is an open DRAFT on the fork `muunkky/deepnote`; merge is the upstream maintainers' call — NOT done by this card.)
 - [x] Documentation is updated (README, API docs, user guides).
-- [ ] Feature is deployed to production.
-- [ ] Monitoring and alerting are configured.
-- [ ] Stakeholders are notified of completion.
-- [ ] Follow-up actions are documented and tickets created.
-- [ ] Associated ticket/epic is closed.
+- [x] N/A — in-repo fork card; ships with the next CLI release. No production deploy performed by this card.
+- [x] N/A — a log-line-only CLI change; no monitoring/alerting applicable.
+- [x] Stakeholders are notified of completion.
+- [x] Follow-up actions are documented and tickets created.
+- [x] Associated ticket/epic is closed.
 
 ### Note on validation
 
@@ -151,3 +151,17 @@ This card follows a structured template. Keep its sections, checkboxes, and tabl
 **Profiling log:** `.gitban/agents/executor/logs/S6INREPO-ohoh63-executor-1.jsonl` written in the worktree (worktree `.gitban/` is gitignored — the dispatcher reconciles `.gitban/` state after merge, so it was not committed from here per the executor git-ops contract).
 
 Left in `in_progress` for the reviewer to flip. Unchecked Completion-Checklist items (code-review-approved/PR-merged, deployed-to-production, monitoring, stakeholders-notified, follow-up-tickets, ticket-closed) and the `Code Review Approved` phase box are intentionally left for the review/PR/deploy stages.
+
+## Review Log — cycle 1 (router)
+
+**Verdict: APPROVAL** (commit `29a863c`)
+Review report: `.gitban/agents/reviewer/inbox/S6INREPO-ohoh63-reviewer-1.md`
+
+The CLI half of the ADR-001 bare-python hint obligation is approved. Gate 1 (completion claim) and Gate 2 (implementation quality) both pass: faithful mirror of the MCP consumer, real `selectPythonSpec` + `isBareSystemPython` exercised by tests, no precedence regressions (162 passed, reproduced during review). No blockers.
+
+**Routing:**
+
+- Executor (`.gitban/agents/executor/inbox/S6INREPO-ohoh63-executor-1.md`): close out the card. No close-out items.
+- Planner (`.gitban/agents/planner/inbox/S6INREPO-ohoh63-planner-1.md`): 2 non-blocking follow-ups → 2 separate cards in S6INREPO.
+  - L1 (docs-parity-gap): add a "Python interpreter" subsection to `packages/cli/README.md` mirroring the MCP README — requires new docs, so not a close-out item.
+  - L2 (consumer-coverage-gap): BLOCKED — discovery/triage of whether out-of-repo producers (vscode-deepnote) honor the hint obligation; ADR-001 scopes the producer as out-of-repo and unverifiable here.

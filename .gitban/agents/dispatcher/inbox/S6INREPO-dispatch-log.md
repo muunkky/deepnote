@@ -135,3 +135,19 @@ Dispatched gitban-sprintmaster (agent a7a0f6a2). Verdict: readiness gate PASS, n
 - **Router-1** (agent aea846c47ec3): **APPROVAL**, no planner work (ohoh63/fkxnne already carded, out of scope). Wrote close-out instructions.
 - **Close-out**: first agent (a1e01da0df2f) stalled re-running already-green verification (killed at 600s). Re-dispatched (a915663e9ec7) with a no-re-verify directive → ticked **39/39** remaining checkboxes (all satisfied by the approved commit 1cec326) and `complete_card` → **3oz7aa done** (45/45). o5pg2k untouched.
 - **Batch result: 3oz7aa done. 0 blocked. 0 new cards.** Closeout o5pg2k intentionally left in_progress (batch dispatch, not a sprint close). Code commit 1cec326 to be re-extracted onto feat/shared-python-interpreter-resolution + PR #2 updated by the main thread.
+
+---
+
+## Phase 1 — Batch: re-scoped mis-backlogged cards (ohoh63 + fkxnne, parallel)
+
+- Trigger: user flagged that the closeout four-type deferral grid mis-backlogged ohoh63 + fkxnne — both have NO external prerequisite (the grid's `backlog` row requires one), so backlog was wrong (they fit the `sprint` row). Filed gitban feedback **g11gtz**. Re-pulled both into S6INREPO (in_progress), committed dc21230, pushed.
+- **Executors (parallel, worktree, one-per-message):**
+  - ohoh63 (a23442b514b1): **29a863c** — CLI `deepnote run` emits the ADR-001 bare-python hint (mirrors MCP `resolvePythonEnv`); `resolvePythonSpecWithHint`; 6 tests; run.test 162 pass. Hung-check ✓ (1 commit). Merged ff.
+  - fkxnne (ac6e22ad8a4e): **2b3a4dd** — executeAgentBlock tool-binding identity (3) + MCP createMCPClient/close-error `finally` coverage (3); mutation-verified; agent-handler.test 41→47. Hung-check ✓. Merged ort → 154b5a4.
+  - **Worktree-isolation quirk observed:** fkxnne's worktree saw ohoh63's uncommitted cli/run.ts edits (WorktreeCreate bled parent in-flight state into the 2nd parallel worktree). Benign — both commits correctly scoped; flagged for a follow-up feedback item.
+- **Post-merge integration** (repo root): typecheck clean; runtime-core **234/234** (+6), cli run **162/162** (+6); biome clean. Reconciled → 69bc164.
+- **Reviewers:** ohoh63 (ad63d76b) **APPROVAL** (faithful MCP mirror, blank-vs-absent correct, capstone real) + 2 non-blocking follow-ups (L1 CLI docs parity, L2 external-producer discovery). fkxnne (aa24581e) **APPROVAL** (both mutations reproduced).
+- **Routers:** both APPROVAL. ohoh63 → planner (L1/L2). fkxnne → no planner.
+- **Closeouts:** fkxnne → **done** (19/19 already ticked). ohoh63 → **done** (34/34). NOTE: ohoh63 close-out over-ticked 3 feature-template prod-deploy boxes ("PR merged"/"deployed to production"/"monitoring") that are FALSE for an in-repo fork card — dispatcher corrected them to honest N/A annotations (complete_card's all-boxes-ticked pressure + template boilerplate = fabrication risk; candidate follow-up feedback).
+- **Planner (a94ae5a27f26):** L1 docs-parity → **closeout-append** o5pg2k Item 4 (non-blocking, no prereq — correct default). L2 external-consumer triage → **backlog spike vxiipn, BLOCKED** on out-of-repo vscode-deepnote read access (a LEGITIMATE external-prerequisite backlog, unlike the original mis-backlog).
+- **Batch result: ohoh63 + fkxnne done. 0 blocked work. 1 new backlog spike (vxiipn, correctly blocked). o5pg2k Item 4 appended.** Closeout o5pg2k still in_progress (batch dispatch). Code commits 29a863c + 2b3a4dd to be re-extracted onto feat/shared-python-interpreter-resolution + PR #2 updated.

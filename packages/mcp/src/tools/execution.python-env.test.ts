@@ -7,14 +7,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // real Python-spawning engine so these tests never touch a real interpreter.
 // `selectPythonSpec` / `isBareSystemPython` / `detectDefaultPython` are kept REAL
 // so we exercise the shared precedence chain (arg > DEEPNOTE_PYTHON > autodetect).
-// We can't deterministically stub the autodetect branch — `selectPythonSpec`
-// calls `detectDefaultPython` via an intra-module reference, which a module mock
-// of the export wouldn't intercept — so the autodetect tests assert against the
-// host's real `detectDefaultPython()` value instead of a hardcoded literal.
+// `selectPythonSpec` calls `detectDefaultPython` via an intra-module reference, so
+// a module-export mock of `detectDefaultPython` would NOT intercept the autodetect
+// branch. Instead we mock `node:child_process.execSync` (the leaf the real
+// `detectDefaultPython` calls) so autodetect resolves deterministically to the
+// literal 'python'. The autodetect assertions then compare against that hardcoded
+// literal — NOT a value derived from the function under test — so a broken
+// autodetect wiring genuinely fails them.
 const mockConstructor = vi.fn()
 const mockStart = vi.fn().mockResolvedValue(undefined)
 const mockStop = vi.fn().mockResolvedValue(undefined)
 const mockRunProject = vi.fn()
+
+vi.mock('node:child_process', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:child_process')>()
+  return {
+    ...actual,
+    execSync: vi.fn((command: string) => {
+      if (command === 'python --version') {
+        return Buffer.from('Python 3.11.0')
+      }
+      throw new Error(`command not found: ${command}`)
+    }),
+  }
+})
 
 vi.mock('@deepnote/runtime-core', async importOriginal => {
   const actual = await importOriginal<typeof import('@deepnote/runtime-core')>()
@@ -33,11 +49,13 @@ vi.mock('@deepnote/runtime-core', async importOriginal => {
 
 const { handleExecutionTool } = await import('./execution')
 const { handleWritingTool } = await import('./writing')
-const { detectDefaultPython } = await import('@deepnote/runtime-core')
 
-// The bare system python the host autodetects to ('python' or 'python3'). It is a
-// bare command, so the bare-python hint must fire when it is the resolved spec.
-const AUTODETECTED_PYTHON = detectDefaultPython()
+// The deterministic autodetect result, fixed by the mocked execSync above (the host
+// is forced to report 'python' as available). Hardcoded so the autodetect assertions
+// are NOT a tautology against detectDefaultPython() itself — a wrong autodetect
+// wiring resolves to something else and fails the comparison. It is a bare command,
+// so the bare-python hint must fire when it is the resolved spec.
+const AUTODETECTED_PYTHON = 'python'
 
 function extractResult(response: { content: Array<{ type: string; text: string }> }): Record<string, unknown> {
   return JSON.parse(response.content[0].text)
@@ -112,6 +130,24 @@ describe('deepnote_run Python interpreter resolution', () => {
       expect(mockConstructor).toHaveBeenCalledWith(expect.objectContaining({ pythonEnv: AUTODETECTED_PYTHON }))
     })
 
+    it('resolves an empty pythonPath to the autodetect spec, not "" (capstone)', async () => {
+      // Empty string is valid per the zod `z.string().optional()` schema, so it can
+      // reach resolvePythonEnv. It must fall through to autodetect — NOT propagate ''
+      // to the engine (which would fail on an empty interpreter path). Fails on the
+      // pre-fix `??` semantics.
+      await handleExecutionTool('deepnote_run', { path: testNotebookPath, pythonPath: '' })
+
+      expect(mockConstructor).toHaveBeenCalledWith(expect.objectContaining({ pythonEnv: AUTODETECTED_PYTHON }))
+    })
+
+    it('resolves a blank DEEPNOTE_PYTHON to the autodetect spec, not "" (capstone)', async () => {
+      process.env.DEEPNOTE_PYTHON = ''
+
+      await handleExecutionTool('deepnote_run', { path: testNotebookPath })
+
+      expect(mockConstructor).toHaveBeenCalledWith(expect.objectContaining({ pythonEnv: AUTODETECTED_PYTHON }))
+    })
+
     it('passes the resolved spec for single-block runs too', async () => {
       const venvPython = '/opt/venvs/proj/bin/python'
       process.env.DEEPNOTE_PYTHON = venvPython
@@ -144,6 +180,33 @@ describe('deepnote_run Python interpreter resolution', () => {
       expect(result.pythonHint).toContain('system interpreter')
       expect(result.pythonHint).toContain('DEEPNOTE_PYTHON')
       expect(result.pythonHint).toContain('deepnote-toolkit')
+    })
+
+    it('FIRES the hint when pythonPath is empty and no other override is set (capstone)', async () => {
+      // An empty pythonPath is NOT a real override — it falls through to a bare
+      // autodetect spec, so the actionable hint must still surface. Asserting it
+      // fires here guards that the empties-as-absent fix did not accidentally
+      // classify '' as an override that suppresses the hint.
+      const response = (await handleExecutionTool('deepnote_run', {
+        path: testNotebookPath,
+        pythonPath: '',
+      })) as { content: Array<{ type: string; text: string }> }
+      const result = extractResult(response)
+
+      expect(typeof result.pythonHint).toBe('string')
+      expect(result.pythonHint).toContain('system interpreter')
+    })
+
+    it('FIRES the hint when DEEPNOTE_PYTHON is blank and no other override is set', async () => {
+      process.env.DEEPNOTE_PYTHON = ''
+
+      const response = (await handleExecutionTool('deepnote_run', { path: testNotebookPath })) as {
+        content: Array<{ type: string; text: string }>
+      }
+      const result = extractResult(response)
+
+      expect(typeof result.pythonHint).toBe('string')
+      expect(result.pythonHint).toContain('system interpreter')
     })
 
     it('does NOT fire the hint when pythonPath is an explicit override', async () => {

@@ -736,11 +736,20 @@ describe('executeAgentBlock', () => {
     })
 
     it('caps the loop at maxTurns=10 via stepCountIs (stopWhen wired to the agent)', async () => {
-      // `stepCountIs(10)` is the real helper (only ToolLoopAgent is mocked), so we
-      // assert it was constructed and handed to the agent as `stopWhen`. The cap
-      // value (10) is the confirmed-intentional default documented in the source.
+      // `stepCountIs(10)` is the real helper (only ToolLoopAgent is mocked): it returns
+      // a predicate `({ steps }) => steps.length === 10`. We assert the captured
+      // `stopWhen` actually fires at 10 steps and NOT at 9 — proving the cap VALUE is
+      // 10, not merely that some stop condition was wired. A regression to any other
+      // cap (or `toBeDefined`-only wiring) fails this.
       await executeAgentBlock(makeAgentBlock(), makeContext())
-      expect(agentMocks.captured.settings?.stopWhen).toBeDefined()
+
+      const stopWhen = agentMocks.captured.settings?.stopWhen as (arg: { steps: unknown[] }) => boolean
+      expect(typeof stopWhen).toBe('function')
+
+      const stepsOfLength = (n: number) => ({ steps: Array.from({ length: n }, () => ({})) })
+      expect(stopWhen(stepsOfLength(9))).toBe(false)
+      expect(stopWhen(stepsOfLength(10))).toBe(true)
+      expect(stopWhen(stepsOfLength(11))).toBe(false)
     })
   })
 })

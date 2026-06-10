@@ -294,6 +294,53 @@ describe('selectPythonSpec', () => {
 
     expect(result).toBe('python3')
   })
+
+  it('treats an empty explicit arg as absent and falls through to DEEPNOTE_PYTHON', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpec({ explicit: '' })
+
+    expect(result).toBe('/env/venv/bin/python')
+    // An empty explicit must not short-circuit to ''; it falls through the chain.
+    expect(mockExecSync).not.toHaveBeenCalled()
+  })
+
+  it('treats a whitespace-only explicit arg as absent and falls through to DEEPNOTE_PYTHON', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpec({ explicit: '   ' })
+
+    expect(result).toBe('/env/venv/bin/python')
+  })
+
+  it('treats a blank DEEPNOTE_PYTHON as absent and falls through to autodetect', () => {
+    mockExecSync.mockImplementation(() => Buffer.from('Python 3.11.0'))
+    process.env.DEEPNOTE_PYTHON = ''
+
+    const result = selectPythonSpec({})
+
+    // before fix: returns '' ; after fix: returns the autodetected spec
+    expect(result).toBe('python')
+    expect(mockExecSync).toHaveBeenCalledWith('python --version', { stdio: 'ignore' })
+  })
+
+  it('treats a whitespace-only DEEPNOTE_PYTHON as absent and falls through to autodetect', () => {
+    mockExecSync.mockImplementation(() => Buffer.from('Python 3.11.0'))
+    process.env.DEEPNOTE_PYTHON = '   '
+
+    const result = selectPythonSpec({})
+
+    expect(result).toBe('python')
+  })
+
+  it('falls through an empty explicit AND a blank DEEPNOTE_PYTHON to autodetect', () => {
+    mockExecSync.mockImplementation(() => Buffer.from('Python 3.11.0'))
+    process.env.DEEPNOTE_PYTHON = ''
+
+    const result = selectPythonSpec({ explicit: '' })
+
+    expect(result).toBe('python')
+  })
 })
 
 describe('buildPythonEnv', () => {

@@ -9,13 +9,13 @@ import { getBlockDependencies, getUpstreamBlocks } from '@deepnote/reactivity'
 import {
   type AgentStreamEvent,
   type BlockExecutionResult,
-  detectDefaultPython,
   ExecutionEngine,
   type ExecutionSummary,
   executableBlockTypeSet,
   type IOutput,
   type DeepnoteBlock as RuntimeDeepnoteBlock,
   resolvePythonExecutable,
+  selectPythonSpec,
 } from '@deepnote/runtime-core'
 import type { Command } from 'commander'
 import dotenv from 'dotenv'
@@ -293,7 +293,7 @@ async function setupProject(path: string | undefined, options: RunOptions): Prom
 
   dotenv.config({ path: join(workingDirectory, DEFAULT_ENV_FILE), quiet: true })
 
-  const pythonEnv = await resolvePythonExecutable(options.python ?? detectDefaultPython())
+  const pythonEnv = await resolvePythonExecutable(selectPythonSpec({ explicit: options.python }))
 
   const inputs = parseInputs(options.input)
 

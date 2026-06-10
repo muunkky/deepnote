@@ -21,7 +21,28 @@ let mockServerPort: number | null = 8888
 const mockGetBlockDependencies = vi.fn()
 const mockGetUpstreamBlocks = vi.fn()
 
-// Mock @deepnote/runtime-core before importing run
+// Mock node:child_process so the REAL selectPythonSpec's autodetect leaf
+// (detectDefaultPython, called intra-module via execSync) resolves deterministically
+// to 'python' without spawning a real interpreter. We deliberately do NOT mock
+// selectPythonSpec itself — the precedence regression this card guards must surface
+// here, so the CLI test exercises the genuine shared selector, not a reimplementation.
+vi.mock('node:child_process', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:child_process')>()
+  return {
+    ...actual,
+    execSync: vi.fn((command: string) => {
+      if (command === 'python --version') {
+        return Buffer.from('Python 3.11.0')
+      }
+      throw new Error(`command not found: ${command}`)
+    }),
+  }
+})
+
+// Mock @deepnote/runtime-core before importing run. ExecutionEngine and
+// resolvePythonExecutable are stubbed (no real server / filesystem probe), but
+// selectPythonSpec + detectDefaultPython are kept REAL so the precedence chain
+// (arg > DEEPNOTE_PYTHON > autodetect) is genuinely exercised here.
 vi.mock('@deepnote/runtime-core', async importOriginal => {
   const actual = await importOriginal<typeof import('@deepnote/runtime-core')>()
   return {
@@ -40,12 +61,6 @@ vi.mock('@deepnote/runtime-core', async importOriginal => {
         mockConstructor(config)
       }
     },
-    detectDefaultPython: () => 'python',
-    // Mirror the real selectPythonSpec precedence (arg > DEEPNOTE_PYTHON > autodetect)
-    // but route the autodetect tail through the mocked detectDefaultPython above so the
-    // CLI wiring is tested deterministically without spawning a real interpreter. The
-    // precedence logic itself is unit-tested in @deepnote/runtime-core (step 2A).
-    selectPythonSpec: ({ explicit }: { explicit?: string } = {}) => explicit ?? process.env.DEEPNOTE_PYTHON ?? 'python',
     resolvePythonExecutable: (pythonPath: string) => Promise.resolve(pythonPath),
   }
 })
@@ -1721,8 +1736,8 @@ describe('run command', () => {
       it('falls back to autodetect when neither --python nor DEEPNOTE_PYTHON is set', async () => {
         setupSuccessfulRun()
         // undefined deletes the var (vitest), matching the real "DEEPNOTE_PYTHON unset"
-        // case. An empty string would be a present value that selectPythonSpec's ??
-        // chain treats as the selected spec — not the autodetect fallback.
+        // case. The real selectPythonSpec's autodetect leaf is driven by the mocked
+        // execSync above, which resolves to 'python'.
         vi.stubEnv('DEEPNOTE_PYTHON', undefined)
 
         await action(HELLO_WORLD_FILE, {})
@@ -1741,6 +1756,21 @@ describe('run command', () => {
 
         expect(mockConstructor).toHaveBeenCalledWith({
           pythonEnv: '/flag/venv/bin/python',
+          workingDirectory: expect.any(String),
+        })
+      })
+
+      it('treats a blank DEEPNOTE_PYTHON as absent and falls through to autodetect', async () => {
+        setupSuccessfulRun()
+        // A blank env value must fall through the precedence chain exactly as an
+        // absent one does — not propagate '' to the engine. With the REAL selector
+        // wired here, this fails on the pre-fix `??` semantics.
+        vi.stubEnv('DEEPNOTE_PYTHON', '')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: 'python',
           workingDirectory: expect.any(String),
         })
       })

@@ -103,14 +103,21 @@ function getErrorCode(error: unknown): string | undefined {
  *
  * Returns the selected `spec` plus an optional actionable `hint`. The hint fires
  * ONLY when the resolved spec is a bare system interpreter (`isBareSystemPython`)
- * AND the caller gave no override — neither the `pythonPath` argument nor the
- * `DEEPNOTE_PYTHON` env var. A bare system interpreter typically lacks
+ * AND the caller gave no real override — neither a non-blank `pythonPath` argument
+ * nor a non-blank `DEEPNOTE_PYTHON` env var (a blank value is not an override; it
+ * falls through to autodetect just like an absent one). A bare system interpreter
+ * typically lacks
  * `deepnote-toolkit`, so without this hint the failure would surface as an opaque
  * import error deep inside execution rather than at the tool boundary.
  */
 function resolvePythonEnv(pythonPath: string | undefined): { spec: string; hint?: string } {
   const spec = selectPythonSpec({ explicit: pythonPath })
-  const hasOverride = pythonPath != null || process.env.DEEPNOTE_PYTHON != null
+  // An override only counts if it is a real (non-blank) signal. A blank `pythonPath`
+  // or `DEEPNOTE_PYTHON=` falls through to autodetect in selectPythonSpec, so it must
+  // NOT suppress the bare-python hint — otherwise an empty signal would both resolve
+  // to a bare interpreter AND silence the warning that it likely lacks the toolkit.
+  const isRealOverride = (value: string | undefined): boolean => value != null && value.trim().length > 0
+  const hasOverride = isRealOverride(pythonPath) || isRealOverride(process.env.DEEPNOTE_PYTHON)
   if (isBareSystemPython(spec) && !hasOverride) {
     return {
       spec,

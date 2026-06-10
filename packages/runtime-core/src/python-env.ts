@@ -133,6 +133,12 @@ export function detectDefaultPython(): string {
  *      server or CLI.
  *   3. {@link detectDefaultPython} — the autodetect fallback (matches today's CLI).
  *
+ * An empty or whitespace-only signal at any tier is treated as **absent**, not as a
+ * present value: it falls through to the next tier exactly as `undefined` would. (A
+ * plain `??` chain would instead pass `""` straight through to the engine, which then
+ * fails on an empty interpreter path — the regression this guards against.) So a blank
+ * `explicit` arg or a blank `DEEPNOTE_PYTHON=` resolves to autodetect, never to `""`.
+ *
  * Both the CLI and the MCP server call this so they can never disagree on which
  * interpreter to run against.
  *
@@ -152,7 +158,20 @@ export function detectDefaultPython(): string {
  *   `DEEPNOTE_PYTHON` is set, and neither `python` nor `python3` is found.
  */
 export function selectPythonSpec({ explicit }: { explicit?: string } = {}): string {
-  return explicit ?? process.env.DEEPNOTE_PYTHON ?? detectDefaultPython()
+  return firstNonBlank(explicit) ?? firstNonBlank(process.env.DEEPNOTE_PYTHON) ?? detectDefaultPython()
+}
+
+/**
+ * Normalises an interpreter signal: returns the value unchanged when it carries a
+ * real spec, or `undefined` when it is absent, empty, or whitespace-only — so an
+ * empty/blank signal falls through the precedence chain instead of being treated
+ * as a present value.
+ */
+function firstNonBlank(value: string | undefined): string | undefined {
+  if (value == null || value.trim().length === 0) {
+    return undefined
+  }
+  return value
 }
 
 /**

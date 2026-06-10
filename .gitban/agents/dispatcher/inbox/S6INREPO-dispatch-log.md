@@ -88,3 +88,20 @@ Dispatched gitban-sprintmaster (agent a7a0f6a2). Verdict: readiness gate PASS, n
 - **3B pv4px0** ✓ (agent a9a9355ed9f6, ~28m): 3 commits (74346de test, 3283ab4 feat, de31e4a style) — run.ts:296 now `resolvePythonExecutable(selectPythonSpec({explicit: options.python}))`, dropped unused detectDefaultPython import; 4 new precedence tests + hermetic beforeEach (`delete process.env.DEEPNOTE_PYTHON`). Verified: run.test 155/155, runtime-core selector 38/38, root tsc clean, biome clean. Honest notes: parity is structural (shared selector), dotenv feeds CLI selector (ADR-001 contract), tests are mock-level not E2E. Hung-check: 3 commits ✓. Merged (ort) → 64c1ac8. Worktree/branch/tag cleaned. Card reconcile → 888f099.
 - **Post-merge integration test (batch barrier):** `npx vitest run packages/mcp packages/cli` from repo root → 196 passed, **1 failed**: `cli/lint.test.ts > reports no issues for hello world file` (empty output). **DIAGNOSED PRE-EXISTING, NOT a regression** — verified by running lint.test.ts at base 41f055d (pre-sprint) in a throwaway worktree: fails identically (1 failed | 1 passed). lint.ts imports only unchanged modules; my batch touched zero files in lint's dependency chain (lint.ts/examples/constants/output all unchanged). My changed packages are green: runtime-core 223/223, mcp 88/88, cli run.test 155/155. The pre-existing lint failure is environmental (CWD/build-artifact dependent) and out of s6 scope; it will not ride into the clean feat/\* code PR (cut from upstream/main). Logged honestly rather than masked.
 - Dispatching reviewers: 3A mjporx (commit 853205f), 3B pv4px0 (commit de31e4a).
+
+### Batch 2 — reviews / routing / closeout
+
+- **3A mjporx reviewer-1** (agent a8fd221f): **APPROVAL**. Gate 1+2 PASS — precedence matches ADR, both literals gone (DRY resolvePythonEnv helper), pythonHint distinct field, 9/9 + full mcp 88/88, tsc/biome clean, dependency c723e41 confirmed ancestor. Non-actionable L1 (empty-string pythonPath, ADR-sanctioned on onwhhg).
+- **3B pv4px0 reviewer-1** (agent af304d84): **APPROVAL**. Gate 1+2 PASS — genuine TDD red (74346de), mock fidelity verified, 155/155 hermetic, tsc clean, no dead code. Non-blocking L1 adr-consumer-gap (CLI lacks bare-python hint that MCP has).
+- **Routers**: mjporx → APPROVAL, no planner. pv4px0 → APPROVAL + planner (L1 CLI-hint).
+- **Closeouts**: mjporx → **done** (39/39: out-of-scope deploy/monitor/PR deferred to sjwaox/o5pg2k via sanctioned mechanism — no fabrication). pv4px0 → **done** (36/36; deferred to o5pg2k).
+- **Planner (pv4px0 L1)** (agent a7cf53f1): dedup → MCP half already covered by mjporx; CLI half genuinely open → **closeout-append Item 3** to o5pg2k (non-blocking, in-repo, no dep). NO new sprint card.
+- Cleanup: removed stray `packages/runtime-core/.gitban/` cruft (executor audit-log misplaced from wrong cwd; untracked, hook didn't guard non-root .gitban).
+- **Batch 2 result: 4/7 done (+ mjporx, pv4px0). 0 blocked. 0 new cards. 1 retro item (Item 3) appended.** Reconciled → 3e0b1b6.
+
+---
+
+## Phase 1 — Batch 3: step 4 sjwaox (runtime-core version bump + CHANGELOG; depends 2B, serialized post-batch-2 for lockfile safety)
+
+- Step 0a: sjwaox → in_progress ✓. Step 0b: pushed origin/sprint/S6INREPO @ 3e0b1b6.
+- Executor dispatched: 4 sjwaox → agent a31c9fdb4504 (watchdog bg bysk3ngxp, stale 300s). Awaiting completion. (Bumps @deepnote/runtime-core past 0.3.0 + adds CHANGELOG documenting agent helpers + new selectPythonSpec/isBareSystemPython exports; publish is EXTERNAL/out-of-scope.)

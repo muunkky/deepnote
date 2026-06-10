@@ -162,3 +162,11 @@ Step 3A (MCP, card `mjporx`) is still `todo`, so there is no MCP call-site to di
 
 - `74346de` test(cli): add failing DEEPNOTE_PYTHON precedence tests for deepnote run
 - `3283ab4` feat(cli): resolve deepnote run interpreter via shared selectPythonSpec
+
+## Router Log (review cycle 1)
+
+- **Verdict:** APPROVAL (Gate 1 PASS, Gate 2 PASS) at commit `de31e4a`.
+- **Review report:** `.gitban/agents/reviewer/inbox/S6INREPO-pv4px0-reviewer-1.md`
+- **Routed to executor:** `.gitban/agents/executor/inbox/S6INREPO-pv4px0-executor-1.md` — close-out the card (flip "Code Review Approved", complete + validate). No PR (card is in sprint S6INREPO; dispatcher owns sprint-level PR).
+- **Routed to planner:** `.gitban/agents/planner/inbox/S6INREPO-pv4px0-planner-1.md` — 1 non-blocking follow-up:
+  - **L1 (adr-consumer-gap):** ADR-001 bare-system-python actionable hint must land on a deepnote-run consumer. Out of scope for pv4px0 ("Scope decided; do not re-architect"). Strong dedup signal: likely already covered by in-progress card `mjporx` (step-3a-mcp-deepnote-run-env-resolution-bare-python-hint); planner to confirm before creating any new card.

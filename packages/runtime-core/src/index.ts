@@ -11,7 +11,13 @@ export type { ExecutionOptions } from './execution-engine'
 export { ExecutionEngine, executableBlockTypeSet, executableBlockTypes } from './execution-engine'
 export type { ExecutionCallbacks, ExecutionResult } from './kernel-client'
 export { createJsonWebSocketFactory, KernelClient } from './kernel-client'
-export { buildPythonEnv, detectDefaultPython, resolvePythonExecutable } from './python-env'
+export {
+  buildPythonEnv,
+  detectDefaultPython,
+  isBareSystemPython,
+  resolvePythonExecutable,
+  selectPythonSpec,
+} from './python-env'
 export type { ServerInfo, ServerOptions } from './server-starter'
 export { findConsecutiveAvailablePorts, startServer, stopServer, waitForServer } from './server-starter'
 export type { BlockExecutionResult, ExecutionSummary, RuntimeConfig } from './types'

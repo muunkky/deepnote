@@ -123,6 +123,39 @@ export function detectDefaultPython(): string {
 }
 
 /**
+ * Selects the Python interpreter *spec* to use, applying the shared precedence
+ * chain from ADR-001:
+ *
+ *   1. `explicit` — a per-invocation caller argument (CLI `--python`, MCP
+ *      `deepnote_run` `pythonPath`). Most specific signal, so it wins.
+ *   2. `process.env.DEEPNOTE_PYTHON` — the public interop contract by which an
+ *      editor/host publishes the user-selected interpreter when it spawns the
+ *      server or CLI.
+ *   3. {@link detectDefaultPython} — the autodetect fallback (matches today's CLI).
+ *
+ * Both the CLI and the MCP server call this so they can never disagree on which
+ * interpreter to run against.
+ *
+ * The returned value is a spec **string** (executable path, `bin/` directory, or
+ * venv root) — it is NOT a built spawn environment. Turning the spec into a
+ * concrete executable plus `PATH`/`VIRTUAL_ENV` happens inside the
+ * `ExecutionEngine` (`server-starter.ts` calls `resolvePythonExecutable` then
+ * `buildPythonEnv`), so callers get an identically-built environment for free
+ * simply by passing this spec as `RuntimeConfig.pythonEnv`.
+ *
+ * Keep this a pure precedence selector with no assembly; it is trivially
+ * unit-testable.
+ *
+ * @param options.explicit - The explicit caller-supplied spec, if any.
+ * @returns The selected Python interpreter spec string.
+ * @throws Error from {@link detectDefaultPython} if no spec is supplied, no
+ *   `DEEPNOTE_PYTHON` is set, and neither `python` nor `python3` is found.
+ */
+export function selectPythonSpec({ explicit }: { explicit?: string } = {}): string {
+  return explicit ?? process.env.DEEPNOTE_PYTHON ?? detectDefaultPython()
+}
+
+/**
  * Checks if the given string is a bare system Python command (e.g. 'python', 'python3', 'python3.11')
  * as opposed to an absolute/relative path to a Python executable.
  */

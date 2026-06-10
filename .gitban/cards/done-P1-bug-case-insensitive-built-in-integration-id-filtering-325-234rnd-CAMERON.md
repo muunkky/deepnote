@@ -329,3 +329,12 @@ Structured bug card. Sections, checkboxes, and tables preserved per template; de
 - **PR:** Draft [deepnote/deepnote#399](https://github.com/deepnote/deepnote/pull/399) — `Closes #325`, branch `fix/case-insensitive-builtin-integration-ids`, 6 cli-only files, no `.gitban`/`.claude`.
 - **Follow-up:** Out-of-scope external-ID case-insensitivity captured as backlog card `ca0ios`.
 - **Deferred checkboxes:** staging/production deploy + monitoring are checked-and-annotated as deferred because this is a fork contribution whose deploy is owned by upstream maintainers.
+
+
+## Post-review remediation (PR #399 review)
+
+CodeRabbit's review of PR #399 found a real regression this card's own review missed: `analysis.ts` cast `metadata.sql_integration_id as string | undefined`, so a truthy **non-string** id would reach `isBuiltinIntegration()` and crash on `.toLowerCase()` (the old `Set.has()` returned `false` for non-strings without throwing). Fixed in commit `0d7c471` — guard the type at the call site (mirroring the zod parse in `collect-integrations.ts`) + regression test `does not crash on a non-string sql_integration_id`. `analysis.test.ts` now 18/18, tsc + biome clean.
+
+Two low-severity self-review notes posted on the PR and resolved: (2) external-ID case-sensitivity asymmetry — pre-existing, deferred out of scope, tracked in `ca0ios`; (3) test-fixture duplication — kept as small per-file fixtures.
+
+CI status: CodeRabbit status check green; GitHub Actions workflows are `action_required` (fork PRs require a maintainer to approve runs — not actionable with read-only upstream access).

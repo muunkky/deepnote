@@ -73,3 +73,16 @@ Dispatched gitban-sprintmaster (agent a7a0f6a2). Verdict: readiness gate PASS, n
 ---
 
 ## Phase 1 — Batch 2 (parallel): 3A mjporx + 3B pv4px0 (depend on 2A, now merged)
+
+- Batch 1 reconciled → 0fa3876. Pushed origin/sprint/S6INREPO @ 0fa3876.
+- Step 0a: mjporx → in_progress ✓, pv4px0 → in_progress ✓.
+- Step 0b: pushed sprint branch (--no-verify, board branch) @ 0fa3876.
+- Executors dispatched (background, worktree, one-per-message):
+  - 3A mjporx → agent ac21b326b6ff (watchdog bg baf0hkyab, stale 300s)
+  - 3B pv4px0 → agent a9a9355ed9f6 (watchdog bg buv6q2nme, stale 300s)
+  - Awaiting completions. (3A consumes selectPythonSpec+isBareSystemPython in MCP execution.ts + hint + README + docs/local-setup.md; 3B converges CLI run.ts on the shared selector.)
+
+### Batch 2 — executor results
+
+- **3A mjporx** ✓ (agent ac21b326b6ff, ~13m): 1 commit 853205f — execution.ts both call sites route through resolvePythonEnv→selectPythonSpec (literals `pythonPath || 'python'` grep-verified gone); bare-python hint as distinct `pythonHint` field (fires only when isBareSystemPython && no override); 9 new tests (execution.python-env.test.ts) + DEEPNOTE_PYTHON docs in mcp/README.md + docs/local-setup.md. Verified: 9/9 new, 88/88 full mcp suite, tsc/biome/prettier/cspell clean. Note: selectPythonSpec calls detectDefaultPython via intra-module ref (module-mock can't intercept) — autodetect tests assert real value. Hung-check: 1 commit ✓. Merged ff → 853205f. Worktree/branch/tag cleaned.
+- **3B pv4px0**: still running. Holding batch-2 integration test + card reconcile + reviews until it merges (clean batch barrier; mcp vs cli disjoint).

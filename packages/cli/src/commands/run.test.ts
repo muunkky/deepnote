@@ -1776,6 +1776,76 @@ describe('run command', () => {
       })
     })
 
+    describe('bare-system-python hint (ADR-001 parity with MCP consumer)', () => {
+      // ADR-001: every deepnote-run consumer must surface an actionable hint when
+      // interpreter resolution lands on a bare system `python` with no real override.
+      // The CLI half mirrors the MCP consumer's wording (card mjporx); the hint fires
+      // ONLY on bare autodetect with neither --python nor DEEPNOTE_PYTHON set. A blank
+      // signal at either tier is not an override — it falls through to autodetect, so it
+      // must NOT suppress the hint.
+      const HINT_FRAGMENT = 'likely lacks deepnote-toolkit'
+
+      it('logs the hint when resolution lands on bare system python with no override', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(getOutput(consoleLogSpy)).toContain(HINT_FRAGMENT)
+        expect(getOutput(consoleLogSpy)).toContain('DEEPNOTE_PYTHON')
+        expect(getOutput(consoleLogSpy)).toContain('--python')
+        expect(getOutput(consoleLogSpy)).toContain('deepnote-toolkit[server]')
+      })
+
+      it('does NOT log the hint when --python override is provided', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, { python: '/flag/venv/bin/python' })
+
+        expect(getOutput(consoleLogSpy)).not.toContain(HINT_FRAGMENT)
+      })
+
+      it('does NOT log the hint when DEEPNOTE_PYTHON override is set', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', '/env/venv/bin/python')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(getOutput(consoleLogSpy)).not.toContain(HINT_FRAGMENT)
+      })
+
+      it('logs the hint when DEEPNOTE_PYTHON is blank (blank is not an override)', async () => {
+        setupSuccessfulRun()
+        // Blank env falls through to autodetect → bare python, so the hint must fire.
+        vi.stubEnv('DEEPNOTE_PYTHON', '')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(getOutput(consoleLogSpy)).toContain(HINT_FRAGMENT)
+      })
+
+      it('does NOT log the hint when a non-bare interpreter is resolved via --python', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        // A path (not a bare `python`/`python3`) is non-bare even though it is also an override.
+        await action(HELLO_WORLD_FILE, { python: '/path/to/venv' })
+
+        expect(getOutput(consoleLogSpy)).not.toContain(HINT_FRAGMENT)
+      })
+
+      it('does NOT log the hint in machine-output mode', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+
+        // Machine output must stay clean JSON — the hint is a human-only status line.
+        expect(getOutput(consoleLogSpy)).not.toContain(HINT_FRAGMENT)
+      })
+    })
+
     describe('--input flag', () => {
       it('passes inputs to runFile', async () => {
         setupSuccessfulRun()

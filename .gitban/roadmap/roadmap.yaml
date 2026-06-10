@@ -742,6 +742,7 @@ milestones:
                 notes: 'PRs #342, #369, #370; #340 (removed agent block from reactivity)'
                 depends_on:
                   - m1/s5/runtime-core-package
+        docs_ref: docs/prds/PRD-001-ai-agent-notebook-authoring.md
       s7:
         id: s7
         title: Users can self-serve through comprehensive product and developer

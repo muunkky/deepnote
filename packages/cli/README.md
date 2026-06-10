@@ -188,6 +188,33 @@ OPENAI_API_KEY=sk-... deepnote run my-project.deepnote --prompt "Analyze the sal
 OPENAI_API_KEY=sk-... deepnote run --prompt "Write a hello world script"
 ```
 
+#### Selecting the Python interpreter
+
+`deepnote run` needs a Python interpreter with `deepnote-toolkit[server]` installed.
+It resolves which interpreter to use with this precedence (most specific wins):
+
+1. The `--python` argument (per-invocation override).
+2. The **`DEEPNOTE_PYTHON`** environment variable.
+3. Autodetected system Python (`python`, then `python3`).
+
+`--python` (and `DEEPNOTE_PYTHON`) accept any of these forms:
+
+| Form       | Example                    |
+| ---------- | -------------------------- |
+| Executable | `/path/to/venv/bin/python` |
+| `bin/` dir | `/path/to/venv/bin`        |
+| Venv root  | `/path/to/venv`            |
+
+This mirrors the MCP server's `DEEPNOTE_PYTHON` resolution, so an editor/host can
+publish the user's selected interpreter to both the CLI and the MCP server.
+
+If neither `--python` nor `DEEPNOTE_PYTHON` is provided and only a bare system
+interpreter (e.g. `python` / `python3`) is found, `deepnote run` still attempts the
+run but prints an actionable hint to set `DEEPNOTE_PYTHON` or pass a venv with
+`deepnote-toolkit[server]` — a bare system Python usually lacks the toolkit, so
+this surfaces the problem up front instead of as an opaque import error deep in
+execution.
+
 #### Agent Block (`--prompt` and agent blocks)
 
 The `--prompt` flag appends an agent block to the notebook (or creates one from scratch) and runs it. The agent can read prior block outputs, execute Python code, and add new blocks to the notebook autonomously.

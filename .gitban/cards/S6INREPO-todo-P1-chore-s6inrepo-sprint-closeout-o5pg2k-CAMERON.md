@@ -166,3 +166,42 @@ rather than a sprint card.
 
 - [ ] Item 2 classified (exactly one deferral type marked `true` above)
 - [ ] Item 2 actioned (action taken matches chosen type)
+
+### Item 3: Emit the ADR-001 bare-system-python hint on the CLI `deepnote run` consumer
+
+ADR-001 requires every deepnote-run consumer to surface an actionable bare-system-python hint
+("set `DEEPNOTE_PYTHON` or pass a venv with deepnote-toolkit[server]") when interpreter resolution
+lands on bare `python`, detected via `isBareSystemPython` from `@deepnote/runtime-core`. The MCP
+half of this obligation is already shipped: card `mjporx` (step 3A) added the hint at the
+`deepnote_run` tool boundary as a `pythonHint` field on both call sites in
+`packages/mcp/src/tools/execution.ts`, gated on `isBareSystemPython(spec) && no override` — that
+portion is fully covered and is NOT what this item tracks. The genuinely-open residual is the CLI:
+`packages/cli/src/commands/run.ts:296` resolves through `selectPythonSpec` (precedence convergence,
+the scope of card `pv4px0`, which was deliberately precedence-only) but never calls
+`isBareSystemPython` and emits no hint — `run.ts` imports `selectPythonSpec` but not
+`isBareSystemPython`. Failure mode if never built: a user with no venv and no `DEEPNOTE_PYTHON`
+running `deepnote run` still gets the opaque mid-run toolkit-import failure ADR-001 set out to
+eliminate, even though the parallel MCP path now warns them. This is additive, in-repo work with no
+external prerequisite (`isBareSystemPython` is already exported and the CLI already resolves the
+spec at the same call site), and it does not block any remaining S6INREPO card: step 4 (`sjwaox`,
+runtime-core version bump + CHANGELOG) and the closeout do not depend on the CLI emitting a hint.
+Captured here for closeout triage — the closeout agent decides whether to promote it to a card
+(this sprint or next) or defer, with full sprint context. Suggested shape if promoted: import
+`isBareSystemPython`, compute the spec once, and when it is bare with no `--python`/`DEEPNOTE_PYTHON`
+override, log the same actionable hint the MCP consumer returns (mirror the `mjporx` text for
+cross-consumer parity); add a vitest precedence-style test asserting the hint fires only on bare
+autodetect with no override.
+
+| Deferral Type   | Description                                                                                                                              | Applies (true/false) |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| backlog         | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. |                      |
+| sprint          | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag.                                            |                      |
+| note-only       | Captured for record; no action; current output is fine as-is.                                                                            |                      |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment).       |                      |
+
+**Source:** pv4px0 review 1
+**Files touched:** packages/cli/src/commands/run.ts, packages/runtime-core/src/python-env.ts (isBareSystemPython consumer), packages/cli/src/commands/run.test.ts
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 3 classified (exactly one deferral type marked `true` above)
+- [ ] Item 3 actioned (action taken matches chosen type)

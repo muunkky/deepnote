@@ -158,7 +158,7 @@ First, identify what was deferred or left incomplete during the main feature wor
 - [x] All tests are passing (unit, integration, and regression).
 - [x] No new linter warnings or errors introduced.
 - [x] All documentation updates are complete and reviewed.
-- [ ] Code changes (if any) are reviewed and merged.
+- [x] Code changes (if any) are reviewed and merged.
 - [x] Follow-up tickets are created and prioritized for next sprint.
 - [x] Team retrospective includes discussion of cleanup backlog (if significant).
 
@@ -201,3 +201,13 @@ Explicitly NOT performed — maintainer-only (`NPM_TOKEN`), external/out-of-scop
 - **package.json sort:** `sort-package-json --check` → already sorted.
 
 No work deferred; no follow-up cards created. The single open Completion-Checklist box ("Code changes reviewed and merged") is the reviewer's gate, intentionally left for cycle close-out.
+
+## Review log (router, cycle 1)
+
+- **Verdict:** APPROVAL (commit `ed13053`)
+- **Review report:** `.gitban/agents/reviewer/inbox/S6INREPO-sjwaox-reviewer-1.md`
+- **Gate 1 (completion claim):** PASS — documentation/config-bump exempt category; checkboxes concrete and verifiable.
+- **Gate 2 (implementation quality):** PASS — version bump to `0.4.0` verified, public-vs-internal helper split documented accurately, CHANGELOG references resolve to real artifacts, no lazy solves/secrets/IaC gaps.
+- **Blockers:** None.
+- **Non-blocking follow-up:** None. The public-vs-internal helper discrepancy the executor surfaced is pre-existing package shape, now accurately documented — not a defect and not adjacent debt worsened by this diff.
+- **Routing:** Executor instructed to close out the card. No planner routing required (no follow-up items). Instructions at `.gitban/agents/executor/inbox/S6INREPO-sjwaox-executor-1.md`.

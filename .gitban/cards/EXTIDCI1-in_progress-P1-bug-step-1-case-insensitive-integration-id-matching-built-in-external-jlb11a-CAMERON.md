@@ -295,3 +295,18 @@ it('capstone: collects a mixed-case external integration once, first-seen casing
 ### Note on validation
 
 Structured bug card; deploy/monitoring/IaC items checked-and-annotated as deferred (fork contribution).
+
+## ⚠️ COMPLETE-FIX SCOPE (authoritative — supersedes the external-only framing above)
+
+This card delivers the **entire** #325 fix as one coherent change on a fresh branch off `upstream/main` — NOT just the external part. Build all three parts together with tests:
+
+**Part 1 — built-in IDs case-insensitive.** In `packages/cli/src/constants.ts`, add an exported, JSDoc'd `isBuiltinIntegration(integrationId: string): boolean` returning `BUILTIN_INTEGRATIONS.has(integrationId.toLowerCase())` (the Set holds canonical lowercase IDs). Route both call sites through it: `collect-integrations.ts` (`!isBuiltinIntegration(...)`) and `analysis.ts` `checkMissingIntegrations` (`isBuiltinIntegration(...)`). Mirrors the lowercase convention in `integrations/fetch-and-merge-integrations.ts:23-24`.
+
+**Part 2 — guard non-string IDs (robustness).** In `analysis.ts checkMissingIntegrations`, `metadata.sql_integration_id` is untrusted `unknown`. Do NOT cast `as string`. Use a `typeof rawId === 'string' ? rawId : undefined` guard so a non-string value is ignored, never reaching `.toLowerCase()` (which would throw). `collect-integrations.ts` already parses via `z.string().optional()` — keep that safe pattern.
+
+**Part 3 — external IDs case-insensitive, first-seen casing preserved.** `collectRequiredIntegrationIds` must dedup the required IDs case-insensitively while keeping the first-seen original casing (e.g. `Map<lowercased, original>`, return `Array.from(map.values())`). `checkMissingIntegrations` must key its `configured`/`missing`/`usage` collections by lowercased id while displaying the first-seen original casing, so `summary.missing`/`summary.configured` carry exactly one representative per integration.
+
+**Combined capstone (the only DoD capstone that matters now — supersedes the external-only one above):**
+- [ ] Given a project with three SQL blocks — `sql_integration_id: "Pandas-DataFrame"` (built-in, mixed case), `"My-Warehouse"` and `"my-warehouse"` (same external integration, `SQL_MY_WAREHOUSE` unset) — `collectRequiredIntegrationIds` returns exactly `["My-Warehouse"]` (built-in filtered out; external deduped to first-seen casing), and `deepnote lint`'s `missing` summary is exactly `["My-Warehouse"]` (one entry, not two, and not the built-in).
+
+**Tests (vitest, behavior-asserting):** cover all three parts plus the combined capstone in `constants.test.ts`, `collect-integrations.test.ts`, `analysis.test.ts`. `analysis.test.ts` needs Python+jinja2 — prepend `/tmp/dn-venv/bin` to PATH before `pnpm --filter @deepnote/cli test`. Also pass `pnpm typecheck` and `pnpm lintAndFormat`. Commit ONLY `packages/cli/` changes; never stage `.gitban/`/`.claude/`.

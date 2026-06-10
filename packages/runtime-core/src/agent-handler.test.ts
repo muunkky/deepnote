@@ -52,6 +52,46 @@ const agentMocks = vi.hoisted(() => {
   return { cassette, captured, FakeToolLoopAgent }
 })
 
+// --- Fake MCP client registry for the executeAgentBlock MCP lifecycle ------
+//
+// `executeAgentBlock` hard-imports `createMCPClient` from '@ai-sdk/mcp' and
+// `Experimental_StdioMCPTransport` from '@ai-sdk/mcp/mcp-stdio', then for each
+// merged server config does `createMCPClient({ transport })`, `client.tools()`,
+// and in the `finally` `client.close()`. To drive the client-instantiation path
+// and the close-error `finally` branch (card-1yecdf tests only used
+// `mcpServers: []`), we mock both modules. The transport is an inert stub; the
+// client factory pops the next fake client off a FIFO queue the test fills, so a
+// test can hand executeAgentBlock a mix of healthy and `.close()`-rejecting
+// clients and assert per-client close behavior.
+const mcpMocks = vi.hoisted(() => {
+  interface FakeMcpClient {
+    tools: ReturnType<typeof vi.fn>
+    close: ReturnType<typeof vi.fn>
+  }
+  // FIFO queue of clients to hand out, one per createMCPClient call (i.e. per
+  // merged server config, in order). Filled per-test in beforeEach/each test.
+  const clientQueue: FakeMcpClient[] = []
+  // Records the transport-construction args so a test can assert the stdio
+  // transport is wired from the resolved server config if it ever needs to.
+  const transportArgs: unknown[] = []
+
+  const createMCPClient = vi.fn(async (_opts: unknown) => {
+    const client = clientQueue.shift()
+    if (client == null) {
+      throw new Error('mcpMocks: createMCPClient called more times than clients were queued')
+    }
+    return client
+  })
+
+  class FakeStdioMCPTransport {
+    constructor(opts: unknown) {
+      transportArgs.push(opts)
+    }
+  }
+
+  return { clientQueue, transportArgs, createMCPClient, FakeStdioMCPTransport }
+})
+
 vi.mock('ai', async importOriginal => {
   const actual = await importOriginal<typeof import('ai')>()
   return {
@@ -72,6 +112,16 @@ vi.mock('@ai-sdk/openai', () => {
     createOpenAI: () => openai,
   }
 })
+
+// Stub the MCP client factory so executeAgentBlock's client-instantiation +
+// close `finally` branch run against fakes (no child process spawned).
+vi.mock('@ai-sdk/mcp', () => ({
+  createMCPClient: mcpMocks.createMCPClient,
+}))
+
+vi.mock('@ai-sdk/mcp/mcp-stdio', () => ({
+  Experimental_StdioMCPTransport: mcpMocks.FakeStdioMCPTransport,
+}))
 
 describe('resolveEnvVars', () => {
   let prevTestHost: string | undefined
@@ -611,6 +661,10 @@ describe('executeAgentBlock', () => {
     agentMocks.cassette.fullStream = []
     agentMocks.cassette.text = ''
     agentMocks.captured.settings = null
+    // Reset MCP fake-client state between tests.
+    mcpMocks.clientQueue.length = 0
+    mcpMocks.transportArgs.length = 0
+    mcpMocks.createMCPClient.mockClear()
   })
 
   afterEach(() => {
@@ -750,6 +804,135 @@ describe('executeAgentBlock', () => {
       expect(stopWhen(stepsOfLength(9))).toBe(false)
       expect(stopWhen(stepsOfLength(10))).toBe(true)
       expect(stopWhen(stepsOfLength(11))).toBe(false)
+    })
+  })
+
+  // Scenario: tool-binding identity (retro Item 1 / card fkxnne) ------------
+  //
+  // The fake ToolLoopAgent replays recorded `tool-result` parts; it never
+  // invokes the registered tools' `execute`. So the `makeContext` callbacks are
+  // never called and a swapped/dropped `execute` binding would slip through.
+  // These tests close that gap by asserting on the tool objects the production
+  // code passed to `new ToolLoopAgent(...)`: the real `tool()` helper is
+  // preserved (only ToolLoopAgent is mocked), so `captured.settings.tools[name]`
+  // is the real wrapped tool and its `.execute` is the exact context callback.
+  describe('agent-tool execute bindings', () => {
+    interface WrappedTool {
+      execute?: unknown
+    }
+
+    it('binds add_code_block.execute to context.addAndExecuteCodeBlock', async () => {
+      const context = makeContext()
+      await executeAgentBlock(makeAgentBlock(), context)
+
+      const tools = agentMocks.captured.settings?.tools as Record<string, WrappedTool>
+      expect(tools.add_code_block).toBeDefined()
+      // Identity, not just "is a function": a swapped binding (e.g. wired to
+      // addMarkdownBlock) would fail this even though both are vi.fns.
+      expect(tools.add_code_block.execute).toBe(context.addAndExecuteCodeBlock)
+    })
+
+    it('binds add_markdown_block.execute to context.addMarkdownBlock', async () => {
+      const context = makeContext()
+      await executeAgentBlock(makeAgentBlock(), context)
+
+      const tools = agentMocks.captured.settings?.tools as Record<string, WrappedTool>
+      expect(tools.add_markdown_block).toBeDefined()
+      expect(tools.add_markdown_block.execute).toBe(context.addMarkdownBlock)
+    })
+
+    it('does not cross-wire the two tool execute bindings', async () => {
+      const context = makeContext()
+      await executeAgentBlock(makeAgentBlock(), context)
+
+      const tools = agentMocks.captured.settings?.tools as Record<string, WrappedTool>
+      // Guard the swap explicitly: each tool must NOT carry the other's callback.
+      expect(tools.add_code_block.execute).not.toBe(context.addMarkdownBlock)
+      expect(tools.add_markdown_block.execute).not.toBe(context.addAndExecuteCodeBlock)
+    })
+  })
+
+  // Scenario: MCP client lifecycle + close-error finally (retro Item 2) ------
+  //
+  // All card-1yecdf tests used `mcpServers: []`, so neither the
+  // client-instantiation path (createMCPClient per merged config) nor the
+  // close-error `finally` branch (agent-handler.ts:247-256) was ever entered.
+  // Here we drive executeAgentBlock with non-empty `mcpServers`, injecting fake
+  // clients via the mocked `createMCPClient`, and assert the close behavior:
+  // every client is closed, and a client whose `.close()` rejects is caught
+  // per-client without aborting the others or the returned result.
+  describe('MCP client lifecycle', () => {
+    function makeFakeClient(overrides?: { closeRejects?: boolean; tools?: Record<string, unknown> }) {
+      const closeImpl = overrides?.closeRejects
+        ? vi.fn(async () => {
+            throw new Error('close failed')
+          })
+        : vi.fn(async () => {})
+      return {
+        tools: vi.fn(async () => overrides?.tools ?? {}),
+        close: closeImpl,
+      }
+    }
+
+    const serverA: McpServerConfig = { name: 'mcp-a', command: 'cmd-a' }
+    const serverB: McpServerConfig = { name: 'mcp-b', command: 'cmd-b' }
+
+    it('closes every client on the happy path (two healthy clients)', async () => {
+      const clientA = makeFakeClient()
+      const clientB = makeFakeClient()
+      mcpMocks.clientQueue.push(clientA, clientB)
+
+      agentMocks.cassette.fullStream = []
+      agentMocks.cassette.text = 'done'
+
+      const result = await executeAgentBlock(makeAgentBlock(), makeContext({ mcpServers: [serverA, serverB] }))
+
+      // Both configs instantiated a client...
+      expect(mcpMocks.createMCPClient).toHaveBeenCalledTimes(2)
+      // ...and both were closed exactly once, with no throw escaping.
+      expect(clientA.close).toHaveBeenCalledTimes(1)
+      expect(clientB.close).toHaveBeenCalledTimes(1)
+      expect(result.finalOutput).toBe('done')
+    })
+
+    it('catches a per-client close() rejection without aborting other closes or the result', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      // First client rejects on close; second is healthy and must STILL be closed.
+      const rejecting = makeFakeClient({ closeRejects: true })
+      const healthy = makeFakeClient()
+      mcpMocks.clientQueue.push(rejecting, healthy)
+
+      agentMocks.cassette.fullStream = [{ type: 'text-delta', text: 'ok' }]
+      agentMocks.cassette.text = 'ok'
+
+      // The finally must swallow the close rejection: executeAgentBlock resolves.
+      const result = await executeAgentBlock(makeAgentBlock(), makeContext({ mcpServers: [serverA, serverB] }))
+
+      expect(rejecting.close).toHaveBeenCalledTimes(1)
+      // The healthy client is still closed even though an earlier close rejected.
+      expect(healthy.close).toHaveBeenCalledTimes(1)
+      // The result is unaffected by the close error.
+      expect(result.finalOutput).toBe('ok')
+      // The error is logged per-client with the offending server name.
+      expect(errorSpy).toHaveBeenCalledTimes(1)
+      expect(String(errorSpy.mock.calls[0]?.[0])).toContain('mcp-a')
+
+      errorSpy.mockRestore()
+    })
+
+    it('merges MCP tool sets into the agent settings alongside the built-in tools', async () => {
+      const clientA = makeFakeClient({ tools: { search_docs: { description: 'search' } } })
+      mcpMocks.clientQueue.push(clientA)
+
+      await executeAgentBlock(makeAgentBlock(), makeContext({ mcpServers: [serverA] }))
+
+      const tools = agentMocks.captured.settings?.tools as Record<string, unknown>
+      // MCP-provided tool is present...
+      expect(tools.search_docs).toBeDefined()
+      // ...without displacing the two built-in authoring tools.
+      expect(tools.add_code_block).toBeDefined()
+      expect(tools.add_markdown_block).toBeDefined()
+      expect(clientA.tools).toHaveBeenCalledTimes(1)
     })
   })
 })

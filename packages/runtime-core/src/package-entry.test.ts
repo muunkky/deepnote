@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 // Capstone: import from the PACKAGE ENTRY (not the relative ./python-env file).
-// This is the unfakeable contract step 3A (MCP) and step 3B (CLI) consume — if
+// This is the integration-meaningful contract step 3A (MCP) and step 3B (CLI) consume — if
 // either symbol is not re-exported from index.ts, this import fails to type-check
 // and the assertions below cannot run.
 import { isBareSystemPython, selectPythonSpec } from '@deepnote/runtime-core'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 describe('@deepnote/runtime-core package entry', () => {
   let savedDeepnotePython: string | undefined

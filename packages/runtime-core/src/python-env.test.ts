@@ -236,7 +236,7 @@ describe('selectPythonSpec', () => {
     const result = selectPythonSpec({ explicit: '/explicit/venv/bin/python' })
 
     expect(result).toBe('/explicit/venv/bin/python')
-    // Precedence short-circuits before env or autodetection is ever consulted.
+    // Precedence short-circuits before env or the autodetect fallback is ever consulted.
     expect(mockExecSync).not.toHaveBeenCalled()
   })
 
@@ -253,7 +253,7 @@ describe('selectPythonSpec', () => {
     const result = selectPythonSpec({})
 
     expect(result).toBe('/env/venv/bin/python')
-    // Env tier wins before autodetection is consulted.
+    // Env tier wins before the autodetect fallback is consulted.
     expect(mockExecSync).not.toHaveBeenCalled()
   })
 

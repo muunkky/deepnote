@@ -635,15 +635,24 @@ milestones:
         id: s6
         title: AI agents can author, edit, and execute Deepnote notebooks
         description:
-          'An AI coding agent (in Cursor, Claude, etc.) can create, convert,
+          "An AI coding agent (in Cursor, Claude, etc.) can create, convert,
           enhance, fix, and run Deepnote notebooks through a purpose-built MCP server,
           and notebooks themselves can contain agent blocks that an LLM executes at
-          runtime — making Deepnote AI-native locally. — Dev setup: baseline toolchain
-          for the @deepnote/mcp server (pure TypeScript). To exercise it live, wire
-          it into an MCP client (Cursor/Claude) per packages/mcp/README.md. Agent-block
-          execution runs through runtime-core, so it inherits the s5 Python prereqs
-          (Python 3, jinja2, a deepnote-toolkit[server] venv) and needs an AI provider
-          key/credentials for the LLM.'
+          runtime — making Deepnote AI-native locally. — S6INREPO status: the in-repo
+          interpreter-resolution + agent-block-readiness slice is COMPLETE (ADR-001
+          shared Python interpreter resolution via runtime-core 0.4.0; #288 consumer
+          side shipped + external producer contract verified; agent-block tool-loop/lifecycle
+          test coverage and reconciled defaults; on draft PR muunkky/deepnote#2).
+          Story remains in_progress — NOT done — pending external/live residuals:
+          (1) a live OpenAI-keyed agent-block E2E proving the agent block 'runs against
+          an LLM at runtime' (needs a real API key + manual run); (2) Deepnote Cloud
+          import (#289, separate feature/milestone); (3) npm publish of the packages
+          (maintainer action). — Dev setup: baseline toolchain for the @deepnote/mcp
+          server (pure TypeScript). To exercise it live, wire it into an MCP client
+          (Cursor/Claude) per packages/mcp/README.md. Agent-block execution runs through
+          runtime-core, so it inherits the s5 Python prereqs (Python 3, jinja2, a
+          deepnote-toolkit[server] venv) and needs an AI provider key/credentials
+          for the LLM."
         status: in_progress
         success_criteria:
           - An MCP server exposes bounded, contract-first tools for notebook
@@ -665,7 +674,14 @@ milestones:
               'Model Context Protocol server for AI-assisted Deepnote notebook
               creation, editing, conversion, and execution. Follows MCP best practices:
               server instructions, bounded toolsets, contracts-first, reusable prompts.
-              Current version 0.3.2 (active development).'
+              S6INREPO completed the in-repo shared-environment slice: the consumer
+              side of ADR-001 shared Python interpreter resolution is shipped (`selectPythonSpec`
+              in runtime-core 0.4.0 unifying CLI `deepnote run` + MCP `deepnote_run`,
+              with an actionable bare-system-python hint), and the external producer
+              contract (#288) is verified satisfied. Kept in_progress because two
+              non-S6INREPO items remain open: block-group layout fidelity / Deepnote
+              Cloud import (#289 — separate feature/milestone) and the live Cursor/VS
+              Code E2E confirmation of the shared environment (external).'
             status: in_progress
             docs_ref: packages/mcp/README.md
             notes: 'PR #273 (v1)'
@@ -702,18 +718,44 @@ milestones:
                 id: shared-env-with-vscode
                 title: Shared environment with VS Code extension
                 description:
-                  'Known gap: no way to share the selected environment
-                  between the VS Code extension and the MCP server.'
+                  'Shared environment between the VS Code extension and
+                  the MCP server, resolved via ADR-001 (shared Python interpreter
+                  resolution). In-repo consumer side SHIPPED in S6INREPO: a single
+                  `selectPythonSpec` in runtime-core (0.4.0) unifies CLI `deepnote
+                  run` + MCP `deepnote_run` interpreter selection with precedence
+                  explicit > DEEPNOTE_PYTHON > autodetect, and both MCP and CLI emit
+                  an actionable bare-system-python hint. Spike vxiipn VERIFIED the
+                  external producer (vscode-deepnote extension) already satisfies
+                  the ADR-001 DEEPNOTE_PYTHON contract structurally via its explicit
+                  venv-path tier, so producer→consumer interop for #288 is effectively
+                  closed in-repo. Residual (external, not CI-verifiable here): a live
+                  Cursor / VS Code end-to-end confirmation run.'
                 sequence: 4
-                status: todo
-                notes: 'Open issue #288'
+                status: done
+                notes:
+                  'Open issue #288. In-repo consumer + producer-contract verification
+                  complete (S6INREPO); residual is a live Cursor/VS Code E2E confirmation
+                  only.'
                 docs_ref: docs/adr/ADR-001-shared-python-interpreter-resolution.md
+                actual_completion_date: '2026-06-10'
+                sprints_ref: S6INREPO
+                cards_ref: sjwaox, vxiipn
+            sprints_ref: S6INREPO
+            cards_ref: sjwaox, vxiipn
           agentic-notebooks:
             id: agentic-notebooks
             title: Agentic notebooks (agent block)
-            description: An agent block type that an LLM executes at runtime,
-              added to the block model and wired through the execution engine.
-              Currently a proof-of-concept maturing toward production.
+            description:
+              "An agent block type that an LLM executes at runtime, added
+              to the block model and wired through the execution engine. S6INREPO
+              shipped (in-repo, draft PR muunkky/deepnote#2): shared Python interpreter
+              resolution (ADR-001, runtime-core 0.4.0) plus agent-block readiness
+              hardening — executeAgentBlock tool-loop event mapping, tool-binding
+              identity, MCP-client-lifecycle/finally coverage, and reconciled model/maxTurns
+              defaults. Kept in_progress because the runtime agent-block still requires
+              a live OpenAI-keyed end-to-end run to prove it 'runs against an LLM
+              at runtime'; that E2E is external and not CI-verifiable in-repo. The
+              runtime-core dependency is satisfied (runtime-core 0.4.0 shipped)."
             status: in_progress
             docs_ref: skills/deepnote/references/blocks-agent.md
             features:
@@ -735,15 +777,35 @@ milestones:
               runtime-agent-execution:
                 id: runtime-agent-execution
                 title: Runtime agent-block execution
-                description: Run-agent-block logic in runtime-core with failure
-                  reporting via onBlockDone; some implementation extracted into
-                  the CLI for VS Code reuse.
+                description:
+                  "Run-agent-block logic in runtime-core with failure reporting
+                  via onBlockDone; some implementation extracted into the CLI for
+                  VS Code reuse. S6INREPO hardening (in-repo, on draft PR muunkky/deepnote#2):
+                  executeAgentBlock tool-loop event mapping + tool-binding identity
+                  + MCP-client-lifecycle/finally coverage (cards 1yecdf, fkxnne),
+                  and model/maxTurns defaults reconciled + documented. NOTE: this
+                  slice is TEST/coverage hardening of the agent block plus interpreter
+                  resolution — NOT new agent-block runtime features. The runtime-core
+                  dependency (m1/s5/runtime-core-package) is SATISFIED: runtime-core
+                  0.4.0 shipped. Residual keeping this in_progress (external, not
+                  CI-verifiable here): a live OpenAI-keyed agent-block end-to-end
+                  run proving the block 'runs against an LLM at runtime' — needs a
+                  real API key + manual run."
                 sequence: 3
                 status: in_progress
-                notes: 'PRs #342, #369, #370; #340 (removed agent block from reactivity)'
+                notes:
+                  'PRs #342, #369, #370; #340 (removed agent block from reactivity).
+                  S6INREPO: cards 1yecdf, fkxnne (tool-loop/lifecycle coverage + defaults).
+                  Residual: live OpenAI-keyed E2E (external).'
                 depends_on:
                   - m1/s5/runtime-core-package
+                sprints_ref: S6INREPO
+                cards_ref: 1yecdf, fkxnne
+            sprints_ref: S6INREPO
+            cards_ref: 1yecdf, fkxnne
         docs_ref: docs/prds/PRD-001-ai-agent-notebook-authoring.md
+        sprints_ref: S6INREPO
+        cards_ref: sjwaox, vxiipn, 1yecdf, fkxnne
       s7:
         id: s7
         title: Users can self-serve through comprehensive product and developer

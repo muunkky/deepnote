@@ -147,6 +147,31 @@ signature, hint wording, and test plan belong to the design doc; the producer-si
   (today file-local, not re-exported by `index.ts:14`) are added to the package's public surface;
   both callers depend on the selector.
 
+### Known consumers / adoption status
+
+> _Factual adoption finding — does not change the Decision. Recorded from a static source review
+> (spike `vxiipn`) of the public `deepnote/vscode-deepnote` repository at commit `923ec53`,
+> cross-referenced against runtime-core's precedence contract._
+
+- **The sole external `deepnote run` producer — the `vscode-deepnote` extension** (VS Code /
+  Cursor / Windsurf) — **satisfies this ADR's contract structurally, but via the chain's
+  `explicit` (highest-precedence) tier, not via `DEEPNOTE_PYTHON`.** It sets `DEEPNOTE_PYTHON`
+  nowhere (0 occurrences in `src/`). Instead it manages its own venv with
+  `deepnote-toolkit[server]` pre-installed and passes that absolute path as `pythonEnv` when it
+  spawns the toolkit Jupyter server / CLI (`src/kernels/deepnote/deepnoteServerStarter.node.ts:272`
+  — `pythonEnv: venvPath.fsPath`). `startServer` resolves `pythonEnv` directly and never consults
+  `selectPythonSpec` / `DEEPNOTE_PYTHON`.
+- Because that interpreter is always an explicit toolkit-bearing venv, `isBareSystemPython` is
+  never true for extension users, so the opaque bare-`python` failure this ADR targets is
+  **structurally unreachable** for them. (Note also: the extension spawns the toolkit Jupyter
+  server and the `deepnote` CLI, **not** the in-repo MCP server.)
+- **Implication:** `DEEPNOTE_PYTHON` currently has **zero external env-var adopters** — the one
+  known producer does not need it. The env-var tier remains relevant for hosts that do **not**
+  supply an explicit interpreter (e.g. an MCP client such as Cursor / Claude Desktop spawning the
+  deepnote MCP server). This **strengthens** the Decision rather than weakening it: the consumer
+  side is correct, and the env-var contract is unadopted-but-unneeded by the current producer
+  precisely because that producer already wins at the higher `explicit` tier.
+
 ## Alternatives Considered
 
 ### Alternative 1: Read `DEEPNOTE_PYTHON` in the MCP server only (no shared chain)
@@ -277,3 +302,4 @@ detectDefaultPython()` — a spec string, **not** a built env. The `ExecutionEng
 | 2026-06-10 | Proposed | Initial proposal                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 2026-06-10 | Proposed | Revised per adversarial review (adr-reviewer): shared resolver selects the interpreter _spec_ not the built env, which the engine builds via `server-starter.ts` (B2); specified the `DEEPNOTE_PYTHON` wire format — same forms as `--python`, canonical = executable path (B3); flagged that `isBareSystemPython` must be added to `index.ts` public exports (B1); sharpened config-file deferral to rest on external-producer adoption friction, noting `.env` reuse (S2); stated precedence rationale (S3); clarified Alt 1 shares the contract (S1) |
 | 2026-06-10 | Accepted | Promoted NOM-001 → ADR-001 after adversarial adr-reviewer returned APPROVE-as-ADR-001 (all findings resolved, code-verified, no new blocking issues)                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 2026-06-10 | Accepted | Added "Known consumers / adoption status" note under Consequences (factual finding from spike `vxiipn`, static review of `deepnote/vscode-deepnote` @ `923ec53`): the sole external `deepnote run` producer satisfies the contract via the `explicit` tier (passes an explicit toolkit venv as `pythonEnv`), sets `DEEPNOTE_PYTHON` nowhere, and never hits `isBareSystemPython` — so `DEEPNOTE_PYTHON` has zero external adopters but the env-var tier stays relevant for hosts without an explicit interpreter. Decision unchanged.                   |

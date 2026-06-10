@@ -47,13 +47,13 @@ Docker is listed as a prereq in `CONTRIBUTING.md`.
 
 **Per-area extras** (only when you touch that area):
 
-| Area / packages | Extra setup beyond baseline |
-| --- | --- |
-| `blocks`, `convert`, `database-integrations`, snapshots, docs | none — pure TypeScript / Markdown |
-| `cli`, `runtime-core`, `reactivity` (execution) | Python 3 + `pip install jinja2`; a venv with `pip install "deepnote-toolkit[server]"`; point `pythonEnv` / `--python` at it |
-| `mcp` server | baseline; to test live, wire into an MCP client (Cursor/Claude) per `packages/mcp/README.md` |
-| agent blocks / AI features | the execution extras above **plus** an AI provider API key |
-| db integrations end-to-end (optional) | a live DB — Docker for Postgres/MySQL/Mongo, or a cloud account + auth for warehouses (see `docs/<integration>.md`) |
+| Area / packages                                               | Extra setup beyond baseline                                                                                                 |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `blocks`, `convert`, `database-integrations`, snapshots, docs | none — pure TypeScript / Markdown                                                                                           |
+| `cli`, `runtime-core`, `reactivity` (execution)               | Python 3 + `pip install jinja2`; a venv with `pip install "deepnote-toolkit[server]"`; point `pythonEnv` / `--python` at it |
+| `mcp` server                                                  | baseline; to test live, wire into an MCP client (Cursor/Claude) per `packages/mcp/README.md`                                |
+| agent blocks / AI features                                    | the execution extras above **plus** an AI provider API key                                                                  |
+| db integrations end-to-end (optional)                         | a live DB — Docker for Postgres/MySQL/Mongo, or a cloud account + auth for warehouses (see `docs/<integration>.md`)         |
 
 Release/publish secrets (`NPM_TOKEN`, PyPI trusted publishing, `CODECOV_TOKEN`) are
 maintainer-only — never needed for fork contributions.
@@ -65,6 +65,7 @@ maintainer-only — never needed for fork contributions.
 ## Day-to-day
 
 **Start a contribution** (clean base → no gitban files in the PR):
+
 ```bash
 git fetch upstream
 git checkout -b feat/my-thing upstream/main
@@ -74,6 +75,7 @@ gh pr create --repo deepnote/deepnote --base main --head muunkky:feat/my-thing
 ```
 
 **Stay current with upstream:**
+
 ```bash
 git checkout main && git pull upstream main && git push origin main
 ```
@@ -91,3 +93,5 @@ the **code** commits onto a clean branch off `upstream/main` for the PR
 Discipline that makes this painless: **never mix `.gitban/` board changes and
 code changes in the same commit.** Keep board mutations and code edits in
 separate commits so the code delta can be cleanly extracted.
+
+**Build the `feat/*` branch, then switch straight back to a board branch — never leave the session parked on `feat/*`:** with `.claude/` absent from that working tree the skills silently stop loading (and the `.gitban/` board goes with them), so `/skills` shows nothing and the `gitban-*` skills become un-invokable; the fix is just `git checkout sprint/<tag>` (or `workspace`), which restores both code and tooling in one tree.

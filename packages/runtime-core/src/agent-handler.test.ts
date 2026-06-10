@@ -1,13 +1,77 @@
-import type { DeepnoteFile, McpServerConfig } from '@deepnote/blocks'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type { AgentBlock, DeepnoteFile, McpServerConfig } from '@deepnote/blocks'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  type AgentStreamEvent,
   buildSystemPrompt,
   createBlocksWithAttachedOutputsFromCollectedOutputs,
+  executeAgentBlock,
   mergeMcpConfigs,
   resolveEnvVars,
   serializeNotebookContext,
   serializeNotebookContextFromBlocks,
 } from './agent-handler'
+
+// --- Fixtured-provider harness for the executeAgentBlock tool-loop ---------
+//
+// `executeAgentBlock` hard-imports `ToolLoopAgent` from 'ai' and `createOpenAI`
+// from '@ai-sdk/openai' with no dependency-injection seam, so to exercise the
+// REAL tool-loop (not the execution-engine boundary mock) we replace those two
+// modules. `ai` is only partially mocked: the real `tool` and `stepCountIs`
+// helpers are preserved (the module evaluates them at import time and the loop
+// passes `stepCountIs(maxTurns)` to the agent), while `ToolLoopAgent` is swapped
+// for a fake whose `.stream()` returns a recorded `fullStream` + `text`. No
+// network, no OPENAI_API_KEY: the recorded cassette below drives the loop end to
+// end. See the `executeAgentBlock` describe block for the chosen approach and
+// rationale.
+const agentMocks = vi.hoisted(() => {
+  // The recorded provider cassette: the `fullStream` parts a single agent turn
+  // emits, plus the final assistant text. Mutated per-test before invoking.
+  const cassette: { fullStream: unknown[]; text: string } = { fullStream: [], text: '' }
+  // Captures the settings the production code passed to `new ToolLoopAgent(...)`
+  // so tests can assert model/turn-cap wiring (stopWhen via stepCountIs).
+  const captured: { settings: Record<string, unknown> | null } = { settings: null }
+
+  class FakeToolLoopAgent {
+    constructor(settings: Record<string, unknown>) {
+      captured.settings = settings
+    }
+    async stream(_opts: unknown) {
+      const parts = cassette.fullStream
+      return {
+        async *[Symbol.asyncIterator]() {},
+        fullStream: (async function* () {
+          for (const part of parts) {
+            yield part
+          }
+        })(),
+        text: Promise.resolve(cassette.text),
+      }
+    }
+  }
+
+  return { cassette, captured, FakeToolLoopAgent }
+})
+
+vi.mock('ai', async importOriginal => {
+  const actual = await importOriginal<typeof import('ai')>()
+  return {
+    ...actual,
+    ToolLoopAgent: agentMocks.FakeToolLoopAgent,
+  }
+})
+
+// `executeAgentBlock` calls `createOpenAI({...})` at the top of the function and
+// then `openai(modelName)` / `openai.chat(modelName)`. Stub it so no real client
+// is constructed and no key/network is touched; the model object is opaque to the
+// loop (it only flows into the agent settings, which our fake ignores).
+vi.mock('@ai-sdk/openai', () => {
+  const openai = Object.assign((modelName: string) => ({ modelId: modelName }), {
+    chat: (modelName: string) => ({ modelId: modelName, api: 'chat' }),
+  })
+  return {
+    createOpenAI: () => openai,
+  }
+})
 
 describe('resolveEnvVars', () => {
   let prevTestHost: string | undefined
@@ -494,5 +558,189 @@ describe('mergeMcpConfigs', () => {
     const result = mergeMcpConfigs([serverA], [serverC])
     expect(result).toHaveLength(2)
     expect(result.map(s => s.name).sort()).toEqual(['server-a', 'server-c'])
+  })
+})
+
+// =============================================================================
+// executeAgentBlock — the live tool-loop (S6INREPO step 2B / card 1yecdf)
+// =============================================================================
+//
+// COVERAGE APPROACH (recorded/fixtured provider — the card's first option):
+// We invoke `executeAgentBlock` DIRECTLY against a recorded provider stream
+// rather than skipping an integration test. `executeAgentBlock` has no DI seam
+// (it hard-imports `ToolLoopAgent`/`createOpenAI`), so per the card we use
+// `vi.mock` to inject the recorded stream: `ai` is partially mocked
+// (`ToolLoopAgent` -> fake, real `tool`/`stepCountIs` preserved) and
+// `@ai-sdk/openai` is stubbed. The fake agent's `.stream()` replays a recorded
+// cassette of `fullStream` parts, so the REAL loop body at agent-handler.ts:215
+// runs and we assert the stream -> tool-call mapping end to end.
+//
+// RATIONALE for recorded-over-skipped: the loop's logic worth protecting is the
+// `fullStream` part -> `onAgentEvent` mapping (text-delta / reasoning-delta /
+// tool-call / tool-result). A recorded cassette exercises that mapping
+// deterministically with zero network and NO OPENAI_API_KEY, which a skipped
+// test would not. The only thing not covered here is real provider wire-format
+// drift, which is the explicitly out-of-scope live-keyed E2E residual.
+
+function makeAgentBlock(overrides?: Partial<AgentBlock>): AgentBlock {
+  return {
+    id: 'agent-block-1',
+    type: 'agent',
+    content: 'Load the dataset and summarize it.',
+    blockGroup: 'bg1',
+    sortingKey: 'a0',
+    metadata: { deepnote_agent_model: 'auto' },
+    ...overrides,
+  } as AgentBlock
+}
+
+describe('executeAgentBlock', () => {
+  // Snapshot env we touch so tests stay isolated and order-independent.
+  let prevApiKey: string | undefined
+  let prevModel: string | undefined
+  let prevBaseUrl: string | undefined
+
+  beforeEach(() => {
+    prevApiKey = process.env.OPENAI_API_KEY
+    prevModel = process.env.OPENAI_MODEL
+    prevBaseUrl = process.env.OPENAI_BASE_URL
+    // The whole point: the loop must run with NO real key in CI.
+    delete process.env.OPENAI_API_KEY
+    delete process.env.OPENAI_MODEL
+    delete process.env.OPENAI_BASE_URL
+    agentMocks.cassette.fullStream = []
+    agentMocks.cassette.text = ''
+    agentMocks.captured.settings = null
+  })
+
+  afterEach(() => {
+    const restore = (key: string, value: string | undefined) => {
+      if (value === undefined) {
+        delete process.env[key]
+      } else {
+        process.env[key] = value
+      }
+    }
+    restore('OPENAI_API_KEY', prevApiKey)
+    restore('OPENAI_MODEL', prevModel)
+    restore('OPENAI_BASE_URL', prevBaseUrl)
+  })
+
+  function makeContext(overrides?: Partial<Parameters<typeof executeAgentBlock>[1]>) {
+    return {
+      openAiToken: 'fixture-token-not-a-real-key',
+      mcpServers: [],
+      notebookContext: '# Notebook: Test\n\n(empty)',
+      addAndExecuteCodeBlock: vi.fn(async (_args: { code: string }) => 'fixture code output'),
+      addMarkdownBlock: vi.fn(async (_args: { content: string }) => 'fixture markdown output'),
+      ...overrides,
+    } as Parameters<typeof executeAgentBlock>[1]
+  }
+
+  // Scenario 1 (Capstone) + Scenario 3 (no API key) -------------------------
+  it('maps a recorded fullStream to add_code_block/add_markdown_block tool events and returns the final text (no OPENAI_API_KEY required)', async () => {
+    expect(process.env.OPENAI_API_KEY).toBeUndefined()
+
+    // Recorded cassette: one agent turn that reasons, calls add_code_block,
+    // gets its output, calls add_markdown_block, then emits the summary text.
+    agentMocks.cassette.fullStream = [
+      { type: 'reasoning-delta', text: 'I should load the data first.' },
+      { type: 'tool-call', toolName: 'add_code_block', input: { code: 'import pandas as pd' } },
+      { type: 'tool-result', toolName: 'add_code_block', output: 'fixture code output' },
+      { type: 'tool-call', toolName: 'add_markdown_block', input: { content: '## Summary' } },
+      { type: 'tool-result', toolName: 'add_markdown_block', output: 'fixture markdown output' },
+      { type: 'text-delta', text: 'Loaded the dataset and ' },
+      { type: 'text-delta', text: 'wrote a summary.' },
+    ]
+    agentMocks.cassette.text = 'Loaded the dataset and wrote a summary.'
+
+    const events: AgentStreamEvent[] = []
+    const result = await executeAgentBlock(makeAgentBlock(), makeContext({ onAgentEvent: e => void events.push(e) }))
+
+    // The loop maps each fullStream part to the right AgentStreamEvent shape.
+    expect(events).toEqual([
+      { type: 'reasoning_delta', text: 'I should load the data first.' },
+      { type: 'tool_called', toolName: 'add_code_block' },
+      { type: 'tool_output', toolName: 'add_code_block', output: 'fixture code output' },
+      { type: 'tool_called', toolName: 'add_markdown_block' },
+      { type: 'tool_output', toolName: 'add_markdown_block', output: 'fixture markdown output' },
+      { type: 'text_delta', text: 'Loaded the dataset and ' },
+      { type: 'text_delta', text: 'wrote a summary.' },
+    ])
+
+    // The final assistant text is surfaced from streamResult.text.
+    expect(result.finalOutput).toBe('Loaded the dataset and wrote a summary.')
+  })
+
+  it('stringifies non-string tool-result output before emitting tool_output', async () => {
+    agentMocks.cassette.fullStream = [
+      { type: 'tool-call', toolName: 'add_code_block', input: { code: 'x = 1' } },
+      // Some tools return structured output; the loop JSON-stringifies it.
+      { type: 'tool-result', toolName: 'add_code_block', output: { rows: 3, ok: true } },
+    ]
+    agentMocks.cassette.text = ''
+
+    const events: AgentStreamEvent[] = []
+    await executeAgentBlock(makeAgentBlock(), makeContext({ onAgentEvent: e => void events.push(e) }))
+
+    expect(events).toEqual([
+      { type: 'tool_called', toolName: 'add_code_block' },
+      { type: 'tool_output', toolName: 'add_code_block', output: JSON.stringify({ rows: 3, ok: true }) },
+    ])
+  })
+
+  // Scenario 1 edge: empty/null stream terminates cleanly --------------------
+  it('returns empty finalOutput and emits no events when the stream is empty', async () => {
+    agentMocks.cassette.fullStream = []
+    agentMocks.cassette.text = ''
+
+    const events: AgentStreamEvent[] = []
+    const result = await executeAgentBlock(makeAgentBlock(), makeContext({ onAgentEvent: e => void events.push(e) }))
+
+    expect(events).toEqual([])
+    expect(result.finalOutput).toBe('')
+  })
+
+  it('does not throw when no onAgentEvent callback is provided', async () => {
+    agentMocks.cassette.fullStream = [{ type: 'text-delta', text: 'hello' }]
+    agentMocks.cassette.text = 'hello'
+
+    const result = await executeAgentBlock(makeAgentBlock(), makeContext({ onAgentEvent: undefined }))
+    expect(result.finalOutput).toBe('hello')
+  })
+
+  // Scenario 2: model precedence + maxTurns wiring (behavior-verified) -------
+  describe('model precedence and turn cap', () => {
+    it('uses block.metadata.deepnote_agent_model when it is not "auto"', async () => {
+      const block = makeAgentBlock({ metadata: { deepnote_agent_model: 'gpt-4o-mini' } })
+      await executeAgentBlock(block, makeContext())
+      expect(agentMocks.captured.settings?.model).toMatchObject({ modelId: 'gpt-4o-mini' })
+    })
+
+    it('falls back to OPENAI_MODEL env when metadata model is "auto"', async () => {
+      process.env.OPENAI_MODEL = 'gpt-4o'
+      await executeAgentBlock(makeAgentBlock(), makeContext())
+      expect(agentMocks.captured.settings?.model).toMatchObject({ modelId: 'gpt-4o' })
+    })
+
+    it('falls back to the gpt-5 literal when metadata is "auto" and OPENAI_MODEL is unset', async () => {
+      expect(process.env.OPENAI_MODEL).toBeUndefined()
+      await executeAgentBlock(makeAgentBlock(), makeContext())
+      expect(agentMocks.captured.settings?.model).toMatchObject({ modelId: 'gpt-5' })
+    })
+
+    it('uses the openai.chat() variant when OPENAI_BASE_URL is set (compatible provider)', async () => {
+      process.env.OPENAI_BASE_URL = 'https://compat.example/v1'
+      await executeAgentBlock(makeAgentBlock(), makeContext())
+      expect(agentMocks.captured.settings?.model).toMatchObject({ api: 'chat' })
+    })
+
+    it('caps the loop at maxTurns=10 via stepCountIs (stopWhen wired to the agent)', async () => {
+      // `stepCountIs(10)` is the real helper (only ToolLoopAgent is mocked), so we
+      // assert it was constructed and handed to the agent as `stopWhen`. The cap
+      // value (10) is the confirmed-intentional default documented in the source.
+      await executeAgentBlock(makeAgentBlock(), makeContext())
+      expect(agentMocks.captured.settings?.stopWhen).toBeDefined()
+    })
   })
 })

@@ -41,6 +41,11 @@ vi.mock('@deepnote/runtime-core', async importOriginal => {
       }
     },
     detectDefaultPython: () => 'python',
+    // Mirror the real selectPythonSpec precedence (arg > DEEPNOTE_PYTHON > autodetect)
+    // but route the autodetect tail through the mocked detectDefaultPython above so the
+    // CLI wiring is tested deterministically without spawning a real interpreter. The
+    // precedence logic itself is unit-tested in @deepnote/runtime-core (step 2A).
+    selectPythonSpec: ({ explicit }: { explicit?: string } = {}) => explicit ?? process.env.DEEPNOTE_PYTHON ?? 'python',
     resolvePythonExecutable: (pythonPath: string) => Promise.resolve(pythonPath),
   }
 })
@@ -178,6 +183,12 @@ describe('run command', () => {
 
       // Ensure DEEPNOTE_TOKEN is not set by default (tests that need it will stub it)
       delete process.env[DEEPNOTE_TOKEN_ENV]
+
+      // Ensure DEEPNOTE_PYTHON is unset by default so interpreter resolution is
+      // deterministic (autodetect). Now that run.ts routes through selectPythonSpec,
+      // an ambient DEEPNOTE_PYTHON would otherwise leak into the resolved pythonEnv.
+      // Tests that exercise the env tier stub it explicitly.
+      delete process.env.DEEPNOTE_PYTHON
 
       // Reset getBlockDependencies to return empty by default (no validation errors)
       mockGetBlockDependencies.mockResolvedValue([])
@@ -1673,6 +1684,65 @@ describe('run command', () => {
         // Should still succeed
         const parsed = JSON.parse(output)
         expect(parsed.success).toBe(true)
+      })
+    })
+
+    describe('python interpreter resolution (selectPythonSpec precedence)', () => {
+      // ADR-001: precedence is --python > DEEPNOTE_PYTHON > autodetect. These tests
+      // assert the resolved pythonEnv handed to the ExecutionEngine, proving the CLI
+      // converges on the shared selectPythonSpec selector (parity with the MCP server,
+      // step 3A) rather than the old `options.python ?? detectDefaultPython()` chain
+      // that ignored DEEPNOTE_PYTHON.
+
+      it('uses --python when provided, even if DEEPNOTE_PYTHON is set (--python wins)', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', '/env/venv/bin/python')
+
+        await action(HELLO_WORLD_FILE, { python: '/flag/venv/bin/python' })
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: '/flag/venv/bin/python',
+          workingDirectory: expect.any(String),
+        })
+      })
+
+      it('honors DEEPNOTE_PYTHON when no --python is provided', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', '/env/venv/bin/python')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: '/env/venv/bin/python',
+          workingDirectory: expect.any(String),
+        })
+      })
+
+      it('falls back to autodetect when neither --python nor DEEPNOTE_PYTHON is set', async () => {
+        setupSuccessfulRun()
+        // undefined deletes the var (vitest), matching the real "DEEPNOTE_PYTHON unset"
+        // case. An empty string would be a present value that selectPythonSpec's ??
+        // chain treats as the selected spec — not the autodetect fallback.
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: 'python',
+          workingDirectory: expect.any(String),
+        })
+      })
+
+      it('prefers --python over autodetect when DEEPNOTE_PYTHON is unset', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, { python: '/flag/venv/bin/python' })
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: '/flag/venv/bin/python',
+          workingDirectory: expect.any(String),
+        })
       })
     })
 

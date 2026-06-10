@@ -45,8 +45,7 @@ vi.mock('@deepnote/runtime-core', async importOriginal => {
     // but route the autodetect tail through the mocked detectDefaultPython above so the
     // CLI wiring is tested deterministically without spawning a real interpreter. The
     // precedence logic itself is unit-tested in @deepnote/runtime-core (step 2A).
-    selectPythonSpec: ({ explicit }: { explicit?: string } = {}) =>
-      explicit ?? process.env.DEEPNOTE_PYTHON ?? 'python',
+    selectPythonSpec: ({ explicit }: { explicit?: string } = {}) => explicit ?? process.env.DEEPNOTE_PYTHON ?? 'python',
     resolvePythonExecutable: (pythonPath: string) => Promise.resolve(pythonPath),
   }
 })

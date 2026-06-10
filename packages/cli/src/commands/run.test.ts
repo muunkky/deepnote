@@ -185,6 +185,12 @@ describe('run command', () => {
       // Ensure DEEPNOTE_TOKEN is not set by default (tests that need it will stub it)
       delete process.env[DEEPNOTE_TOKEN_ENV]
 
+      // Ensure DEEPNOTE_PYTHON is unset by default so interpreter resolution is
+      // deterministic (autodetect). Now that run.ts routes through selectPythonSpec,
+      // an ambient DEEPNOTE_PYTHON would otherwise leak into the resolved pythonEnv.
+      // Tests that exercise the env tier stub it explicitly.
+      delete process.env.DEEPNOTE_PYTHON
+
       // Reset getBlockDependencies to return empty by default (no validation errors)
       mockGetBlockDependencies.mockResolvedValue([])
       mockGetUpstreamBlocks.mockResolvedValue({
@@ -1715,7 +1721,10 @@ describe('run command', () => {
 
       it('falls back to autodetect when neither --python nor DEEPNOTE_PYTHON is set', async () => {
         setupSuccessfulRun()
-        vi.stubEnv('DEEPNOTE_PYTHON', '')
+        // undefined deletes the var (vitest), matching the real "DEEPNOTE_PYTHON unset"
+        // case. An empty string would be a present value that selectPythonSpec's ??
+        // chain treats as the selected spec — not the autodetect fallback.
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
 
         await action(HELLO_WORLD_FILE, {})
 
@@ -1727,7 +1736,7 @@ describe('run command', () => {
 
       it('prefers --python over autodetect when DEEPNOTE_PYTHON is unset', async () => {
         setupSuccessfulRun()
-        vi.stubEnv('DEEPNOTE_PYTHON', '')
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
 
         await action(HELLO_WORLD_FILE, { python: '/flag/venv/bin/python' })
 

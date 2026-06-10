@@ -2,8 +2,8 @@ import { execSync } from 'node:child_process'
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildPythonEnv, detectDefaultPython, resolvePythonExecutable } from './python-env'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { buildPythonEnv, detectDefaultPython, resolvePythonExecutable, selectPythonSpec } from './python-env'
 
 vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
@@ -209,6 +209,90 @@ describe('detectDefaultPython', () => {
     // Should only call once for 'python' since it succeeds
     expect(mockExecSync).toHaveBeenCalledTimes(1)
     expect(mockExecSync).toHaveBeenCalledWith('python --version', { stdio: 'ignore' })
+  })
+})
+
+describe('selectPythonSpec', () => {
+  const mockExecSync = vi.mocked(execSync)
+  let savedDeepnotePython: string | undefined
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    savedDeepnotePython = process.env.DEEPNOTE_PYTHON
+    delete process.env.DEEPNOTE_PYTHON
+  })
+
+  afterEach(() => {
+    if (savedDeepnotePython === undefined) {
+      delete process.env.DEEPNOTE_PYTHON
+    } else {
+      process.env.DEEPNOTE_PYTHON = savedDeepnotePython
+    }
+  })
+
+  it('returns the explicit arg when provided, even if DEEPNOTE_PYTHON is set', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpec({ explicit: '/explicit/venv/bin/python' })
+
+    expect(result).toBe('/explicit/venv/bin/python')
+    // Precedence short-circuits before env or autodetection is ever consulted.
+    expect(mockExecSync).not.toHaveBeenCalled()
+  })
+
+  it('returns the explicit arg when provided and DEEPNOTE_PYTHON is unset', () => {
+    const result = selectPythonSpec({ explicit: '/explicit/venv/bin/python' })
+
+    expect(result).toBe('/explicit/venv/bin/python')
+    expect(mockExecSync).not.toHaveBeenCalled()
+  })
+
+  it('returns process.env.DEEPNOTE_PYTHON when no explicit arg is given', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpec({})
+
+    expect(result).toBe('/env/venv/bin/python')
+    // Env tier wins before autodetection is consulted.
+    expect(mockExecSync).not.toHaveBeenCalled()
+  })
+
+  it('reads DEEPNOTE_PYTHON when called with no argument object', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpec()
+
+    expect(result).toBe('/env/venv/bin/python')
+  })
+
+  it('treats an undefined explicit as absent and falls through to DEEPNOTE_PYTHON', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpec({ explicit: undefined })
+
+    expect(result).toBe('/env/venv/bin/python')
+  })
+
+  it('falls back to detectDefaultPython() when neither explicit arg nor DEEPNOTE_PYTHON is set', () => {
+    mockExecSync.mockImplementation(() => Buffer.from('Python 3.11.0'))
+
+    const result = selectPythonSpec({})
+
+    expect(result).toBe('python')
+    expect(mockExecSync).toHaveBeenCalledWith('python --version', { stdio: 'ignore' })
+  })
+
+  it('falls back through detectDefaultPython() to python3 when python is unavailable', () => {
+    mockExecSync.mockImplementation((command: string) => {
+      if (command === 'python --version') {
+        throw new Error('command not found: python')
+      }
+      return Buffer.from('Python 3.11.0')
+    })
+
+    const result = selectPythonSpec({})
+
+    expect(result).toBe('python3')
   })
 })
 

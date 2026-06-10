@@ -53,3 +53,23 @@ Dispatched gitban-sprintmaster (agent a7a0f6a2). Verdict: readiness gate PASS, n
   - 2A onwhhg → agent a512932abc67 (watchdog bg bxadsmnfv, stale 300s)
   - 2B 1yecdf → agent a9c2ae6788a7 (watchdog bg b6g936m9n, stale 300s)
   - Awaiting completion notifications. (Merge + hung-executor check + tests on each return.)
+
+### Batch 1 — executor results + merges
+
+- **2A onwhhg** ✓ (agent a512932abc67): 2 commits (270a92a test, c723e41 feat) — selectPythonSpec resolver + isBareSystemPython re-export from index.ts + 7 precedence tests + package-entry capstone test. Scoped vitest 38✓, tsc/biome/cspell clean. Hung-check: 2 commits ✓. Merged ff → c723e41. Worktree/branch/tag cleaned. Reconciled card state → d70ff6e.
+- **2B 1yecdf** ✓ (agent a9c2ae6788a7): 1 commit 7c0f292 — executeAgentBlock tool-loop coverage (capstone invokes executeAgentBlock directly vs a recorded fullStream cassette, OPENAI_API_KEY asserted unset = fixtured, no key) + sourced model-precedence/maxTurns reconciliation (no behavior change). Scoped vitest 41✓, tsc/biome clean. Honest scope note from executor: fixtured, NOT live-verified (live-keyed E2E is the documented external residual). Hung-check: 1 commit ✓. Merged (ort) → bf32d0e. Worktree/branch/tag cleaned.
+- **Post-merge integration test (batch barrier):** `npx vitest run packages/runtime-core` from repo-root CWD → **223/223 passed, 7/7 files**. (A first run from the package dir hit ENOENT on execution-engine.test.ts's root-relative `examples/1_hello_world.deepnote` fixture path — an environmental CWD artifact, NOT a regression: my batch touched zero files outside 2A/2B's scope.)
+- Dispatching reviewers: 2A onwhhg (commit c723e41), 2B 1yecdf (commit 7c0f292).
+
+### Batch 1 — reviews / routing / closeout
+
+- **2A onwhhg reviewer-1** (agent a7c6f6c9): **APPROVAL**. Gate 1+2 PASS — verified TDD red→green (270a92a→c723e41), capstone real (package-entry import), 38 tests, tsc/biome clean. Non-blocking note: selector-wiring-pending (3A/3B will consume the selector).
+- **2B 1yecdf reviewer-1** (agent a9c62ccc): **APPROVAL**. Gate 1+2 PASS — partial vi.mock so production tool-loop is real code under test, cassette faithful to ai@6.0.116, comment-only handler change, 41 tests. Non-blocking: L1 tool-execute-wiring unasserted, L2 MCP finally branch unexercised.
+- **Routers**: onwhhg → APPROVAL, no planner (selector-wiring already-tracked 3A/3B scope). 1yecdf → APPROVAL + planner work (L1/L2).
+- **Closeouts**: onwhhg → **done** (37/37 resolved: 32 complete + 5 out-of-scope deploy/monitor boxes deferred to existing sibling cards sjwaox/o5pg2k via sanctioned `deferred to <card>` — no fabrication). 1yecdf → **done** (30/30 already checked).
+- **Planner (1yecdf L1/L2)** (agent a8d899c8): three-way taxonomy → both **closeout-append** to o5pg2k Retrospective (Items 1 & 2; non-blocking, no downstream dep, no external prereq). NO new sprint card created (correctly governed by planner skill over router's "all into sprint" framing). 0 duplicates.
+- **Batch 1 result: 2/7 done (onwhhg, 1yecdf). 0 blocked. 0 new cards. 2 retro items appended to closeout.**
+
+---
+
+## Phase 1 — Batch 2 (parallel): 3A mjporx + 3B pv4px0 (depend on 2A, now merged)

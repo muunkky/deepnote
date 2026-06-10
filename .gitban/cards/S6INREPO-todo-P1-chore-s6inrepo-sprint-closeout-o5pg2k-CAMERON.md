@@ -105,3 +105,64 @@ Closeout actions are enumerated in the Acceptance Criteria list above (archive c
 - [ ] Roadmap (`m1/s6`) updated for stories this sprint completed. <!-- cite: roadmap: -->
 
 ---
+
+### Item 1: Assert executeAgentBlock tool-wiring bindings (add_code_block / add_markdown_block execute)
+
+The shipped tests for card 1yecdf (step 2B) invoke `executeAgentBlock` directly and assert the
+`fullStream` part → `onAgentEvent` mapping, but the fake `ToolLoopAgent` replays pre-recorded
+`tool-result` parts rather than invoking the registered tools' `execute` callbacks. The two real
+agent tools are registered with `execute: context.addAndExecuteCodeBlock` (`add_code_block`) and
+`context.addMarkdownBlock` (`add_markdown_block`) at agent-handler.ts:199,207, but the `makeContext`
+`vi.fn` callbacks are never called, so nothing asserts the wiring: a swapped or dropped `execute`
+binding (`add_code_block` accidentally wired to the markdown callback, or vice versa) would not be
+caught. Close it by asserting on `captured.settings.tools` that
+`add_code_block.execute === context.addAndExecuteCodeBlock` (and the markdown counterpart), or have
+the fake invoke a registered tool's `execute` and assert the corresponding context callback fired.
+The reviewer classified this as a non-blocking follow-up (outside card 1yecdf's stream→event-mapping
+capstone). It does not block any downstream S6INREPO card — step 4 (sjwaox) is a version bump +
+CHANGELOG that does not depend on this added assertion, and steps 3A/3B depend on step 2A, not 2B —
+and it needs no external prerequisite (the registrations already exist), so it is captured here for
+closeout triage rather than a sprint card.
+
+| Deferral Type   | Description                                                                                                                              | Applies (true/false) |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| backlog         | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. |                      |
+| sprint          | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag.                                            |                      |
+| note-only       | Captured for record; no action; current output is fine as-is.                                                                            |                      |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment).       |                      |
+
+**Source:** 1yecdf review 1
+**Files touched:** packages/runtime-core/src/agent-handler.ts, packages/runtime-core/src/agent-handler.test.ts
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 1 classified (exactly one deferral type marked `true` above)
+- [ ] Item 1 actioned (action taken matches chosen type)
+
+### Item 2: Cover executeAgentBlock MCP lifecycle / close-error finally branch
+
+`executeAgentBlock` merges and instantiates MCP clients (`mergeMcpConfigs` + `createMCPClient`,
+agent-handler.ts:177-191) and closes them in a `finally` block with per-client error handling
+(lines 247-256). `mergeMcpConfigs` is unit-tested in isolation, but the executor's MCP lifecycle and
+close-error path _inside_ `executeAgentBlock` is unexercised — the new card-1yecdf tests all use
+`mcpServers: []`, so neither the client-instantiation path nor the close-error `finally` branch is
+ever entered. Add coverage that drives `executeAgentBlock` with a non-empty `mcpServers` config and
+asserts the close-error branch behaves correctly (a client whose `.close()` rejects is caught
+per-client and does not abort the others or the overall result). The reviewer classified this as a
+non-blocking follow-up. It does not block any downstream S6INREPO card (step 4 is a version bump +
+CHANGELOG independent of this branch; steps 3A/3B depend on step 2A) and needs no external
+prerequisite (the MCP merge/close code already exists), so it is captured here for closeout triage
+rather than a sprint card.
+
+| Deferral Type   | Description                                                                                                                              | Applies (true/false) |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| backlog         | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. |                      |
+| sprint          | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag.                                            |                      |
+| note-only       | Captured for record; no action; current output is fine as-is.                                                                            |                      |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment).       |                      |
+
+**Source:** 1yecdf review 1
+**Files touched:** packages/runtime-core/src/agent-handler.ts, packages/runtime-core/src/agent-handler.test.ts
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 2 classified (exactly one deferral type marked `true` above)
+- [ ] Item 2 actioned (action taken matches chosen type)

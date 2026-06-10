@@ -220,3 +220,18 @@ Confirmed-intentional via **sourced comments** added to `agent-handler.ts` (no b
 - `pnpm --filter @deepnote/runtime-core exec tsc --noEmit` → exit 0.
 
 No work deferred; no follow-up cards created.
+
+## Review Log — cycle 1 (router)
+
+**Verdict: APPROVAL** (commit `7c0f292`).
+Review report: `.gitban/agents/reviewer/inbox/S6INREPO-1yecdf-reviewer-1.md`
+
+- Gate 1 (completion claim): PASS — concrete Intent, real/unfakeable capstone, honest checkbox integrity.
+- Gate 2 (implementation quality): PASS — real loop under test (partial `vi.mock('ai')`), fixture faithful to `ai@6.0.116` `TextStreamPart`, ordered-event capstone assertion, comment-only defaults reconciliation. Independent run: 41 passed (7 new), tsc exit 0, biome exit 0.
+
+**Routing:**
+
+- Executor (cycle 1): close-out — check remaining boxes, complete + validate. No blocking close-out actions per reviewer. PR-branch cut is the PR agent's job.
+- Planner (cycle 1): 2 non-blocking follow-ups grouped into 1 sprint card (same module `agent-handler.ts` / `agent-handler.test.ts`):
+  - L1 tool-wiring-coverage-gap — assert `add_code_block.execute`/`add_markdown_block.execute` bindings (registered-tool `execute` not currently exercised).
+  - L2 mcp-merge-coverage-gap — cover the MCP lifecycle / close-error `finally` branch inside `executeAgentBlock`.

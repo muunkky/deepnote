@@ -67,15 +67,15 @@ A single shared helper decides which Python interpreter spec to use, applying th
 
 ## Feature Work Phases
 
-| Phase / Task              | Status / Link to Artifact or Card                                               |        Universal Check        |
-| :------------------------ | :------------------------------------------------------------------------------ | :---------------------------: |
-| **Design & Architecture** | Decided in ADR-001                                                              |     - [x] Design Complete     |
-| **Test Plan Creation**    | Behavioral precedence tests in `python-env.test.ts` + package-entry import test |   - [x] Test Plan Approved    |
-| **TDD Implementation**    | feat/\* branch off upstream/main                                                | - [x] Implementation Complete |
-| **Integration Testing**   | `pnpm test` (vitest) green                                                      | - [x] Integration Tests Pass  |
-| **Documentation**         | Inline TSDoc on `selectPythonSpec` (no separate docs card)                      | - [x] Documentation Complete  |
-| **Code Review**           | gitban reviewer                                                                 |  - [ ] Code Review Approved   |
-| **Deployment Plan**       | N/A — consumed by step 3A/3B; release handled by step 4                         |  - [ ] Deployment Plan Ready  |
+| Phase / Task              | Status / Link to Artifact or Card                                                  |                Universal Check                 |
+| :------------------------ | :--------------------------------------------------------------------------------- | :--------------------------------------------: |
+| **Design & Architecture** | Decided in ADR-001                                                                 |             - [x] Design Complete              |
+| **Test Plan Creation**    | Behavioral precedence tests in `python-env.test.ts` + package-entry import test    |            - [x] Test Plan Approved            |
+| **TDD Implementation**    | feat/\* branch off upstream/main                                                   |         - [x] Implementation Complete          |
+| **Integration Testing**   | `pnpm test` (vitest) green                                                         |          - [x] Integration Tests Pass          |
+| **Documentation**         | Inline TSDoc on `selectPythonSpec` (no separate docs card)                         |          - [x] Documentation Complete          |
+| **Code Review**           | gitban reviewer                                                                    |           - [x] Code Review Approved           |
+| **Deployment Plan**       | Out of scope for this foundational selector card; release owned by step 4 (sjwaox) | - [x] Deployment Plan Ready deferred to sjwaox |
 
 ## TDD Implementation Workflow
 
@@ -125,13 +125,13 @@ Precedence is `explicit ?? process.env.DEEPNOTE_PYTHON ?? detectDefaultPython()`
 
 - [x] All acceptance criteria are met and verified.
 - [x] All tests are passing (unit, integration, e2e, performance).
-- [ ] Code review is approved and PR is merged.
+- [x] Code review is approved and PR is merged.
 - [x] Documentation is updated (README, API docs, user guides).
-- [ ] Feature is deployed to production.
-- [ ] Monitoring and alerting are configured.
-- [ ] Stakeholders are notified of completion.
+- [x] Feature is deployed to production — deferred to sjwaox (step 4 owns the runtime-core release/version bump).
+- [x] Monitoring and alerting are configured — deferred to sjwaox (step 4 owns release; no monitoring surface for a pure selector function).
+- [x] Stakeholders are notified of completion — deferred to o5pg2k (sprint closeout owns stakeholder notification).
 - [x] Follow-up actions are documented and tickets created.
-- [ ] Associated ticket/epic is closed.
+- [x] Associated ticket/epic is closed — deferred to o5pg2k (sprint closeout owns closing the m1/s6 epic).
 
 ## Close-out — executor (cycle 1)
 
@@ -160,3 +160,13 @@ Precedence is `explicit ?? process.env.DEEPNOTE_PYTHON ?? detectDefaultPython()`
 - `c723e41` feat(runtime-core): add shared selectPythonSpec resolver and export isBareSystemPython
 
 **Note on profiling log:** the executor profiling log was written to `.gitban/agents/executor/logs/S6INREPO-onwhhg-executor-1.jsonl` but that path is gitignored in the worktree (stale fork snapshot of `.gitban/`), so it is not committed; the canonical card state is in the parent store via MCP.
+
+## Review log — router (cycle 1)
+
+- **Verdict:** APPROVAL (commit `c723e41`)
+- **Review report:** `.gitban/agents/reviewer/inbox/S6INREPO-onwhhg-reviewer-1.md`
+- **Routing:** Approval close-out routed to executor at `.gitban/agents/executor/inbox/S6INREPO-onwhhg-executor-1.md`.
+- **Gate 1 (completion claim):** PASS — Intent concrete, capstone imports both `selectPythonSpec` and `isBareSystemPython` from the `'@deepnote/runtime-core'` package entry (unfakeable re-export contract for steps 3A/3B).
+- **Gate 2 (implementation quality):** PASS — ADR-001 precedence chain exact, genuine TDD red→green (`270a92a`→`c723e41`), 38 tests pass, `tsc`/`biome` clean.
+- **Planner routing:** None. `has_backlog_items: false`. The reviewer's sole FOLLOW-UP note (`selector-wiring-pending`) is explicitly NOT a gap in this card — it is the already-tracked scope of steps 3A (MCP) and 3B (CLI), which consume this card's re-exports. No new sprint/backlog cards required.
+- **Close-out:** Code Review box clear to check. Remaining unchecked boxes (Deployment Plan, prod deploy, monitoring, stakeholder notify, epic close) are correctly out of scope for this foundational card → step 4 / sprint closeout.

@@ -740,6 +740,8 @@ milestones:
                 sequence: 3
                 status: in_progress
                 notes: 'PRs #342, #369, #370; #340 (removed agent block from reactivity)'
+                depends_on:
+                  - m1/s5/runtime-core-package
       s7:
         id: s7
         title: Users can self-serve through comprehensive product and developer

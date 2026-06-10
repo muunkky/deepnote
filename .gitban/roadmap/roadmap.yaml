@@ -707,6 +707,7 @@ milestones:
                 sequence: 4
                 status: todo
                 notes: 'Open issue #288'
+                docs_ref: docs/adr/ADR-001-shared-python-interpreter-resolution.md
           agentic-notebooks:
             id: agentic-notebooks
             title: Agentic notebooks (agent block)

@@ -9,9 +9,9 @@
 
 **Required Checks:**
 
-- [ ] Ticket/Issue ID is linked above
-- [ ] Component/Service is clearly identified
-- [ ] Severity level is assigned based on impact
+- [x] Ticket/Issue ID is linked above
+- [x] Component/Service is clearly identified
+- [x] Severity level is assigned based on impact
 
 > **Sequencing:** runs as the last work card before the S6INREPO closeout (`o5pg2k`); the closeout completes only after this lands. The fix lands on `sprint/S6INREPO`; the operator then re-extracts the code commits onto the `feat/shared-python-interpreter-resolution` PR branch.
 
@@ -23,12 +23,12 @@ After this card, an empty or blank interpreter signal can no longer silently bre
 
 ### Observable outcomes
 
-- [ ] **Capstone:** with no `--python`/`pythonPath` and `DEEPNOTE_PYTHON=""` (blank), `selectPythonSpec()` returns the autodetected interpreter (not `""`); and via the MCP `deepnote_run` path, `pythonPath: ""` resolves to the autodetect spec and the bare-python hint still fires — both proven by a test that fails on the current `??` code and passes after the fix.
-- [ ] `selectPythonSpec` treats empty/whitespace-only `explicit` and `DEEPNOTE_PYTHON` as absent (falls through the precedence chain); its JSDoc no longer documents `??`-style passthrough of empty strings.
-- [ ] `resolvePythonEnv` `hasOverride` (execution.ts) uses a truthiness/non-blank check, so a blank `DEEPNOTE_PYTHON=` does not suppress the bare-python hint.
-- [ ] CLI `run.test.ts` precedence suite exercises the REAL `selectPythonSpec` (only the autodetect leaf `detectDefaultPython` mocked), so a real precedence regression fails it.
-- [ ] `execution.python-env.test.ts` autodetect-tier assertion no longer derives its expected value from `detectDefaultPython()` under test — a wrong autodetect wiring fails it.
-- [ ] `agent-handler.test.ts` "maxTurns=10" test asserts the cap value (e.g. `stopWhen` equals `stepCountIs(10)` / inspects the argument), not merely that `stopWhen` is defined.
+- [x] **Capstone:** with no `--python`/`pythonPath` and `DEEPNOTE_PYTHON=""` (blank), `selectPythonSpec()` returns the autodetected interpreter (not `""`); and via the MCP `deepnote_run` path, `pythonPath: ""` resolves to the autodetect spec and the bare-python hint still fires — both proven by a test that fails on the current `??` code and passes after the fix.
+- [x] `selectPythonSpec` treats empty/whitespace-only `explicit` and `DEEPNOTE_PYTHON` as absent (falls through the precedence chain); its JSDoc no longer documents `??`-style passthrough of empty strings.
+- [x] `resolvePythonEnv` `hasOverride` (execution.ts) uses a truthiness/non-blank check, so a blank `DEEPNOTE_PYTHON=` does not suppress the bare-python hint.
+- [x] CLI `run.test.ts` precedence suite exercises the REAL `selectPythonSpec` (only the autodetect leaf `detectDefaultPython` mocked), so a real precedence regression fails it.
+- [x] `execution.python-env.test.ts` autodetect-tier assertion no longer derives its expected value from `detectDefaultPython()` under test — a wrong autodetect wiring fails it.
+- [x] `agent-handler.test.ts` "maxTurns=10" test asserts the cap value (e.g. `stopWhen` equals `stepCountIs(10)` / inspects the argument), not merely that `stopWhen` is defined.
 
 ## Bug Description
 
@@ -132,13 +132,13 @@ Pure code/test change on a fork branch; revert with `git revert` of the remediat
 
 |              Step               | Status/Details                                         |                       Universal Check                       |
 | :-----------------------------: | :----------------------------------------------------- | :---------------------------------------------------------: |
-|    **1. Write Failing Test**    | empty/blank fallback + 3 fidelity tests                |  - [ ] A failing test that reproduces the bug is committed  |
-|    **2. Verify Test Fails**     | run scoped vitest                                      | - [ ] Test suite was run and the new test fails as expected |
-|    **3. Implement Code Fix**    | selectPythonSpec + hasOverride + JSDoc + test rewrites |        - [ ] Code changes are complete and committed        |
-|    **4. Verify Test Passes**    | run scoped vitest                                      |         - [ ] The original failing test now passes          |
-|   **5. Run Full Test Suite**    | runtime-core + mcp + cli                               |    - [ ] All existing tests still pass (no regressions)     |
-|       **6. Code Review**        | reviewer (gitban)                                      |       - [ ] Code review approved by at least one peer       |
-|   **7. Update Documentation**   | `selectPythonSpec` JSDoc                               |            - [ ] Documentation is updated (DaC)             |
+|    **1. Write Failing Test**    | empty/blank fallback + 3 fidelity tests                |  - [x] A failing test that reproduces the bug is committed  |
+|    **2. Verify Test Fails**     | run scoped vitest                                      | - [x] Test suite was run and the new test fails as expected |
+|    **3. Implement Code Fix**    | selectPythonSpec + hasOverride + JSDoc + test rewrites |        - [x] Code changes are complete and committed        |
+|    **4. Verify Test Passes**    | run scoped vitest                                      |         - [x] The original failing test now passes          |
+|   **5. Run Full Test Suite**    | runtime-core + mcp + cli                               |    - [x] All existing tests still pass (no regressions)     |
+|       **6. Code Review**        | reviewer (gitban)                                      |       - [x] Code review approved by at least one peer       |
+|   **7. Update Documentation**   | `selectPythonSpec` JSDoc                               |            - [x] Documentation is updated (DaC)             |
 |    **8. Deploy to Staging**     | N/A — fork PR, no deploy                               |                          - [x] N/A                          |
 |   **9. Staging Verification**   | N/A                                                    |                          - [x] N/A                          |
 |  **10. Deploy to Production**   | N/A — merge is upstream maintainers' call              |                          - [x] N/A                          |
@@ -173,27 +173,27 @@ it("treats an empty explicit arg as absent", () => {
 
 | Test Type            | Test Case                                                       | Expected Result                         | Status     |
 | :------------------- | :-------------------------------------------------------------- | :-------------------------------------- | :--------- |
-| **Unit Test**        | `selectPythonSpec` with `explicit=''` / blank `DEEPNOTE_PYTHON` | Falls through to autodetect             | - [ ] Pass |
-| **Integration Test** | MCP `deepnote_run` with `pythonPath: ''`                        | Resolves to autodetect spec; hint fires | - [ ] Pass |
-| **Regression Test**  | Real venv path / explicit arg still wins                        | Unchanged                               | - [ ] Pass |
-| **Fidelity (CLI)**   | Precedence suite runs real selector                             | Fails on a real precedence regression   | - [ ] Pass |
-| **Fidelity (MCP)**   | Autodetect assertion non-tautological                           | Fails on wrong autodetect wiring        | - [ ] Pass |
-| **Fidelity (agent)** | maxTurns asserts cap value 10                                   | Fails if cap changes                    | - [ ] Pass |
+| **Unit Test**        | `selectPythonSpec` with `explicit=''` / blank `DEEPNOTE_PYTHON` | Falls through to autodetect             | - [x] Pass |
+| **Integration Test** | MCP `deepnote_run` with `pythonPath: ''`                        | Resolves to autodetect spec; hint fires | - [x] Pass |
+| **Regression Test**  | Real venv path / explicit arg still wins                        | Unchanged                               | - [x] Pass |
+| **Fidelity (CLI)**   | Precedence suite runs real selector                             | Fails on a real precedence regression   | - [x] Pass |
+| **Fidelity (MCP)**   | Autodetect assertion non-tautological                           | Fails on wrong autodetect wiring        | - [x] Pass |
+| **Fidelity (agent)** | maxTurns asserts cap value 10                                   | Fails if cap changes                    | - [x] Pass |
 
 ### Verification Checklist
 
-- [ ] Original bug is no longer reproducible
-- [ ] All new tests pass
-- [ ] All existing tests still pass (no regressions)
-- [ ] Code review completed and approved
-- [ ] Documentation updated
-- [ ] No new linter warnings
+- [x] Original bug is no longer reproducible
+- [x] All new tests pass
+- [x] All existing tests still pass (no regressions)
+- [x] Code review completed and approved
+- [x] Documentation updated
+- [x] No new linter warnings
 
 ## Regression Prevention
 
-- [ ] **Automated Test:** empty/blank fallback unit + integration tests added
-- [ ] **Integration Test:** MCP `deepnote_run` empty-`pythonPath` path covered
-- [ ] **Documentation:** `selectPythonSpec` JSDoc states empties-as-absent
+- [x] **Automated Test:** empty/blank fallback unit + integration tests added
+- [x] **Integration Test:** MCP `deepnote_run` empty-`pythonPath` path covered
+- [x] **Documentation:** `selectPythonSpec` JSDoc states empties-as-absent
 
 ## Validation & Finalization
 
@@ -212,11 +212,21 @@ it("treats an empty explicit arg as absent", () => {
 
 ### Completion Checklist
 
-- [ ] Root cause is fully understood and documented
-- [ ] Fix follows TDD process (failing test → fix → passing test)
-- [ ] All tests pass (unit, integration, regression)
-- [ ] Documentation updated (DaC)
-- [ ] No manual infrastructure changes
-- [ ] Regression prevention measures added
-- [ ] Follow-up tickets referenced (ohoh63, fkxnne)
-- [ ] Associated review findings resolved
+- [x] Root cause is fully understood and documented
+- [x] Fix follows TDD process (failing test → fix → passing test)
+- [x] All tests pass (unit, integration, regression)
+- [x] Documentation updated (DaC)
+- [x] No manual infrastructure changes
+- [x] Regression prevention measures added
+- [x] Follow-up tickets referenced (ohoh63, fkxnne)
+- [x] Associated review findings resolved
+
+## Review Log — Cycle 1 (APPROVAL)
+
+- **Verdict:** APPROVAL (Gate 1 PASS, Gate 2 PASS)
+- **Reviewed commit:** 1cec326
+- **Date:** 2026-06-10
+- **Review report:** `.gitban/agents/reviewer/inbox/S6INREPO-3oz7aa-reviewer-1.md`
+- **Blockers:** None
+- **Follow-up items:** None (the two adjacent gaps the diff brushes against — `ohoh63`, `fkxnne` — are already carded)
+- **Outstanding close-out action:** Reconcile the card's unticked DoD/Observable/checkbox state (left unticked by the executor's mid-run socket death; all work satisfied by 1cec326). Routed to executor inbox `.gitban/agents/executor/inbox/S6INREPO-3oz7aa-executor-1.md`.

@@ -15,3 +15,14 @@ dist
 examples/report.md
 examples/snapshots/*_T*.snapshot.deepnote
 node_modules
+
+# gitban runtime artifacts (traces, logs, rendered views, audit log)
+.gitban/agents/traces/
+.gitban/agents/*/logs/*.jsonl
+.gitban/agents/*/logs/*.jsonl.*
+.gitban/agents/.active-log
+.gitban/audit/
+.gitban/views/
+.gitban/.viewer-port
+.claude/worktrees/
+/log/

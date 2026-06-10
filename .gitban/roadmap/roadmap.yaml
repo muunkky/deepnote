@@ -404,8 +404,13 @@ milestones:
                 description: 'Known gap: built-in integration ID filtering should
                   be normalized to be case-insensitive.'
                 sequence: 5
-                status: todo
-                notes: 'Open issue #325'
+                status: done
+                notes: 'Closed by card 234rnd / PR deepnote/deepnote#399 (Closes #325).
+                  Single shared isBuiltinIntegration() helper normalizes built-in
+                  ID matching to be case-insensitive across collect-integrations.ts
+                  and analysis.ts. Out-of-scope external-ID case-insensitivity tracked
+                  in backlog card ca0ios.'
+                cards_ref: 234rnd (done); ca0ios (backlog follow-up)
       s5:
         id: s5
         title: Deepnote projects run locally from the command line

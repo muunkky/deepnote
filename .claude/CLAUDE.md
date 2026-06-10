@@ -24,6 +24,44 @@ feat/*     → PR branches, cut from upstream/main (clean — no gitban files).
 
 Git HTTPS auth is brokered by the GitHub CLI (`gh auth setup-git`, token scope `repo`).
 
+## Local dev setup
+
+**Baseline — needed for any contribution.** TypeScript monorepo, pnpm workspace.
+
+```bash
+nvm use                        # Node 22.21.0 (.nvmrc; engines >=22.14.0)
+corepack enable                # pnpm 10.19 — npm/yarn are rejected by packageManager
+pnpm install --frozen-lockfile
+```
+
+Reproduce CI locally before pushing:
+
+```bash
+pnpm test          # vitest
+pnpm typecheck     # tsc --noEmit across packages
+pnpm lintAndFormat # Biome (TS/JS) + Prettier (md/yaml)
+pnpm spell-check   # cspell — add terms to cspell.json / docs-dictionary.txt
+```
+
+Docker is listed as a prereq in `CONTRIBUTING.md`.
+
+**Per-area extras** (only when you touch that area):
+
+| Area / packages | Extra setup beyond baseline |
+| --- | --- |
+| `blocks`, `convert`, `database-integrations`, snapshots, docs | none — pure TypeScript / Markdown |
+| `cli`, `runtime-core`, `reactivity` (execution) | Python 3 + `pip install jinja2`; a venv with `pip install "deepnote-toolkit[server]"`; point `pythonEnv` / `--python` at it |
+| `mcp` server | baseline; to test live, wire into an MCP client (Cursor/Claude) per `packages/mcp/README.md` |
+| agent blocks / AI features | the execution extras above **plus** an AI provider API key |
+| db integrations end-to-end (optional) | a live DB — Docker for Postgres/MySQL/Mongo, or a cloud account + auth for warehouses (see `docs/<integration>.md`) |
+
+Release/publish secrets (`NPM_TOKEN`, PyPI trusted publishing, `CODECOV_TOKEN`) are
+maintainer-only — never needed for fork contributions.
+
+> Per-story setup is also captured in the gitban roadmap: each `m1/s<n>` story
+> description ends with a "Dev setup" clause. Read the relevant node before
+> cutting its branch — `read_roadmap(path="m1/s5")`, etc.
+
 ## Day-to-day
 
 **Start a contribution** (clean base → no gitban files in the PR):

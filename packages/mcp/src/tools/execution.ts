@@ -22,7 +22,7 @@ import {
   slugifyProjectName,
   splitDeepnoteFile,
 } from '@deepnote/convert'
-import { ExecutionEngine, executableBlockTypeSet } from '@deepnote/runtime-core'
+import { ExecutionEngine, executableBlockTypeSet, isBareSystemPython, selectPythonSpec } from '@deepnote/runtime-core'
 import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { formatOutput } from '../utils.js'
@@ -94,6 +94,32 @@ function getErrorCode(error: unknown): string | undefined {
   if (typeof error !== 'object' || error === null) return undefined
   const maybeCode = Reflect.get(error, 'code')
   return typeof maybeCode === 'string' ? maybeCode : undefined
+}
+
+/**
+ * Resolve the Python interpreter spec to hand to {@link ExecutionEngine}, applying
+ * the shared precedence chain (arg > `DEEPNOTE_PYTHON` > autodetect) from
+ * `@deepnote/runtime-core`'s {@link selectPythonSpec}.
+ *
+ * Returns the selected `spec` plus an optional actionable `hint`. The hint fires
+ * ONLY when the resolved spec is a bare system interpreter (`isBareSystemPython`)
+ * AND the caller gave no override — neither the `pythonPath` argument nor the
+ * `DEEPNOTE_PYTHON` env var. A bare system interpreter typically lacks
+ * `deepnote-toolkit`, so without this hint the failure would surface as an opaque
+ * import error deep inside execution rather than at the tool boundary.
+ */
+function resolvePythonEnv(pythonPath: string | undefined): { spec: string; hint?: string } {
+  const spec = selectPythonSpec({ explicit: pythonPath })
+  const hasOverride = pythonPath != null || process.env.DEEPNOTE_PYTHON != null
+  if (isBareSystemPython(spec) && !hasOverride) {
+    return {
+      spec,
+      hint:
+        `Resolved Python to "${spec}" (system interpreter) which likely lacks deepnote-toolkit. ` +
+        `Set DEEPNOTE_PYTHON or pass pythonPath to a venv with deepnote-toolkit[server] installed.`,
+    }
+  }
+  return { spec }
 }
 
 export const executionTools: Tool[] = [
@@ -390,8 +416,9 @@ async function handleRun(args: Record<string, unknown>) {
 
   // Actually run the notebooks
   const workingDir = path.dirname(originalPath)
+  const { spec: pythonEnv, hint: pythonHint } = resolvePythonEnv(pythonPath)
   const engine = new ExecutionEngine({
-    pythonEnv: pythonPath || 'python',
+    pythonEnv,
     workingDirectory: workingDir,
   })
 
@@ -467,6 +494,7 @@ async function handleRun(args: Record<string, unknown>) {
           },
       results: compact ? results.filter(r => !r.success || r.error) : results,
       ...(outputSummaries && outputSummaries.length > 0 ? { outputSummaries } : {}),
+      ...(pythonHint ? { pythonHint } : {}),
       hint:
         snapshotPath && !includeOutputSummary
           ? 'Use deepnote_snapshot_load to inspect outputs, errors, and debug info'
@@ -555,8 +583,9 @@ async function handleRunBlock(
 
   // Run the specific block
   const workingDir = path.dirname(originalPath)
+  const { spec: pythonEnv, hint: pythonHint } = resolvePythonEnv(pythonPath)
   const engine = new ExecutionEngine({
-    pythonEnv: pythonPath || 'python',
+    pythonEnv,
     workingDirectory: workingDir,
   })
 
@@ -582,6 +611,7 @@ async function handleRunBlock(
               executedBlocks: summary.executedBlocks,
               failedBlocks: summary.failedBlocks,
               durationMs: summary.totalDurationMs,
+              ...(pythonHint ? { pythonHint } : {}),
             },
             null,
             2

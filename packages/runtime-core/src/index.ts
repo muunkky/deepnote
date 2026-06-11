@@ -17,6 +17,7 @@ export {
   isBareSystemPython,
   resolvePythonExecutable,
   selectPythonSpec,
+  selectPythonSpecWithHint,
 } from './python-env'
 export type { ServerInfo, ServerOptions } from './server-starter'
 export { findConsecutiveAvailablePorts, startServer, stopServer, waitForServer } from './server-starter'

@@ -3,7 +3,13 @@ import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildPythonEnv, detectDefaultPython, resolvePythonExecutable, selectPythonSpec } from './python-env'
+import {
+  buildPythonEnv,
+  detectDefaultPython,
+  resolvePythonExecutable,
+  selectPythonSpec,
+  selectPythonSpecWithHint,
+} from './python-env'
 
 vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
@@ -340,6 +346,113 @@ describe('selectPythonSpec', () => {
     const result = selectPythonSpec({ explicit: '' })
 
     expect(result).toBe('python')
+  })
+})
+
+describe('selectPythonSpecWithHint', () => {
+  // The single source of truth for the ADR-001 bare-system-python warning shared by the
+  // CLI (`--python`) and MCP (`pythonPath`) consumers. The hint fires ONLY when the
+  // resolved spec is bare AND no *real* (non-blank) override was supplied — a blank value
+  // is not an override and must NOT suppress it.
+  const mockExecSync = vi.mocked(execSync)
+  let savedDeepnotePython: string | undefined
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    savedDeepnotePython = process.env.DEEPNOTE_PYTHON
+    delete process.env.DEEPNOTE_PYTHON
+    // Default to a bare autodetect so the hint gate can fire unless a test overrides it.
+    mockExecSync.mockImplementation(() => Buffer.from('Python 3.11.0'))
+  })
+
+  afterEach(() => {
+    if (savedDeepnotePython === undefined) {
+      delete process.env.DEEPNOTE_PYTHON
+    } else {
+      process.env.DEEPNOTE_PYTHON = savedDeepnotePython
+    }
+  })
+
+  it('attaches the hint when resolution lands on bare system python with no override', () => {
+    const result = selectPythonSpecWithHint({ argLabel: '--python' })
+
+    expect(result.spec).toBe('python')
+    expect(result.hint).toBeDefined()
+    expect(result.hint).toContain('system interpreter')
+    expect(result.hint).toContain('DEEPNOTE_PYTHON')
+    expect(result.hint).toContain('deepnote-toolkit')
+  })
+
+  it('embeds the caller-surface argLabel in the hint', () => {
+    const cli = selectPythonSpecWithHint({ argLabel: '--python' })
+    const mcp = selectPythonSpecWithHint({ argLabel: 'pythonPath' })
+
+    expect(cli.hint).toContain('--python')
+    expect(mcp.hint).toContain('pythonPath')
+    expect(mcp.hint).not.toContain('--python')
+  })
+
+  it('does NOT attach a hint when an explicit (real) override is provided', () => {
+    const result = selectPythonSpecWithHint({ explicit: '/explicit/venv/bin/python', argLabel: '--python' })
+
+    expect(result.spec).toBe('/explicit/venv/bin/python')
+    expect(result.hint).toBeUndefined()
+  })
+
+  it('does NOT attach a hint when DEEPNOTE_PYTHON is a real override', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpecWithHint({ argLabel: 'pythonPath' })
+
+    expect(result.spec).toBe('/env/venv/bin/python')
+    expect(result.hint).toBeUndefined()
+  })
+
+  it('does NOT attach a hint when the resolved spec is a non-bare interpreter', () => {
+    // A path override resolves to a non-bare spec, so the bare-python gate never opens.
+    const result = selectPythonSpecWithHint({ explicit: '/path/to/venv', argLabel: '--python' })
+
+    expect(result.spec).toBe('/path/to/venv')
+    expect(result.hint).toBeUndefined()
+  })
+
+  it('FIRES the hint when explicit is blank (blank is not an override)', () => {
+    // A blank explicit falls through to bare autodetect; the warning must still surface.
+    const result = selectPythonSpecWithHint({ explicit: '', argLabel: '--python' })
+
+    expect(result.spec).toBe('python')
+    expect(result.hint).toBeDefined()
+    expect(result.hint).toContain('system interpreter')
+  })
+
+  it('FIRES the hint when DEEPNOTE_PYTHON is blank (blank is not an override)', () => {
+    process.env.DEEPNOTE_PYTHON = ''
+
+    const result = selectPythonSpecWithHint({ argLabel: 'pythonPath' })
+
+    expect(result.spec).toBe('python')
+    expect(result.hint).toBeDefined()
+    expect(result.hint).toContain('system interpreter')
+  })
+
+  it('FIRES the hint when both explicit and DEEPNOTE_PYTHON are blank', () => {
+    process.env.DEEPNOTE_PYTHON = ''
+
+    const result = selectPythonSpecWithHint({ explicit: '   ', argLabel: '--python' })
+
+    expect(result.spec).toBe('python')
+    expect(result.hint).toBeDefined()
+  })
+
+  it('does NOT attach a hint when DEEPNOTE_PYTHON is an explicit bare override', () => {
+    // The user explicitly chose a bare interpreter via env — that is a real override,
+    // so even though the spec is bare, no hint fires.
+    process.env.DEEPNOTE_PYTHON = 'python'
+
+    const result = selectPythonSpecWithHint({ argLabel: 'pythonPath' })
+
+    expect(result.spec).toBe('python')
+    expect(result.hint).toBeUndefined()
   })
 })
 

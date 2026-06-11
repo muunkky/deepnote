@@ -75,7 +75,7 @@ Today the "your interpreter is a bare system python and probably lacks deepnote-
 | **Baseline Measurements**   | runtime-core 234, cli run 162, mcp python-env 13 (current green) |     - [x] Baseline metrics captured (complexity, performance, coverage).      |
 | **Incremental Refactoring** | extract → wire MCP → wire CLI                                    | - [x] Refactoring implemented incrementally with passing tests at each step.  |
 | **Documentation Updates**   | JSDoc on the new helper; CHANGELOG                               |          - [x] All documentation updated to reflect refactored code.          |
-| **Code Review**             | gitban reviewer                                                  | - [ ] Code reviewed for correctness, style guide compliance, maintainability. |
+| **Code Review**             | gitban reviewer                                                  | - [x] Code reviewed for correctness, style guide compliance, maintainability. |
 | **Performance Validation**  | N/A — pure structural change, no hot path                        |                                   - [x] N/A                                   |
 | **Staging Deployment**      | N/A — in-repo fork PR, no deploy                                 |                                   - [x] N/A                                   |
 | **Production Deployment**   | N/A — merge is the user's call; ships with next release          |                                   - [x] N/A                                   |
@@ -93,7 +93,7 @@ Today the "your interpreter is a bare system python and probably lacks deepnote-
 |     **7. Repeat Steps 4-6**      | wire MCP, then CLI                          | - [x] All incremental refactoring steps completed with passing tests. |
 |   **8. Update Documentation**    | JSDoc + CHANGELOG                           |                   - [x] All documentation updated.                    |
 |   **9. Style & Linting Check**   | tsc --noEmit + biome                        | - [x] Code passes linting, type checking, and style guide validation. |
-|       **10. Code Review**        | gitban reviewer                             |      - [ ] Changes reviewed for correctness and maintainability.      |
+|       **10. Code Review**        | gitban reviewer                             |      - [x] Changes reviewed for correctness and maintainability.      |
 |  **11. Performance Validation**  | N/A — structural                            |                               - [x] N/A                               |
 |    **12. Deploy to Staging**     | N/A — fork PR                               |                               - [x] N/A                               |
 |  **13. Production Deployment**   | N/A — user's merge call                     |                               - [x] N/A                               |
@@ -133,7 +133,7 @@ Today the "your interpreter is a bare system python and probably lacks deepnote-
 - [x] All tests pass after each refactoring step (continuous validation).
 - [x] Documentation updated (JSDoc, CHANGELOG).
 - [x] Code passes style guide validation (tsc, biome).
-- [ ] Code reviewed (gitban reviewer).
+- [x] Code reviewed (gitban reviewer).
 - [x] No behavior change — both consumer suites pass UNCHANGED.
 - [x] Staging validation N/A — in-repo fork PR.
 - [x] Production deployment N/A — merge is the user's call.

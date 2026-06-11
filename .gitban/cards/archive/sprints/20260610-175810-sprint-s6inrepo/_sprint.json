@@ -1,0 +1,27 @@
+{
+  "sprint_id": "20260610-175810-sprint-s6inrepo",
+  "sprint_name": "S6INREPO",
+  "sprint_folder": "20260610-175810-sprint-s6inrepo",
+  "created_at": "2026-06-10T17:58:10.697901",
+  "start_date": null,
+  "end_date": "2026-06-10",
+  "archived_at": "2026-06-10T17:58:10.697901",
+  "card_ids": ["5qz6zl", "onwhhg", "1yecdf", "mjporx", "pv4px0", "sjwaox", "3oz7aa", "ohoh63", "fkxnne", "vxiipn"],
+  "metrics": {
+    "total_cards": 10,
+    "by_priority": {
+      "P1": 8,
+      "P2": 2
+    },
+    "by_type": {
+      "feature": 5,
+      "test": 2,
+      "chore": 1,
+      "bug": 1,
+      "spike": 1
+    },
+    "by_handle": {
+      "CAMERON": 10
+    }
+  }
+}

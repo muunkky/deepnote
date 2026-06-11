@@ -164,6 +164,34 @@ deepnote-toolkit config set server.jupyter_port 9000
 
 **Security Warning**: The CLI will warn if Jupyter runs without authentication. This is intended for local development only. Set `DEEPNOTE_JUPYTER_TOKEN` for shared environments.
 
+### Selecting the Python interpreter (`DEEPNOTE_PYTHON`)
+
+Local execution — whether through the CLI or the `@deepnote/mcp` server's `deepnote_run` tool — needs a Python interpreter that has `deepnote-toolkit[server]` installed. Both tools resolve the interpreter with the same precedence (most specific wins):
+
+1. A per-invocation argument (`--python` for the CLI, `pythonPath` for `deepnote_run`).
+2. The **`DEEPNOTE_PYTHON`** environment variable.
+3. Autodetected system Python (`python`, then `python3`).
+
+`DEEPNOTE_PYTHON` (and the per-invocation argument) accept any of these forms:
+
+| Form           | Example                    | Notes                                           |
+| -------------- | -------------------------- | ----------------------------------------------- |
+| **Executable** | `/path/to/venv/bin/python` | A direct path to the Python binary.             |
+| **`bin/` dir** | `/path/to/venv/bin`        | The directory containing `python`.              |
+| **Venv root**  | `/path/to/venv`            | The venv root; `bin/python` is located for you. |
+
+Publish your interpreter by exporting the variable before launching the CLI or MCP server:
+
+```bash
+# Point at a venv that has deepnote-toolkit[server] installed
+export DEEPNOTE_PYTHON=/path/to/venv
+
+# Now the CLI and the MCP server both run against that interpreter
+deepnote run analysis.deepnote
+```
+
+**Bare-system-python hint**: if you provide no interpreter override and only a bare system Python (e.g. `python` or `python3`) is found, the tools still attempt to run but warn you that this interpreter likely lacks `deepnote-toolkit`. The fix is to set `DEEPNOTE_PYTHON` (or pass `--python` / `pythonPath`) to a venv with `deepnote-toolkit[server]` installed, so the failure surfaces up front instead of as an opaque import error mid-run.
+
 ### Using in Python Code
 
 ```python

@@ -9,13 +9,13 @@ import { getBlockDependencies, getUpstreamBlocks } from '@deepnote/reactivity'
 import {
   type AgentStreamEvent,
   type BlockExecutionResult,
-  detectDefaultPython,
   ExecutionEngine,
   type ExecutionSummary,
   executableBlockTypeSet,
   type IOutput,
   type DeepnoteBlock as RuntimeDeepnoteBlock,
   resolvePythonExecutable,
+  selectPythonSpecWithHint,
 } from '@deepnote/runtime-core'
 import type { Command } from 'commander'
 import dotenv from 'dotenv'
@@ -293,7 +293,18 @@ async function setupProject(path: string | undefined, options: RunOptions): Prom
 
   dotenv.config({ path: join(workingDirectory, DEFAULT_ENV_FILE), quiet: true })
 
-  const pythonEnv = await resolvePythonExecutable(options.python ?? detectDefaultPython())
+  // Shared ADR-001 resolver: `--python` > DEEPNOTE_PYTHON > autodetect, plus the
+  // bare-system-python hint. The same runtime-core helper backs the MCP consumer, so the
+  // two cannot diverge; only the printed surface noun (`--python`) is CLI-specific. The
+  // hint is a human-only status line, so it stays suppressed in machine-output mode.
+  const { spec: pythonSpec, hint: pythonHint } = selectPythonSpecWithHint({
+    explicit: options.python,
+    argLabel: '--python',
+  })
+  if (pythonHint && !isMachineOutput) {
+    log(getChalk().yellow(pythonHint))
+  }
+  const pythonEnv = await resolvePythonExecutable(pythonSpec)
 
   const inputs = parseInputs(options.input)
 

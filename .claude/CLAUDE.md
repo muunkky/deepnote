@@ -1,8 +1,8 @@
 # Contributing to deepnote (fork workflow)
 
-> Personal dev-setup instructions for this clone. Lives on the `workspace`
-> branch and is pushed only to the public fork — **never** include this, or any
-> `.gitban/` / `.claude/` file, in a PR to `deepnote/deepnote`.
+> Personal dev-setup + contribution-strategy instructions for this clone. Lives on the
+> `workspace`/`sprint/*` branches and is pushed only to the public fork — **never** include
+> this, or any `.gitban/` / `.claude/` file, in a PR to `deepnote/deepnote`.
 
 ## Why a fork
 
@@ -17,12 +17,48 @@ board + scaffold are committed and pushed to the public fork instead.
 upstream = deepnote/deepnote   (read-only source of truth)
 origin   = muunkky/deepnote    (your public fork — full write)
 
-main       → tracks upstream/main; a clean mirror. NEVER commit here directly.
-workspace  → gitban board + scaffold (.gitban/, .claude/). Pushed to origin/workspace.
-feat/*     → PR branches, cut from upstream/main (clean — no gitban files).
+main                → tracks upstream/main; a clean mirror. NEVER commit here directly.
+workspace           → gitban board + scaffold (.gitban/, .claude/) home base. Pushed to origin/workspace.
+sprint/<TAG>        → integrated working branch (the "monolith"): board + planning docs + code for a
+                      sprint, co-evolving in lockstep with gitban.
+sprint-record/<TAG> → the "with-gitban" process diff for a sprint (board + PRD/ADR/design/spikes + code).
+                      A PR on the fork only — never opened against upstream.
+contrib/<slug>      → the clean "contribution diff": code only, cut from upstream/main (no .gitban/,
+  (legacy: feat/*)    .claude/, or docs/{prds,adr,spikes}). This is the upstream-ready PR.
 ```
 
 Git HTTPS auth is brokered by the GitHub CLI (`gh auth setup-git`, token scope `repo`).
+
+## Contribution strategy: develop as a monolith, ship as sliced diffs
+
+We work **in lockstep with gitban on the fork**, then slice clean PRs out for upstream.
+
+1. **Develop the monolith on `sprint/<TAG>`.** A sprint's roadmap nodes, PRDs, ADRs, design docs,
+   spikes, the gitban board, and the code all co-evolve on one integrated branch. Read-only upstream
+   access means our whole product-development lifecycle has to live _somewhere_ versioned — the fork is
+   that home, and keeping docs + board + code together is what "monolith" means here (an integrated
+   working branch, **not** a monolithic architecture).
+
+2. **Use an upstream issue to showcase and ask — never push unsolicited.** For each body of work,
+   comment on an existing `deepnote/deepnote` issue (e.g. #288, #154) or open a new one, describe the
+   approach, link the two diffs (below), and _offer_ to open a PR. We open the upstream PR only after a
+   maintainer signals interest. (This is the #288 pattern.)
+
+3. **Slice two diffs per issue — both as PRs on the fork, both linked from the issue:**
+   - **Contribution diff (clean / "without gitban")** — branch `contrib/<slug>` cut from
+     `upstream/main`: **code only**. No `.gitban/`, no `.claude/`, no `docs/{prds,adr,spikes}` (none of
+     those exist on `upstream/main`). This _is_ the upstream-ready PR — the exact diff we'd open against
+     `deepnote/deepnote` once invited.
+   - **Process diff (full / "with gitban")** — branch `sprint-record/<TAG>`: the whole lifecycle —
+     board, PRD/ADR/design/spikes, and code. It shows maintainers _how_ the change was reasoned and
+     de-risked, not just the result. Stays on the fork.
+
+   The clean diff is what merges upstream; the process diff is showcase/context that never leaves the
+   fork.
+
+**Doc boundary (default):** planning docs (`docs/prds/`, `docs/adr/`, `docs/spikes/`) ride only in the
+process diff. If a maintainer asks for an ADR/PRD upstream, add _that specific doc_ to the clean PR —
+otherwise the contribution diff stays code-only.
 
 ## Local dev setup
 
@@ -64,14 +100,17 @@ maintainer-only — never needed for fork contributions.
 
 ## Day-to-day
 
-**Start a contribution** (clean base → no gitban files in the PR):
+**Slice the clean contribution diff** out of the sprint monolith onto a branch off `upstream/main`
+(no gitban files in the PR). Open the upstream PR only after the issue invites it:
 
 ```bash
 git fetch upstream
-git checkout -b feat/my-thing upstream/main
-# ...code changes, commit...
-git push -u origin feat/my-thing
-gh pr create --repo deepnote/deepnote --base main --head muunkky:feat/my-thing
+git checkout -b contrib/my-thing upstream/main
+git checkout sprint/<TAG> -- <code paths>   # or cherry-pick the code commits
+git commit && git push -u origin contrib/my-thing
+# open a PR on the FORK, link it (+ the sprint-record process diff) from the upstream issue;
+# once a maintainer says yes:
+gh pr create --repo deepnote/deepnote --base main --head muunkky:contrib/my-thing
 ```
 
 **Stay current with upstream:**

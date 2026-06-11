@@ -1139,6 +1139,99 @@ milestones:
             description:
               'Stub: support notebook kernels for languages beyond Python
               (feature-scope issue).'
-            status: todo
-            notes: 'Open issue #154 (Feature Scope: Alternative Language Kernels).'
-            features: {}
+            status: in_progress
+            notes:
+              'DoD scope = Through C (showcase on #154). Stops at the maintainer-gated
+              upstream merge. Out of scope: PRD-002 Phase 2/3 (first-class language
+              format field, --list-kernels discovery, import language-preservation);
+              non-goals (polyglot, value-add blocks on non-Python kernels, auto-install,
+              WASM/remote kernels); proving a specific heavy kernel (Julia/R) in CI
+              (launch model is kernel-agnostic; CI uses pure-pip bash_kernel, Julia/R
+              as manual check).'
+            features:
+              non-python-launch-model:
+                id: non-python-launch-model
+                title: Non-Python kernel launch model
+                description:
+                  "Server/launch model for executing non-Python kernels:
+                  reuse the existing deepnote-toolkit Jupyter server and thread a
+                  kernelName through RuntimeConfig -> ExecutionEngine -> KernelClient.connect(),
+                  replacing the hardcoded 'python3' at kernel-client.ts:78. Pre-validate
+                  against GET /api/kernelspecs for clean missing-kernel errors. Gating
+                  Phase 1 decision for PRD-002; settled empirically by the 2026-06-11
+                  server-hosting spike. Selection source/precedence and value-add/reactivity
+                  degradation are separate ADRs."
+                sequence: 1
+                status: verifying
+                docs_ref: docs/adr/ADR-002-non-python-kernel-launch-model.md
+              kernel-name-selection:
+                id: kernel-name-selection
+                title: Kernel-name selection source & precedence
+                description:
+                  "Where RuntimeConfig.kernelName comes from: explicit
+                  CLI --kernel flag > notebook-declared language (Phase 2) > 'python3'
+                  default, on a channel separate from DEEPNOTE_PYTHON (a DEEPNOTE_KERNEL
+                  env tier is a deferred extension point). Owns the override-collision
+                  precedence (explicit non-Python override wins); defers the resulting
+                  block behavior to ADR-004. Accepted via adversarial gate."
+                sequence: 2
+                status: verifying
+                docs_ref: docs/adr/ADR-003-kernel-name-selection.md
+              degradation-behavior:
+                id: degradation-behavior
+                title: Non-Python value-add & reactivity degradation
+                description:
+                  'What happens to Python-only constructs when kernelName
+                  is non-Python: value-add blocks (SQL/viz/input/agent, all _dntk
+                  Python RPC) hard-fail with a typed, actionable error (never silently
+                  skip — CI determinism); the Python-AST reactivity analyzer is bypassed
+                  gracefully (reactivity is Python-only), never crashing at ast.parse().
+                  Owns the behavior side of the override collision (ADR-003 owns precedence).
+                  Accepted via adversarial gate.'
+                sequence: 3
+                status: verifying
+                docs_ref: docs/adr/ADR-004-non-python-degradation-behavior.md
+              phase1-implementation:
+                id: phase1-implementation
+                title: Phase 1 implementation — run a non-Python notebook via
+                  --kernel
+                description:
+                  'Implementation of PRD-002 Phase 1 across ADR-002/003/004:
+                  thread kernelName (RuntimeConfig->ExecutionEngine->KernelClient.connect,
+                  replacing hardcoded python3); selectKernelName resolver + --kernel
+                  CLI flag; pre-flight /api/kernelspecs validation -> typed KernelNotRegisteredError;
+                  configurable kernel idle-timeout; hard-fail value-add blocks + reactivity
+                  bypass on non-Python; failureCategory discriminant on RunResult/BlockResult
+                  for the 4 failure classes; a provisioned CI integration job (Python+deepnote-toolkit[server]+bash_kernel)
+                  running a real end-to-end non-Python notebook returning a non-text/plain
+                  MIME bundle. Bridge to sprint cards.'
+                sequence: 4
+                status: todo
+                docs_ref: docs/designs/phase1-alternative-language-kernels.md
+                depends_on:
+                  - non-python-launch-model
+                  - kernel-name-selection
+                  - degradation-behavior
+            docs_ref: docs/prds/PRD-002-alternative-language-kernels.md
+            success_criteria:
+              - A single-language non-Python notebook (code + markdown) runs
+                end-to-end through the real CLI and returns outputs, including
+                at least one non-text/plain MIME bundle (not just a text echo)
+              - The hardcoded 'python3' kernel name is replaced by a kernelName
+                threaded RuntimeConfig -> ExecutionEngine ->
+                KernelClient.connect(); existing Python notebooks behave
+                identically (regression-free)
+              - Pre-flight /api/kernelspecs validation yields a typed,
+                actionable missing-kernel error (never the opaque server 500);
+                missing-kernelspec vs registered-but-fails-to-launch categories
+                are distinguishable and tested
+              - All three Phase 1 ADRs accepted via the adversarial adr-reviewer
+                gate (server/launch [ADR-002], kernel-name selection
+                source/precedence, value-add/reactivity degradation) and a Phase
+                1 design doc written + reviewed
+              - 'CI green on the clean contrib/ branch: pnpm test, typecheck, lintAndFormat,
+                spell-check'
+              - 'Two diffs published as fork PRs and linked from issue #154 with an
+                explicit offer to open the upstream PR: the clean contribution diff
+                (contrib/<slug>, code-only) and the process diff (sprint-record/<TAG>,
+                full lifecycle)'

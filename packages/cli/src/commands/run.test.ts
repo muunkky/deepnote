@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { deserializeDeepnoteFile } from '@deepnote/blocks'
 import type { DatabaseIntegrationConfig } from '@deepnote/database-integrations'
 import { KernelDiedError, KernelLaunchError, KernelNotRegisteredError } from '@deepnote/runtime-core'
@@ -133,10 +134,36 @@ function getJsonOutput(spy: Mock): unknown {
   return JSON.parse(calls)
 }
 
-// Example files relative to project root
-const HELLO_WORLD_FILE = join('examples', '1_hello_world.deepnote')
-const BLOCKS_FILE = join('examples', '2_blocks.deepnote')
-const INTEGRATIONS_FILE = join('examples', '3_integrations.deepnote')
+// Example fixtures are anchored to this test module's own directory, not to
+// process.cwd(). CWD-relative paths (join('examples', …)) only resolve when
+// vitest happens to be launched from the repo root; running the suite from
+// packages/cli (or any other CWD) would point the fixtures at a non-existent
+// file, routing every action(…) call through FileResolutionError before it
+// reaches the code under test — silently masking real regressions (e.g. the
+// failureCategory assertions). Resolving from import.meta.url makes the
+// fixture base CWD-independent. Walk up four levels from
+// packages/cli/src/commands → repo root, where examples/ lives.
+const MODULE_DIR = dirname(fileURLToPath(import.meta.url)) // packages/cli/src/commands
+const REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..') // packages/cli/src/commands -> <repo-root>
+const EXAMPLES_DIR = join(REPO_ROOT, 'examples') // -> <repo-root>/examples
+const HELLO_WORLD_FILE = join(EXAMPLES_DIR, '1_hello_world.deepnote')
+const BLOCKS_FILE = join(EXAMPLES_DIR, '2_blocks.deepnote')
+const INTEGRATIONS_FILE = join(EXAMPLES_DIR, '3_integrations.deepnote')
+
+// Multi-format conversion fixtures (.ipynb/.py/.qmd) live at <repo-root>/test-fixtures/formats.
+// Anchored to the same module-relative REPO_ROOT so they share the CWD-independent base.
+const TEST_FIXTURES_FORMATS_DIR = join(REPO_ROOT, 'test-fixtures', 'formats')
+
+// Fail loudly and precisely if a fixture is missing/relocated, instead of
+// letting the absence surface as an opaque FileResolutionError buried inside
+// an unrelated assertion. This runs at module load, before any test (and
+// before the describe-body resolveUpstreamTargetPair calls), so a bad
+// base dir is caught immediately with the offending absolute path.
+for (const fixtureDir of [EXAMPLES_DIR, TEST_FIXTURES_FORMATS_DIR]) {
+  if (!fs.existsSync(fixtureDir)) {
+    throw new Error(`Test fixture dir missing at ${fixtureDir} — check REPO_ROOT (resolved from import.meta.url)`)
+  }
+}
 
 function parseDeepnoteFixture(path: string) {
   return deserializeDeepnoteFile(fs.readFileSync(path, 'utf-8'))
@@ -2805,10 +2832,12 @@ describe('run command', () => {
     let consoleErrorSpy: Mock
     let programErrorSpy: Mock
 
-    // Test fixtures for different formats
-    const JUPYTER_FILE = join('test-fixtures', 'formats', 'jupyter', 'basic.ipynb')
-    const PERCENT_FILE = join('test-fixtures', 'formats', 'percent', 'basic-cells.percent.py')
-    const QUARTO_FILE = join('test-fixtures', 'formats', 'quarto', 'basic.qmd')
+    // Test fixtures for different formats — anchored to the module-relative
+    // TEST_FIXTURES_FORMATS_DIR (not process.cwd()) so they resolve regardless
+    // of the CWD vitest is launched from.
+    const JUPYTER_FILE = join(TEST_FIXTURES_FORMATS_DIR, 'jupyter', 'basic.ipynb')
+    const PERCENT_FILE = join(TEST_FIXTURES_FORMATS_DIR, 'percent', 'basic-cells.percent.py')
+    const QUARTO_FILE = join(TEST_FIXTURES_FORMATS_DIR, 'quarto', 'basic.qmd')
 
     beforeEach(() => {
       vi.clearAllMocks()

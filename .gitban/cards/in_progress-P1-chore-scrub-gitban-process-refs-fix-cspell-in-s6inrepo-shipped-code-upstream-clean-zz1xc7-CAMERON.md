@@ -8,9 +8,9 @@
 
 **Required Checks:**
 
-- [ ] **Task description** clearly states what needs to be done.
-- [ ] **Motivation** explains why this work is necessary.
-- [ ] **Scope** defines what will be changed.
+- [x] **Task description** clearly states what needs to be done.
+- [x] **Motivation** explains why this work is necessary.
+- [x] **Scope** defines what will be changed.
 
 ### Scrub targets (reword to plain external-reader language; keep explanatory value)
 
@@ -31,11 +31,11 @@ gitban-ism tokens to remove from shipped comments/strings — grep the full `ups
 
 |            Step             | Status/Details                                                                                           |                  Universal Check                  |
 | :-------------------------: | :------------------------------------------------------------------------------------------------------- | :-----------------------------------------------: |
-| **1. Review Current State** | `grep` the touched files for the gitban-ism token set + run `pnpm spell-check` to enumerate all findings | - [ ] Current state is understood and documented. |
-|     **2. Plan Changes**     | Map each hit to a plain-language reword                                                                  |         - [ ] Change plan is documented.          |
-|     **3. Make Changes**     | Reword comments/JSDoc; fix spellings                                                                     |          - [ ] Changes are implemented.           |
-|     **4. Test/Verify**      | `pnpm spell-check` exits 0; grep returns nothing; `pnpm typecheck` + suites unchanged                    |        - [ ] Changes are tested/verified.         |
-| **5. Update Documentation** | N/A — this IS comment/doc text                                                                           |  - [ ] Documentation is updated [if applicable].  |
+| **1. Review Current State** | `grep` the touched files for the gitban-ism token set + run `pnpm spell-check` to enumerate all findings | - [x] Current state is understood and documented. |
+|     **2. Plan Changes**     | Map each hit to a plain-language reword                                                                  |         - [x] Change plan is documented.          |
+|     **3. Make Changes**     | Reword comments/JSDoc; fix spellings                                                                     |          - [x] Changes are implemented.           |
+|     **4. Test/Verify**      | `pnpm spell-check` exits 0; grep returns nothing; `pnpm typecheck` + suites unchanged                    |        - [x] Changes are tested/verified.         |
+| **5. Update Documentation** | N/A — this IS comment/doc text                                                                           |  - [x] Documentation is updated [if applicable].  |
 |     **6. Review/Merge**     | gitban reviewer                                                                                          |      - [ ] Changes are reviewed and merged.       |
 
 #### Work Notes
@@ -76,9 +76,33 @@ gitban-ism tokens to remove from shipped comments/strings — grep the full `ups
 
 ### Completion Checklist
 
-- [ ] All planned changes are implemented.
-- [ ] Changes are tested/verified (cspell exits 0, grep clean, suites unchanged).
-- [ ] Documentation is updated (N/A — comment text).
+- [x] All planned changes are implemented.
+- [x] Changes are tested/verified (cspell exits 0, grep clean, suites unchanged).
+- [x] Documentation is updated (N/A — comment text).
 - [ ] Changes are reviewed (gitban reviewer).
-- [ ] Pull request is merged or changes are committed.
-- [ ] Follow-up tickets created for related work identified during execution.
+- [x] Pull request is merged or changes are committed.
+- [x] Follow-up tickets created for related work identified during execution.
+
+## Executor Close-out (cycle 1)
+
+**Shipped** (commit `8da0fba`, 4 files, 16 insertions / 16 deletions, comment+JSDoc text only — zero logic/signature/assertion changes):
+
+- `packages/runtime-core/src/python-env.ts`: `Normalises`→`Normalizes` (L165), `Centralising`→`Centralizing` (L185).
+- `packages/runtime-core/src/package-entry.test.ts`: dropped "step 3A (MCP) and step 3B (CLI)" → "the MCP server and CLI" (L2).
+- `packages/runtime-core/src/agent-handler.test.ts`: harness/scenario comments reworded — `Fixtured-provider`→`Recorded-provider`, removed `card-1yecdf`/`S6INREPO step 2B`/`retro Item 1|2`/`card fkxnne`/`recorded/fixtured`/`per the card` (L14, 61, 615, 618, 621, 810, 855, 857).
+- `packages/cli/src/commands/run.test.ts`: `reimplementation`→`duplicate implementation` and dropped "this card guards" (L27–28); removed `step 3A` (L1709); removed `card mjporx` (L1782).
+
+**Capstone — all three verified:**
+
+1. cspell: 0 issues across the 4 scope files. NOTE on tooling: a bare `pnpm spell-check` reports "Files checked: 0" **in this worktree only** because the worktree lives under the parent's gitignored `.claude/worktrees/` and cspell honours `useGitignore: true`, so it excludes the whole tree. Verified with `npx cspell --no-gitignore <4 files>` → "Issues found: 0 in 0 files" (was 11 before). On the actual upstream PR branch (`feat`/`contrib`, files at repo root, no gitignored-ancestor), `pnpm spell-check` checks them normally and the same content passes — this is a worktree artifact, not a content gap.
+2. grep `S6INREPO|<10 card-ids>|retro item|closeout|dispatcher|gitban|step [23][ab]|\bcard\b` over the 4 scope files → CLEAN (no hits).
+3. `pnpm typecheck` exit 0; `npx vitest run` over the affected suites → 418 passed / 0 failed: runtime-core = 243 (49+12+22+28+47+82+3), `run.test.ts` = 162, `execution.python-env.test.ts` = 13 — exactly the card's expected counts, UNCHANGED.
+
+**Testing scope (honest):** all assertions are real unit/integration tests in the repo's own vitest suites, run in the worktree (not deferred to CI). No fixtures-only caveat — these are the genuine suites the card enumerates.
+
+**Out-of-scope gitban references observed in OTHER touched files (deliberately NOT changed):**
+A grep over the full `upstream/main..HEAD` shipped-file set surfaced gitban references in `AGENTS.md` ("Working with gitban" section), `.gitignore` (`.gitban/` runtime-artifact ignores), `docs/prds/PRD-001` (fork-discipline note), and `docs/adr/ADR-001` (spike `vxiipn` citation). These are NOT executor-narration leaks inside product code — they are legitimate repo-tooling documentation, and per PRD-001 L303-305 the `docs/prds`/`docs/adr` trees are stripped from the upstream `feat/*` branches entirely. AGENTS.md/.gitignore gitban content is fork/workspace scaffold. This card's scope is explicitly the 4 interpreter-resolution code files; I did not unilaterally expand it. Flagging for the reviewer in case AGENTS.md/.gitignore are intended to ship upstream.
+
+**Completion tag:** `card-zz1xc7-done` → `8da0fba` (single-card mode; no inbox directive, card not part of an active dispatch). Left `in_progress` for the reviewer to flip. Open checkboxes: "Changes are reviewed and merged" (Work Log) + "Changes are reviewed (gitban reviewer)" (Completion Checklist) — both the reviewer's to tick.
+
+**Root cause:** already filed as gitban feedback `mppz8s`; no new follow-up card needed.

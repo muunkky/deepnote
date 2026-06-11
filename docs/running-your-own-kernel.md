@@ -73,7 +73,7 @@ Phase 1 is honest about its limits:
 - **Reactivity is bypassed.** Dependency analysis is a Python-AST analyzer, so on a
   non-Python kernel it is skipped and blocks run in their existing notebook order. The
   CLI prints `Reactivity is Python-only; running without dependency analysis (blocks run
-  in order).`
+in order).`
 - **Requesting an unregistered kernel fails legibly.** `--kernel no_such_kernel` returns
   `Kernel 'no_such_kernel' is not registered. Installed kernels: ...` (and, with
   `-o json`, `"failureCategory": "missing-kernel"`) — never an opaque server 500.
@@ -81,8 +81,6 @@ Phase 1 is honest about its limits:
 These are deliberate Phase-1 boundaries. A notebook-declared `language` field, a
 `--list-kernels` discovery surface, and a configurable per-kernel startup timeout are
 planned for later phases.
-
-
 
 <Callout status="warning">
 **Deepnote's support for other kernels is still in its early days.**

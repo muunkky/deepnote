@@ -93,7 +93,9 @@ describeIntegration('non-Python kernel — real CLI against real deepnote-toolki
   beforeAll(() => {
     // Surface why the suite is (or isn't) running so a CI skip is never silent.
     // biome-ignore lint/suspicious/noConsole: integration diagnostics belong on the CI log.
-    console.log(`[integration] RUN_INTEGRATION_TESTS=${process.env.RUN_INTEGRATION_TESTS} venv=${venv} cliBin=${cliBin}`)
+    console.log(
+      `[integration] RUN_INTEGRATION_TESTS=${process.env.RUN_INTEGRATION_TESTS} venv=${venv} cliBin=${cliBin}`
+    )
 
     // Copy fixtures into an isolated temp dir so the CLI's snapshot persistence lands
     // there, not in the repo (the source `snapshots/` dir would otherwise be created
@@ -132,7 +134,7 @@ describeIntegration('non-Python kernel — real CLI against real deepnote-toolki
 
     // Collect every MIME key emitted by the bash kernel across all block outputs.
     const mimeKeys = result.blocks.flatMap(block =>
-      block.outputs.flatMap(output => (output.data ? Object.keys(output.data) : [])),
+      block.outputs.flatMap(output => (output.data ? Object.keys(output.data) : []))
     )
 
     // The headline assertion: a binary, non-text/plain bundle came back through the

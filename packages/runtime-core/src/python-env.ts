@@ -162,7 +162,7 @@ export function selectPythonSpec({ explicit }: { explicit?: string } = {}): stri
 }
 
 /**
- * Normalises an interpreter signal: returns the value unchanged when it carries a
+ * Normalizes an interpreter signal: returns the value unchanged when it carries a
  * real spec, or `undefined` when it is absent, empty, or whitespace-only — so an
  * empty/blank signal falls through the precedence chain instead of being treated
  * as a present value.
@@ -182,7 +182,7 @@ function firstNonBlank(value: string | undefined): string | undefined {
  *
  * Previously this decision was copy-pasted into both consumers, so a change to the
  * override semantics (e.g. the empty-string remediation that tightened `hasOverride`
- * to a non-blank check) had to be applied in lockstep to both copies. Centralising it
+ * to a non-blank check) had to be applied in lockstep to both copies. Centralizing it
  * here means CLI and MCP can never diverge on hint behaviour.
  *
  * The hint fires ONLY when BOTH hold:

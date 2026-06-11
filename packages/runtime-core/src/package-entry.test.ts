@@ -1,5 +1,5 @@
 // Capstone: import from the PACKAGE ENTRY (not the relative ./python-env file).
-// This is the integration-meaningful contract step 3A (MCP) and step 3B (CLI) consume — if
+// This is the integration-meaningful contract the MCP server and CLI consume — if
 // either symbol is not re-exported from index.ts, this import fails to type-check
 // and the assertions below cannot run.
 import { isBareSystemPython, selectPythonSpec } from '@deepnote/runtime-core'

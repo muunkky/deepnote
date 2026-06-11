@@ -24,8 +24,8 @@ const mockGetUpstreamBlocks = vi.fn()
 // Mock node:child_process so the REAL selectPythonSpec's autodetect leaf
 // (detectDefaultPython, called intra-module via execSync) resolves deterministically
 // to 'python' without spawning a real interpreter. We deliberately do NOT mock
-// selectPythonSpec itself — the precedence regression this card guards must surface
-// here, so the CLI test exercises the genuine shared selector, not a reimplementation.
+// selectPythonSpec itself — the precedence regression these tests guard must surface
+// here, so the CLI test exercises the genuine shared selector, not a duplicate implementation.
 vi.mock('node:child_process', async importOriginal => {
   const actual = await importOriginal<typeof import('node:child_process')>()
   return {
@@ -1705,8 +1705,8 @@ describe('run command', () => {
     describe('python interpreter resolution (selectPythonSpec precedence)', () => {
       // ADR-001: precedence is --python > DEEPNOTE_PYTHON > autodetect. These tests
       // assert the resolved pythonEnv handed to the ExecutionEngine, proving the CLI
-      // converges on the shared selectPythonSpec selector (parity with the MCP server,
-      // step 3A) rather than the old `options.python ?? detectDefaultPython()` chain
+      // converges on the shared selectPythonSpec selector (parity with the MCP server)
+      // rather than the old `options.python ?? detectDefaultPython()` chain
       // that ignored DEEPNOTE_PYTHON.
 
       it('uses --python when provided, even if DEEPNOTE_PYTHON is set (--python wins)', async () => {
@@ -1779,7 +1779,7 @@ describe('run command', () => {
     describe('bare-system-python hint (ADR-001 parity with MCP consumer)', () => {
       // ADR-001: every deepnote-run consumer must surface an actionable hint when
       // interpreter resolution lands on a bare system `python` with no real override.
-      // The CLI half mirrors the MCP consumer's wording (card mjporx); the hint fires
+      // The CLI half mirrors the MCP consumer's wording; the hint fires
       // ONLY on bare autodetect with neither --python nor DEEPNOTE_PYTHON set. A blank
       // signal at either tier is not an override — it falls through to autodetect, so it
       // must NOT suppress the hint.

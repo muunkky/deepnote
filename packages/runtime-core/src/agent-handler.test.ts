@@ -11,7 +11,7 @@ import {
   serializeNotebookContextFromBlocks,
 } from './agent-handler'
 
-// --- Fixtured-provider harness for the executeAgentBlock tool-loop ---------
+// --- Recorded-provider harness for the executeAgentBlock tool-loop ---------
 //
 // `executeAgentBlock` hard-imports `ToolLoopAgent` from 'ai' and `createOpenAI`
 // from '@ai-sdk/openai' with no dependency-injection seam, so to exercise the
@@ -58,7 +58,7 @@ const agentMocks = vi.hoisted(() => {
 // `Experimental_StdioMCPTransport` from '@ai-sdk/mcp/mcp-stdio', then for each
 // merged server config does `createMCPClient({ transport })`, `client.tools()`,
 // and in the `finally` `client.close()`. To drive the client-instantiation path
-// and the close-error `finally` branch (card-1yecdf tests only used
+// and the close-error `finally` branch (earlier tests only used
 // `mcpServers: []`), we mock both modules. The transport is an inert stub; the
 // client factory pops the next fake client off a FIFO queue the test fills, so a
 // test can hand executeAgentBlock a mix of healthy and `.close()`-rejecting
@@ -612,13 +612,13 @@ describe('mergeMcpConfigs', () => {
 })
 
 // =============================================================================
-// executeAgentBlock — the live tool-loop (S6INREPO step 2B / card 1yecdf)
+// executeAgentBlock — the live tool-loop
 // =============================================================================
 //
-// COVERAGE APPROACH (recorded/fixtured provider — the card's first option):
+// COVERAGE APPROACH (recorded provider):
 // We invoke `executeAgentBlock` DIRECTLY against a recorded provider stream
 // rather than skipping an integration test. `executeAgentBlock` has no DI seam
-// (it hard-imports `ToolLoopAgent`/`createOpenAI`), so per the card we use
+// (it hard-imports `ToolLoopAgent`/`createOpenAI`), so we use
 // `vi.mock` to inject the recorded stream: `ai` is partially mocked
 // (`ToolLoopAgent` -> fake, real `tool`/`stepCountIs` preserved) and
 // `@ai-sdk/openai` is stubbed. The fake agent's `.stream()` replays a recorded
@@ -807,7 +807,7 @@ describe('executeAgentBlock', () => {
     })
   })
 
-  // Scenario: tool-binding identity (retro Item 1 / card fkxnne) ------------
+  // Scenario: tool-binding identity ----------------------------------------
   //
   // The fake ToolLoopAgent replays recorded `tool-result` parts; it never
   // invokes the registered tools' `execute`. So the `makeContext` callbacks are
@@ -852,9 +852,9 @@ describe('executeAgentBlock', () => {
     })
   })
 
-  // Scenario: MCP client lifecycle + close-error finally (retro Item 2) ------
+  // Scenario: MCP client lifecycle + close-error finally --------------------
   //
-  // All card-1yecdf tests used `mcpServers: []`, so neither the
+  // The earlier tests used `mcpServers: []`, so neither the
   // client-instantiation path (createMCPClient per merged config) nor the
   // close-error `finally` branch (agent-handler.ts:247-256) was ever entered.
   // Here we drive executeAgentBlock with non-empty `mcpServers`, injecting fake

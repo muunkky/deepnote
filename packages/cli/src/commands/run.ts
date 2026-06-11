@@ -13,6 +13,7 @@ import {
   type ExecutionSummary,
   executableBlockTypeSet,
   type IOutput,
+  isNonPythonKernel,
   type DeepnoteBlock as RuntimeDeepnoteBlock,
   resolvePythonExecutable,
   selectKernelName,
@@ -48,6 +49,31 @@ import {
 import { openDeepnoteFileInCloud } from '../utils/open-file-in-cloud'
 import { saveExecutionSnapshot } from '../utils/output-persistence'
 import { DEFAULT_API_URL } from './integrations'
+
+/**
+ * User-facing notice emitted when reactivity dependency analysis is skipped
+ * because the active kernel is non-Python (ADR-004 Decision pt 2 / design-doc
+ * KD-5). Phase-1 reactivity (the Python-AST analyzer) is Python-only, so on a
+ * non-Python kernel we skip the analyzer up front rather than spawning a
+ * subprocess we know will fail on non-Python source, and run blocks in their
+ * existing notebook order without dependency resolution.
+ */
+const REACTIVITY_PYTHON_ONLY_NOTICE =
+  'Reactivity is Python-only; running without dependency analysis (blocks run in order).'
+
+/**
+ * Emit the reactivity-bypass notice for a non-Python kernel, suppressed in
+ * machine-output mode (mirrors the other user-facing notices in this command).
+ * Centralised so both analyzer call sites (`resolveUpstreamExecutionBlockIds`
+ * and `validateRequirements`) emit identical text.
+ */
+function emitReactivityPythonOnlyNotice(isMachineOutput: boolean): void {
+  if (isMachineOutput) {
+    debug(REACTIVITY_PYTHON_ONLY_NOTICE)
+    return
+  }
+  log(getChalk().yellow(REACTIVITY_PYTHON_ONLY_NOTICE))
+}
 
 /**
  * Error thrown when required inputs are missing.
@@ -354,7 +380,7 @@ async function setupProject(path: string | undefined, options: RunOptions): Prom
   })
 
   // Validate that all requirements are met (inputs, integrations) - exit code 2 if not
-  await validateRequirements(file, inputs, pythonEnv, allIntegrations, options.notebook)
+  await validateRequirements(file, inputs, pythonEnv, allIntegrations, kernelName, isMachineOutput, options.notebook)
 
   // Inject integration environment variables into process.env
   // This allows SQL blocks to access database connections
@@ -461,9 +487,24 @@ function assertExecutableBlockExists(blockId: string, notebooks: DeepnoteFile['p
 async function resolveUpstreamExecutionBlockIds(
   file: DeepnoteFile,
   options: { notebook?: string; block?: string },
-  pythonInterpreter: string
+  pythonInterpreter: string,
+  kernelName: string,
+  isMachineOutput: boolean
 ): Promise<string[] | undefined> {
   if (!options.block) {
+    return undefined
+  }
+
+  // ADR-004 Decision pt 2 / design-doc KD-5: reactivity (the Python-AST DAG
+  // analyzer) is Python-only. On a non-Python kernel, skip `getUpstreamBlocks`
+  // entirely rather than spawning a subprocess we know will fail on non-Python
+  // source, emit a notice, and run the requested block in existing order (no
+  // dependency resolution). This reuses the fatal-branch fallback shape below
+  // (`return undefined` => single block, no upstream deps). The name-based check
+  // (`isNonPythonKernel`) is correct here because this site runs pre-connect, so
+  // no kernelspec `language` is available yet.
+  if (isNonPythonKernel(kernelName)) {
+    emitReactivityPythonOnlyNotice(isMachineOutput)
     return undefined
   }
 
@@ -726,8 +767,8 @@ async function listInputs(path: string, options: RunOptions): Promise<void> {
  * Also validates that all requirements (inputs, integrations) are met.
  */
 async function dryRunDeepnoteProject(path: string, options: RunOptions): Promise<void> {
-  const { absolutePath, file, isMachineOutput, pythonEnv } = await setupProject(path, options)
-  const blockIds = await resolveUpstreamExecutionBlockIds(file, options, pythonEnv)
+  const { absolutePath, file, isMachineOutput, pythonEnv, kernelName } = await setupProject(path, options)
+  const blockIds = await resolveUpstreamExecutionBlockIds(file, options, pythonEnv, kernelName, isMachineOutput)
   const executableBlocks = collectExecutableBlocks(file, { ...options, blockIds })
 
   const notebookCount = options.notebook ? 1 : file.project.notebooks.length
@@ -779,6 +820,8 @@ async function validateRequirements(
   providedInputs: Record<string, unknown>,
   pythonInterpreter: string,
   integrations: DatabaseIntegrationConfig[],
+  kernelName: string,
+  isMachineOutput: boolean,
   notebookName?: string
 ): Promise<void> {
   const notebooks = notebookName ? file.project.notebooks.filter(n => n.name === notebookName) : file.project.notebooks
@@ -809,6 +852,20 @@ async function validateRequirements(
   }
 
   // === Check for missing inputs ===
+  // ADR-004 Decision pt 2 / design-doc KD-5: the input-validation analyzer
+  // (`getBlockDependencies`) is the Python-AST analyzer and is Python-only. On a
+  // non-Python kernel, skip it up front (no subprocess spawn we know will fail on
+  // non-Python source), emit the notice, and skip input validation — a runtime
+  // failure surfaces the issue instead. The integration check above is NOT
+  // reactivity-related and must always run, so this guard sits after it. The
+  // name-based check (`isNonPythonKernel`) is correct here because this site runs
+  // pre-connect, so no kernelspec `language` is available yet. The existing
+  // try/catch below remains as a safety net for the Python path.
+  if (isNonPythonKernel(kernelName)) {
+    emitReactivityPythonOnlyNotice(isMachineOutput)
+    return
+  }
+
   // Get dependency info for all blocks
   let deps: Awaited<ReturnType<typeof getBlockDependencies>>
   try {
@@ -908,7 +965,7 @@ async function runDeepnoteProject(path: string | undefined, options: RunOptions)
 
     // Track execution timing for snapshot
     const executionStartedAt = new Date().toISOString()
-    const blockIds = await resolveUpstreamExecutionBlockIds(file, options, pythonEnv)
+    const blockIds = await resolveUpstreamExecutionBlockIds(file, options, pythonEnv, kernelName, isMachineOutput)
 
     // Use runProject instead of runFile since we may have converted the file in memory
     const summary = await engine.runProject(file, {

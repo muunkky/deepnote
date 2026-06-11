@@ -226,6 +226,68 @@ jobs:
       - name: Test CLI --help
         run: node dist/bin.js --help
         working-directory: packages/cli
+  integration-kernels:
+    name: Integration (real kernels)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Real-kernel integration suite (design-doc Sub-phase 1C, R7 + R2/R6). This is the
+    # ONLY job that provisions Python and runs real-server execution: it boots the
+    # deepnote-toolkit server, launches a real bash Jupyter kernel through the built
+    # CLI, and proves a non-text/plain image/png MIME bundle comes back end-to-end.
+    # The always-on mocked `test` job is unaffected — the default vitest config excludes
+    # the *.integration.test.ts glob (KD-9), so these never run there.
+    env:
+      # NOM-002 spike-validated pins (docs/spikes/nom-002/RESULTS.md). Bump
+      # deliberately and record in the closeout/CHANGELOG — they key the pip cache and
+      # pin the real-server contract the integration assertions depend on.
+      DEEPNOTE_TOOLKIT_VERSION: 2.3.1
+      BASH_KERNEL_VERSION: 0.10.0
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip wheels
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/pip
+          # Key on the exact pins so a toolkit/bash_kernel bump invalidates the cache.
+          key: pip-integration-kernels-${{ runner.os }}-py3.11-toolkit${{ env.DEEPNOTE_TOOLKIT_VERSION }}-bash${{ env.BASH_KERNEL_VERSION }}
+
+      - name: Provision deepnote-toolkit + bash_kernel venv
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install "deepnote-toolkit[server]==${DEEPNOTE_TOOLKIT_VERSION}" "bash_kernel==${BASH_KERNEL_VERSION}" jinja2
+          .venv/bin/python -m bash_kernel.install --sys-prefix
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm run build
+
+      - name: Run real-kernel integration suite
+        run: pnpm run test:integration
+        env:
+          RUN_INTEGRATION_TESTS: 'true'
+          # The integration test resolves the venv from this (or repo-root `.venv`).
+          DEEPNOTE_INTEGRATION_VENV: ${{ github.workspace }}/.venv
   license-check:
     name: License Check
     runs-on: ubuntu-latest

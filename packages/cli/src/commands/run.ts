@@ -15,6 +15,7 @@ import {
   type IOutput,
   type DeepnoteBlock as RuntimeDeepnoteBlock,
   resolvePythonExecutable,
+  selectKernelName,
   selectPythonSpecWithHint,
 } from '@deepnote/runtime-core'
 import type { Command } from 'commander'
@@ -78,6 +79,7 @@ export class MissingIntegrationError extends Error {
 
 export interface RunOptions {
   python?: string
+  kernel?: string
   cwd?: string
   notebook?: string
   block?: string
@@ -184,6 +186,7 @@ interface ProjectSetup {
   workingDirectory: string
   file: DeepnoteFile
   pythonEnv: string
+  kernelName: string
   inputs: Record<string, unknown>
   isMachineOutput: boolean
   convertedFile: ConvertedFile
@@ -306,6 +309,15 @@ async function setupProject(path: string | undefined, options: RunOptions): Prom
   }
   const pythonEnv = await resolvePythonExecutable(pythonSpec)
 
+  // ADR-003 kernel selector: --kernel > notebook-declared language (Phase 2,
+  // not wired) > 'python3'. A separate pure resolver from the interpreter axis;
+  // it reads no env. The resolved kernel is echoed for the "deterministic and
+  // visible" criterion (suppressed in machine-output mode).
+  const kernelName = selectKernelName({ explicit: options.kernel })
+  if (!isMachineOutput) {
+    log(getChalk().dim(`Resolved kernel: ${kernelName}`))
+  }
+
   const inputs = parseInputs(options.input)
 
   // Parse integrations file (if it exists)
@@ -348,7 +360,17 @@ async function setupProject(path: string | undefined, options: RunOptions): Prom
   // This allows SQL blocks to access database connections
   injectIntegrationEnvVars(allIntegrations, workingDirectory)
 
-  return { absolutePath, workingDirectory, file, pythonEnv, inputs, isMachineOutput, convertedFile, allIntegrations }
+  return {
+    absolutePath,
+    workingDirectory,
+    file,
+    pythonEnv,
+    kernelName,
+    inputs,
+    isMachineOutput,
+    convertedFile,
+    allIntegrations,
+  }
 }
 
 /**
@@ -852,8 +874,17 @@ async function validateRequirements(
 }
 
 async function runDeepnoteProject(path: string | undefined, options: RunOptions): Promise<void> {
-  const { absolutePath, workingDirectory, pythonEnv, inputs, isMachineOutput, convertedFile, file, allIntegrations } =
-    await setupProject(path, options)
+  const {
+    absolutePath,
+    workingDirectory,
+    pythonEnv,
+    kernelName,
+    inputs,
+    isMachineOutput,
+    convertedFile,
+    file,
+    allIntegrations,
+  } = await setupProject(path, options)
 
   debug(`Inputs: ${JSON.stringify(inputs)}`)
 
@@ -864,6 +895,7 @@ async function runDeepnoteProject(path: string | undefined, options: RunOptions)
   const engine = new ExecutionEngine({
     pythonEnv,
     workingDirectory,
+    kernelName,
   })
   const restoreConsoleDebug = suppressMachineOutputDebugNoise(isMachineOutput)
   let engineStarted = false

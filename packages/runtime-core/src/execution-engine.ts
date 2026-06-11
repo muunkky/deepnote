@@ -97,6 +97,11 @@ export interface ExecutionOptions {
 export class ExecutionEngine {
   private server: ServerInfo | null = null
   private kernel: KernelClient | null = null
+  /**
+   * The kernelspec language reported by `connect()` for a non-`python3` kernel
+   * (a forward-looking signal — KD-3). `undefined` for the `python3` fast-path.
+   */
+  private kernelLanguage: string | undefined
 
   constructor(private readonly config: RuntimeConfig) {}
 
@@ -105,6 +110,16 @@ export class ExecutionEngine {
    */
   get serverPort(): number | null {
     return this.server?.jupyterPort ?? null
+  }
+
+  /**
+   * The kernelspec language reported by the connected kernel, if any. Captured
+   * during `connect()` for a non-`python3` kernel; `undefined` for the
+   * `python3` fast-path. A forward-looking signal consumed by the per-block
+   * degradation guard (KD-3).
+   */
+  get kernelLanguageName(): string | undefined {
+    return this.kernelLanguage
   }
 
   /**
@@ -119,8 +134,10 @@ export class ExecutionEngine {
     })
 
     try {
-      this.kernel = new KernelClient()
-      await this.kernel.connect(this.server.url)
+      this.kernel = new KernelClient({ kernelStartupTimeoutMs: this.config.kernelStartupTimeoutMs })
+      // Forward the configured kernel name (default 'python3') and store the
+      // resolved kernelspec language for the forward-looking guard (KD-3).
+      this.kernelLanguage = await this.kernel.connect(this.server.url, this.config.kernelName)
     } catch (error) {
       await this.stop()
       throw error

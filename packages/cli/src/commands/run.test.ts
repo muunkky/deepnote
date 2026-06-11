@@ -57,7 +57,7 @@ vi.mock('@deepnote/runtime-core', async importOriginal => {
         return mockServerPort
       }
 
-      constructor(config: { pythonEnv: string; workingDirectory: string }) {
+      constructor(config: { pythonEnv: string; workingDirectory: string; kernelName?: string }) {
         mockConstructor(config)
       }
     },
@@ -259,6 +259,7 @@ describe('run command', () => {
       expect(mockConstructor).toHaveBeenCalledWith({
         pythonEnv: 'python',
         workingDirectory: expect.stringContaining('examples'),
+        kernelName: 'python3',
       })
     })
 
@@ -270,6 +271,7 @@ describe('run command', () => {
       expect(mockConstructor).toHaveBeenCalledWith({
         pythonEnv: '/path/to/venv',
         workingDirectory: expect.any(String),
+        kernelName: 'python3',
       })
     })
 
@@ -281,6 +283,7 @@ describe('run command', () => {
       expect(mockConstructor).toHaveBeenCalledWith({
         pythonEnv: 'python',
         workingDirectory: '/custom/work/dir',
+        kernelName: 'python3',
       })
     })
 
@@ -1702,6 +1705,72 @@ describe('run command', () => {
       })
     })
 
+    describe('kernel selection (selectKernelName precedence + --kernel thread)', () => {
+      // ADR-003 / design-doc Sub-phase 1A: --kernel feeds the explicit tier of the
+      // REAL selectKernelName (kept un-mocked via ...actual), resolving the kernelName
+      // handed to the ExecutionEngine. The runtime-core kernel-client suite separately
+      // proves connect() drives SessionManager.startNew with { name: kernelName }; these
+      // tests prove the CLI half of the composed thread (resolution + echo + config).
+
+      it('threads --kernel into the ExecutionEngine config (kernelName=bash)', async () => {
+        setupSuccessfulRun()
+
+        await action(HELLO_WORLD_FILE, { kernel: 'bash' })
+
+        expect(mockConstructor).toHaveBeenCalledWith(
+          expect.objectContaining({ kernelName: 'bash' })
+        )
+      })
+
+      it('echoes the resolved kernel in human output', async () => {
+        setupSuccessfulRun()
+
+        await action(HELLO_WORLD_FILE, { kernel: 'bash' })
+
+        expect(getOutput(consoleLogSpy)).toContain('Resolved kernel: bash')
+      })
+
+      it('defaults to python3 with no --kernel and still echoes the resolved kernel', async () => {
+        setupSuccessfulRun()
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(mockConstructor).toHaveBeenCalledWith(
+          expect.objectContaining({ kernelName: 'python3' })
+        )
+        expect(getOutput(consoleLogSpy)).toContain('Resolved kernel: python3')
+      })
+
+      it('treats a whitespace-only --kernel as absent (falls through to python3)', async () => {
+        setupSuccessfulRun()
+
+        await action(HELLO_WORLD_FILE, { kernel: '   ' })
+
+        expect(mockConstructor).toHaveBeenCalledWith(
+          expect.objectContaining({ kernelName: 'python3' })
+        )
+      })
+
+      it('does not echo the resolved kernel in machine-output mode', async () => {
+        setupSuccessfulRun()
+
+        await action(HELLO_WORLD_FILE, { kernel: 'bash', output: 'json' })
+
+        expect(getOutput(consoleLogSpy)).not.toContain('Resolved kernel:')
+      })
+
+      it('does not consult DEEPNOTE_PYTHON for kernel selection', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', '/some/python')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(mockConstructor).toHaveBeenCalledWith(
+          expect.objectContaining({ kernelName: 'python3' })
+        )
+      })
+    })
+
     describe('python interpreter resolution (selectPythonSpec precedence)', () => {
       // ADR-001: precedence is --python > DEEPNOTE_PYTHON > autodetect. These tests
       // assert the resolved pythonEnv handed to the ExecutionEngine, proving the CLI
@@ -1718,6 +1787,7 @@ describe('run command', () => {
         expect(mockConstructor).toHaveBeenCalledWith({
           pythonEnv: '/flag/venv/bin/python',
           workingDirectory: expect.any(String),
+          kernelName: 'python3',
         })
       })
 
@@ -1730,6 +1800,7 @@ describe('run command', () => {
         expect(mockConstructor).toHaveBeenCalledWith({
           pythonEnv: '/env/venv/bin/python',
           workingDirectory: expect.any(String),
+          kernelName: 'python3',
         })
       })
 
@@ -1745,6 +1816,7 @@ describe('run command', () => {
         expect(mockConstructor).toHaveBeenCalledWith({
           pythonEnv: 'python',
           workingDirectory: expect.any(String),
+          kernelName: 'python3',
         })
       })
 
@@ -1757,6 +1829,7 @@ describe('run command', () => {
         expect(mockConstructor).toHaveBeenCalledWith({
           pythonEnv: '/flag/venv/bin/python',
           workingDirectory: expect.any(String),
+          kernelName: 'python3',
         })
       })
 
@@ -1772,6 +1845,7 @@ describe('run command', () => {
         expect(mockConstructor).toHaveBeenCalledWith({
           pythonEnv: 'python',
           workingDirectory: expect.any(String),
+          kernelName: 'python3',
         })
       })
     })

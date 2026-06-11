@@ -2,11 +2,49 @@ import type { IDisplayData, IExecuteResult, IOutput } from '@jupyterlab/nbformat
 import { KernelManager, ServerConnection, SessionManager } from '@jupyterlab/services'
 import type { IKernelConnection } from '@jupyterlab/services/lib/kernel/kernel'
 import type { ISessionConnection } from '@jupyterlab/services/lib/session/session'
+import { KernelDiedError, type KernelspecSummary, KernelLaunchError, KernelNotRegisteredError } from './kernel-errors'
+import { DEFAULT_KERNEL_NAME } from './kernel-name'
 
 export interface ExecutionResult {
   success: boolean
   outputs: IOutput[]
   executionCount: number | null
+}
+
+/**
+ * Options for {@link KernelClient}. All optional so the existing zero-arg
+ * `new KernelClient()` call sites stay valid; only `kernelStartupTimeoutMs`
+ * is consumed today (ADR-002 / KD-7).
+ */
+export interface KernelClientOptions {
+  /** Idle-wait budget for kernel startup, in milliseconds. Default 30000. */
+  kernelStartupTimeoutMs?: number
+}
+
+const DEFAULT_KERNEL_STARTUP_TIMEOUT_MS = 30000
+
+/** Shape of a single entry in `GET /api/kernelspecs`'s `kernelspecs` map. */
+interface KernelspecEntry {
+  name?: string
+  spec?: {
+    display_name?: string
+    language?: string
+  }
+}
+
+/** Shape of the `GET /api/kernelspecs` response we depend on. */
+interface KernelspecsResponse {
+  default?: string
+  kernelspecs?: Record<string, KernelspecEntry>
+}
+
+/** Summarise a `/api/kernelspecs` map into the typed-error payload (KD-8). */
+function summarizeKernelspecs(kernelspecs: Record<string, KernelspecEntry>): KernelspecSummary[] {
+  return Object.entries(kernelspecs).map(([name, entry]) => ({
+    name: entry.name ?? name,
+    displayName: entry.spec?.display_name ?? name,
+    language: entry.spec?.language ?? '',
+  }))
 }
 
 export interface ExecutionCallbacks {
@@ -48,11 +86,28 @@ export class KernelClient {
   private sessionManager: SessionManager | null = null
   private session: ISessionConnection | null = null
   private kernel: IKernelConnection | null = null
+  private readonly kernelStartupTimeoutMs: number
+
+  constructor(options: KernelClientOptions = {}) {
+    this.kernelStartupTimeoutMs = options.kernelStartupTimeoutMs ?? DEFAULT_KERNEL_STARTUP_TIMEOUT_MS
+  }
 
   /**
    * Connect to a Jupyter server and start a kernel session.
+   *
+   * For any explicitly-set non-`python3` kernel name, a pre-flight
+   * `GET /api/kernelspecs` validates the name before any `POST /api/kernels`,
+   * converting the server's opaque `500` into a typed
+   * {@link KernelNotRegisteredError}. The literal `python3` default skips the
+   * GET entirely (round-trip-free, byte-stable Python path).
+   *
+   * @param serverUrl - The Jupyter server base URL.
+   * @param kernelName - The kernelspec name to launch. Defaults to `'python3'`.
+   * @returns The resolved kernelspec language for a registered non-`python3`
+   *   kernel, or `undefined` for the `python3` fast-path or a failed pre-flight
+   *   GET (the engine stores it as a forward-looking signal — KD-3).
    */
-  async connect(serverUrl: string): Promise<void> {
+  async connect(serverUrl: string, kernelName: string = DEFAULT_KERNEL_NAME): Promise<string | undefined> {
     try {
       const url = new URL(serverUrl)
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -67,16 +122,27 @@ export class KernelClient {
       this.kernelManager = new KernelManager({ serverSettings })
       this.sessionManager = new SessionManager({ kernelManager: this.kernelManager, serverSettings })
 
+      // Pre-flight kernelspec validation for explicit non-python3 kernels (R2/KD-2/KD-3).
+      // python3 skips the GET so the common path stays round-trip-free.
+      let language: string | undefined
+      if (kernelName !== DEFAULT_KERNEL_NAME) {
+        language = await this.preflightKernelspec(serverUrl, kernelName)
+      }
+
       // Wait for session manager to be ready
       await this.sessionManager.ready
 
-      // Start a new session with Python kernel
-      this.session = await this.sessionManager.startNew({
-        name: 'deepnote-cli',
-        path: 'deepnote-cli',
-        type: 'notebook',
-        kernel: { name: 'python3' },
-      })
+      // Start a new session with the selected kernel
+      try {
+        this.session = await this.sessionManager.startNew({
+          name: 'deepnote-cli',
+          path: 'deepnote-cli',
+          type: 'notebook',
+          kernel: { name: kernelName },
+        })
+      } catch (cause) {
+        throw new KernelLaunchError(kernelName, cause)
+      }
 
       this.kernel = this.session.kernel
       if (!this.kernel) {
@@ -84,7 +150,9 @@ export class KernelClient {
       }
 
       // Wait for kernel to be idle (ready to execute)
-      await this.waitForKernelIdle()
+      await this.waitForKernelIdle(this.kernelStartupTimeoutMs)
+
+      return language
     } catch (error) {
       await this.disconnect()
       throw error
@@ -92,9 +160,38 @@ export class KernelClient {
   }
 
   /**
+   * Pre-flight `GET {serverUrl}/api/kernelspecs` for a non-`python3` kernel.
+   *
+   * - An absent name throws {@link KernelNotRegisteredError} (before any POST).
+   * - A failed GET returns `undefined` and falls through to the existing
+   *   `/api` readiness handling — never a false missing-kernel error (R2).
+   * - A registered name returns the kernelspec's reported language (KD-3).
+   */
+  private async preflightKernelspec(serverUrl: string, kernelName: string): Promise<string | undefined> {
+    let specs: KernelspecsResponse
+    try {
+      const base = serverUrl.replace(/\/$/, '')
+      const response = await fetch(`${base}/api/kernelspecs`)
+      if (!response.ok) {
+        return undefined // fall back to /api readiness, not a missing-kernel error
+      }
+      specs = (await response.json()) as KernelspecsResponse
+    } catch {
+      return undefined // GET failed entirely — fall through to existing readiness path
+    }
+
+    const kernelspecs = specs.kernelspecs ?? {}
+    const spec = kernelspecs[kernelName]
+    if (!spec) {
+      throw new KernelNotRegisteredError(kernelName, summarizeKernelspecs(kernelspecs))
+    }
+    return spec.spec?.language
+  }
+
+  /**
    * Wait for the kernel to reach idle status.
    */
-  private async waitForKernelIdle(timeoutMs = 30000): Promise<void> {
+  private async waitForKernelIdle(timeoutMs = DEFAULT_KERNEL_STARTUP_TIMEOUT_MS): Promise<void> {
     if (!this.kernel) return
 
     const startTime = Date.now()
@@ -107,7 +204,7 @@ export class KernelClient {
       }
 
       if (this.kernel.status === 'dead') {
-        throw new Error('Kernel is dead')
+        throw new KernelDiedError()
       }
 
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -118,18 +215,37 @@ export class KernelClient {
    * Execute code on the kernel and collect outputs.
    */
   async execute(code: string, callbacks?: ExecutionCallbacks): Promise<ExecutionResult> {
-    if (!this.kernel) {
+    const kernel = this.kernel
+    if (!kernel) {
       throw new Error('Kernel not connected. Call connect() first.')
     }
 
     return new Promise((resolve, reject) => {
       const outputs: IOutput[] = []
       let executionCount: number | null = null
+      let settled = false
 
-      const future = this.kernel?.requestExecute({ code })
+      const future = kernel.requestExecute({ code })
       if (!future) {
         reject(new Error('Failed to execute code on kernel'))
         return
+      }
+
+      // Detect mid-run kernel death so it surfaces as a typed KernelDiedError
+      // (not a bare Error or a silent hang). The typed instance must reach the
+      // CLI boundary to stay distinct from an in-block user error (card qajbsg).
+      const onStatusChanged = (_sender: unknown, status: string) => {
+        if (status === 'dead' && !settled) {
+          settled = true
+          kernel.statusChanged.disconnect(onStatusChanged)
+          future.dispose()
+          reject(new KernelDiedError())
+        }
+      }
+      kernel.statusChanged.connect(onStatusChanged)
+
+      const cleanup = () => {
+        kernel.statusChanged.disconnect(onStatusChanged)
       }
 
       callbacks?.onStart?.()
@@ -148,6 +264,8 @@ export class KernelClient {
 
       future.done
         .then(() => {
+          if (settled) return
+          settled = true
           const hasError = outputs.some(o => o.output_type === 'error')
           const result: ExecutionResult = {
             success: !hasError,
@@ -157,8 +275,17 @@ export class KernelClient {
           callbacks?.onDone?.(result)
           resolve(result)
         })
-        .catch(reject)
-        .finally(() => future?.dispose())
+        .catch(error => {
+          if (settled) return
+          settled = true
+          // A rejected future while the kernel is dead is a kernel death, not a
+          // generic failure — surface the typed error.
+          reject(kernel.status === 'dead' ? new KernelDiedError() : error)
+        })
+        .finally(() => {
+          cleanup()
+          future.dispose()
+        })
     })
   }
 

@@ -9,6 +9,20 @@ export interface RuntimeConfig {
   serverPort?: number
   /** Optional environment variables to pass to the server */
   env?: Record<string, string>
+  /**
+   * Jupyter kernelspec name the server launches for execution. Sibling of
+   * `pythonEnv` (ADR-002): `pythonEnv` selects which Python runs the toolkit
+   * server; `kernelName` selects which kernel that server launches. Defaults to
+   * `'python3'` — every existing notebook is byte-stable and skips the
+   * pre-flight `GET /api/kernelspecs`.
+   */
+  kernelName?: string
+  /**
+   * Idle-wait budget for kernel startup, in milliseconds. Defaults to `30000`
+   * (ADR-002 / KD-7), preserving today's behavior. Configurable so heavy
+   * kernels (JVM/Julia warmup) are not failed on a spurious timeout.
+   */
+  kernelStartupTimeoutMs?: number
 }
 
 export interface BlockExecutionResult {

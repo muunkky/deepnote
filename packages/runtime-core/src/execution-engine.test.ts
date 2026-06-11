@@ -141,10 +141,59 @@ describe('ExecutionEngine', () => {
       )
     })
 
-    it('connects kernel client to server URL', async () => {
+    it('connects kernel client to server URL with the default python3 kernel', async () => {
       await engine.start()
 
-      expect(mockKernelClient.connect).toHaveBeenCalledWith('http://localhost:8888')
+      expect(mockKernelClient.connect).toHaveBeenCalledWith('http://localhost:8888', undefined)
+    })
+
+    it('forwards the configured kernelName to connect', async () => {
+      const bashEngine = new ExecutionEngine({
+        pythonEnv: '/path/to/venv',
+        workingDirectory: '/project',
+        kernelName: 'bash',
+      })
+
+      await bashEngine.start()
+
+      expect(mockKernelClient.connect).toHaveBeenCalledWith('http://localhost:8888', 'bash')
+
+      await bashEngine.stop()
+    })
+
+    it('stores the kernelspec language returned by connect', async () => {
+      mockKernelClient.connect.mockResolvedValueOnce('bash')
+      const bashEngine = new ExecutionEngine({
+        pythonEnv: '/path/to/venv',
+        workingDirectory: '/project',
+        kernelName: 'bash',
+      })
+
+      await bashEngine.start()
+
+      expect(bashEngine.kernelLanguageName).toBe('bash')
+
+      await bashEngine.stop()
+    })
+
+    it('leaves the kernel language undefined for the python3 default', async () => {
+      await engine.start()
+
+      expect(engine.kernelLanguageName).toBeUndefined()
+    })
+
+    it('forwards kernelStartupTimeoutMs into the KernelClient', async () => {
+      const timeoutEngine = new ExecutionEngine({
+        pythonEnv: '/path/to/venv',
+        workingDirectory: '/project',
+        kernelStartupTimeoutMs: 90000,
+      })
+
+      await timeoutEngine.start()
+
+      expect(MockKernelClient).toHaveBeenCalledWith(expect.objectContaining({ kernelStartupTimeoutMs: 90000 }))
+
+      await timeoutEngine.stop()
     })
 
     it('stops server if kernel connection fails', async () => {

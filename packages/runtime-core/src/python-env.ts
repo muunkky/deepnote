@@ -175,6 +175,59 @@ function firstNonBlank(value: string | undefined): string | undefined {
 }
 
 /**
+ * Selects the Python interpreter spec via {@link selectPythonSpec} and attaches an
+ * actionable `hint` when resolution lands on a bare system interpreter with no real
+ * override — the single source of truth for the ADR-001 bare-python warning shared by
+ * every `deepnote-run` consumer (CLI `deepnote run`, MCP `deepnote_run`).
+ *
+ * Previously this decision was copy-pasted into both consumers, so a change to the
+ * override semantics (e.g. the empty-string remediation that tightened `hasOverride`
+ * to a non-blank check) had to be applied in lockstep to both copies. Centralising it
+ * here means CLI and MCP can never diverge on hint behaviour.
+ *
+ * The hint fires ONLY when BOTH hold:
+ *   1. the resolved spec is a bare system interpreter ({@link isBareSystemPython}), and
+ *   2. the caller gave no *real* override — neither a non-blank `explicit` argument nor
+ *      a non-blank `DEEPNOTE_PYTHON` env var.
+ *
+ * A blank/whitespace-only value is **not** an override: it falls through to autodetect
+ * in {@link selectPythonSpec} exactly as an absent one would, so it must NOT suppress the
+ * hint — otherwise an empty signal would both resolve to a bare interpreter AND silence
+ * the warning that it likely lacks the toolkit.
+ *
+ * A bare system interpreter typically lacks `deepnote-toolkit`, so without this hint the
+ * failure surfaces as an opaque import error deep inside execution rather than up front at
+ * the consumer boundary. The consumer is responsible for *surfacing* the hint (the CLI
+ * prints it on a human status line, gated behind `!isMachineOutput`; the MCP tool returns
+ * it as `pythonHint`); this helper only *computes* it.
+ *
+ * @param options.explicit - The explicit caller-supplied spec, if any (CLI `--python`,
+ *   MCP `pythonPath`).
+ * @param options.argLabel - The caller-surface noun embedded in the hint so each consumer
+ *   names its own argument (`'--python'` for the CLI, `'pythonPath'` for the MCP tool).
+ * @returns `{ spec }`, plus `hint` when the bare-system-python-without-override gate fires.
+ */
+export function selectPythonSpecWithHint({
+  explicit,
+  argLabel,
+}: {
+  explicit?: string
+  argLabel: string
+}): { spec: string; hint?: string } {
+  const spec = selectPythonSpec({ explicit })
+  const hasOverride = firstNonBlank(explicit) != null || firstNonBlank(process.env.DEEPNOTE_PYTHON) != null
+  if (isBareSystemPython(spec) && !hasOverride) {
+    return {
+      spec,
+      hint:
+        `Resolved Python to "${spec}" (system interpreter) which likely lacks deepnote-toolkit. ` +
+        `Set DEEPNOTE_PYTHON or pass ${argLabel} pointing at a venv with deepnote-toolkit[server] installed.`,
+    }
+  }
+  return { spec }
+}
+
+/**
  * Checks if the given string is a bare system Python command (e.g. 'python', 'python3', 'python3.11')
  * as opposed to an absolute/relative path to a Python executable.
  */

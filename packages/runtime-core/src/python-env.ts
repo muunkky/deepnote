@@ -207,13 +207,10 @@ function firstNonBlank(value: string | undefined): string | undefined {
  *   names its own argument (`'--python'` for the CLI, `'pythonPath'` for the MCP tool).
  * @returns `{ spec }`, plus `hint` when the bare-system-python-without-override gate fires.
  */
-export function selectPythonSpecWithHint({
-  explicit,
-  argLabel,
-}: {
-  explicit?: string
-  argLabel: string
-}): { spec: string; hint?: string } {
+export function selectPythonSpecWithHint({ explicit, argLabel }: { explicit?: string; argLabel: string }): {
+  spec: string
+  hint?: string
+} {
   const spec = selectPythonSpec({ explicit })
   const hasOverride = firstNonBlank(explicit) != null || firstNonBlank(process.env.DEEPNOTE_PYTHON) != null
   if (isBareSystemPython(spec) && !hasOverride) {

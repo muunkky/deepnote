@@ -5,6 +5,27 @@ All notable changes to `@deepnote/runtime-core` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0]
+
+A minor (additive) release that adds one new public export and changes no existing
+exported signature.
+
+### Added
+
+#### Public export — shared bare-system-python hint
+
+- `selectPythonSpecWithHint({ explicit, argLabel })` — selects the Python interpreter
+  spec via `selectPythonSpec` and attaches an actionable `hint` when resolution lands on
+  a bare system interpreter (`isBareSystemPython`) with no real (non-blank) override
+  (`explicit` argument or `DEEPNOTE_PYTHON`). `argLabel` parameterises the caller-surface
+  noun embedded in the hint (`--python` for the CLI, `pythonPath` for the MCP tool).
+
+  This centralises the ADR-001 bare-system-python warning that was previously copy-pasted
+  into the CLI (`deepnote run`) and MCP (`deepnote_run`) consumers, so the two can no
+  longer diverge on hint behaviour. Both consumers now call this helper; the prior inline
+  resolvers (CLI `resolvePythonSpecWithHint`, MCP `resolvePythonEnv`'s hint logic) were
+  removed.
+
 ## [0.4.0]
 
 This is the first published release that surfaces the agent-block execution path

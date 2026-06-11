@@ -1,6 +1,7 @@
 # NOM-002 spike — recorded probe outputs (2026-06-11)
 
-Env: system python3.11.2; venv with `deepnote-toolkit[server]` + `bash_kernel` + `jinja2`.
+Env: system python3.11.2; venv with `deepnote-toolkit[server]==2.3.1` + `bash_kernel==0.10.0` + `jinja2`.
+(These are the validated pins the ALTKERN1 CI integration job uses; bump cadence is a closeout follow-up.)
 Kernelspecs registered in venv: `bash`, `python3`.
 Reproduced independently during the NOM-002 adversarial review (same verdict).
 

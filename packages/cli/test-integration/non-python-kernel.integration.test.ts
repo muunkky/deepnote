@@ -71,7 +71,7 @@ interface RunOutcome {
 /**
  * Run the built CLI and capture stdout/stderr/exit code. The CLI exits non-zero on a
  * failed run (e.g. missing kernel → InvalidUsage = 2), so a non-zero exit is data, not
- * a thrown error — normalise both into a {@link RunOutcome}. Runs from the temp
+ * a thrown error — normalize both into a {@link RunOutcome}. Runs from the temp
  * {@link workDir} so persisted snapshots never touch the repo.
  */
 async function runCli(args: string[]): Promise<RunOutcome> {

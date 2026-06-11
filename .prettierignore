@@ -1,3 +1,7 @@
 CODEOWNERS
 pnpm-lock.yaml
 .deepnote.env.yaml
+
+# Fork-only tooling scaffold — managed by gitban/claude, not project source (never goes upstream)
+.gitban/
+.claude/

@@ -140,6 +140,30 @@ function parseDeepnoteFixture(path: string) {
   return deserializeDeepnoteFile(fs.readFileSync(path, 'utf-8'))
 }
 
+/**
+ * Resolve a real upstream/target executable-block pair from a fixture notebook
+ * that has at least two executable blocks. Used by the reactivity-bypass tests
+ * so `--block` targets a block that genuinely exists (the mocked engine does not
+ * validate block ids, but the dry-run path does) and that has an upstream
+ * dependency for the python3-arm dependency-resolution assertion.
+ */
+function resolveUpstreamTargetPair(path: string): { upstreamBlockId: string; targetBlockId: string } {
+  const fixture = parseDeepnoteFixture(path)
+  const notebook = fixture.project.notebooks.find(
+    candidate => candidate.blocks.filter(block => block.type === 'code' || block.type.startsWith('input-')).length >= 2
+  )
+  if (!notebook) {
+    throw new Error('Expected notebook with at least two executable blocks in fixture')
+  }
+  const executableBlocks = notebook.blocks.filter(block => block.type === 'code' || block.type.startsWith('input-'))
+  const upstreamBlockId = executableBlocks[0]?.id
+  const targetBlockId = executableBlocks[executableBlocks.length - 1]?.id
+  if (!upstreamBlockId || !targetBlockId) {
+    throw new Error('Expected executable blocks in fixture notebook')
+  }
+  return { upstreamBlockId, targetBlockId }
+}
+
 // Test helpers
 interface ExecutionSummary {
   totalBlocks: number
@@ -1760,6 +1784,141 @@ describe('run command', () => {
         await action(HELLO_WORLD_FILE, {})
 
         expect(mockConstructor).toHaveBeenCalledWith(expect.objectContaining({ kernelName: 'python3' }))
+      })
+    })
+
+    describe('reactivity bypass on non-Python kernel (ADR-004 pt 2 / design-doc KD-5)', () => {
+      // The Python-AST analyzers (getUpstreamBlocks for --block dependency resolution,
+      // getBlockDependencies for whole-notebook input validation) are Python-only. On a
+      // non-Python kernel run.ts must NOT invoke them — it skips the subprocess up front,
+      // emits a "Reactivity is Python-only" notice, and runs blocks in existing order.
+      // The observable contract per KD-5 is "the analyzer is not invoked" (NOT "no error
+      // surfaced", which both sites already guaranteed via try/catch). isNonPythonKernel /
+      // selectKernelName / DEFAULT_KERNEL_NAME are kept REAL (...actual) so the genuine
+      // name-based gate is exercised, not a duplicate.
+
+      const REACTIVITY_NOTICE_FRAGMENT = 'Reactivity is Python-only'
+      // Real executable block ids (the mocked engine does not validate ids, but the
+      // dry-run path's assertExecutableBlockExists does, so use genuine fixture blocks).
+      // Resolved lazily in beforeEach — the fixture path is relative to the test CWD,
+      // which is only correct inside a running test, not at describe-collection time.
+      let upstreamBlockId: string
+      let targetBlockId: string
+      beforeEach(() => {
+        ;({ upstreamBlockId, targetBlockId } = resolveUpstreamTargetPair(BLOCKS_FILE))
+      })
+
+      it('does NOT call getUpstreamBlocks on a non-Python --block run, and runs the block in order', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { kernel: 'bash', block: targetBlockId })
+
+        expect(mockGetUpstreamBlocks).not.toHaveBeenCalled()
+        // Block still runs (in existing order) with no resolved upstream deps.
+        expect(mockRunProject).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.objectContaining({ blockId: targetBlockId, blockIds: undefined })
+        )
+      })
+
+      it('does NOT call getBlockDependencies on a non-Python whole-notebook run (input validation skipped)', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { kernel: 'bash' })
+
+        expect(mockGetBlockDependencies).not.toHaveBeenCalled()
+        // Run still proceeds normally.
+        expect(mockStart).toHaveBeenCalled()
+        expect(mockRunProject).toHaveBeenCalled()
+      })
+
+      it('emits the "Reactivity is Python-only" notice on a non-Python --block run', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { kernel: 'bash', block: targetBlockId })
+
+        expect(getOutput(consoleLogSpy)).toContain(REACTIVITY_NOTICE_FRAGMENT)
+      })
+
+      it('emits the "Reactivity is Python-only" notice on a non-Python whole-notebook run', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { kernel: 'bash' })
+
+        expect(getOutput(consoleLogSpy)).toContain(REACTIVITY_NOTICE_FRAGMENT)
+      })
+
+      it('still calls both analyzers on python3 (regression — bypass does not fire on the default kernel)', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { block: targetBlockId })
+
+        expect(mockGetUpstreamBlocks).toHaveBeenCalled()
+        expect(mockGetBlockDependencies).toHaveBeenCalled()
+        expect(getOutput(consoleLogSpy)).not.toContain(REACTIVITY_NOTICE_FRAGMENT)
+      })
+
+      it('suppresses the notice in machine-output mode (still bypasses the analyzer)', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { kernel: 'bash', block: targetBlockId, output: 'json' })
+
+        expect(mockGetUpstreamBlocks).not.toHaveBeenCalled()
+        expect(getOutput(consoleLogSpy)).not.toContain(REACTIVITY_NOTICE_FRAGMENT)
+      })
+
+      it('bypasses getUpstreamBlocks during dry-run on a non-Python kernel', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { kernel: 'bash', block: targetBlockId, dryRun: true })
+
+        expect(mockGetUpstreamBlocks).not.toHaveBeenCalled()
+      })
+
+      it('capstone: non-Python --block with an upstream dependency skips getUpstreamBlocks entirely; identical python3 run resolves the dependency', async () => {
+        // The fixture target block HAS an upstream dependency, so the python3 arm
+        // genuinely resolves an upstream and the non-Python arm genuinely forgoes that
+        // resolution — the user-visible difference KD-5 specifies.
+        const fixture = parseDeepnoteFixture(BLOCKS_FILE)
+        const allBlocks = fixture.project.notebooks.flatMap(notebook => notebook.blocks)
+        const upstreamBlock = allBlocks.find(block => block.id === upstreamBlockId)
+        const targetBlock = allBlocks.find(block => block.id === targetBlockId)
+        if (!upstreamBlock || !targetBlock) {
+          throw new Error('Expected upstream and target blocks in fixture notebook')
+        }
+        const resolvedUpstream = {
+          status: 'success' as const,
+          blocksToExecuteWithDeps: [upstreamBlock, targetBlock],
+          newlyComputedBlocksContentDeps: [],
+        }
+
+        // --- non-Python arm: analyzer NOT invoked, notice emitted, block runs in order ---
+        setupSuccessfulRun()
+        mockGetUpstreamBlocks.mockResolvedValue(resolvedUpstream)
+
+        await action(BLOCKS_FILE, { kernel: 'bash', block: targetBlockId })
+
+        expect(mockGetUpstreamBlocks).not.toHaveBeenCalled()
+        expect(getOutput(consoleLogSpy)).toContain(REACTIVITY_NOTICE_FRAGMENT)
+        expect(mockRunProject).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.objectContaining({ blockId: targetBlockId, blockIds: undefined })
+        )
+
+        // --- python3 arm (identical invocation): analyzer IS invoked, dependency resolved ---
+        vi.clearAllMocks()
+        setupSuccessfulRun()
+        mockGetBlockDependencies.mockResolvedValue([])
+        mockGetUpstreamBlocks.mockResolvedValue(resolvedUpstream)
+
+        await action(BLOCKS_FILE, { block: targetBlockId })
+
+        expect(mockGetUpstreamBlocks).toHaveBeenCalledTimes(1)
+        expect(getOutput(consoleLogSpy)).not.toContain(REACTIVITY_NOTICE_FRAGMENT)
+        expect(mockRunProject).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.objectContaining({ blockId: targetBlockId, blockIds: [upstreamBlockId, targetBlockId] })
+        )
       })
     })
 

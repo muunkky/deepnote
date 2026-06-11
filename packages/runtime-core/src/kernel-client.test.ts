@@ -282,9 +282,7 @@ describe('KernelClient', () => {
         const language = await client.connect('http://localhost:8888', 'bash')
 
         expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8888/api/kernelspecs')
-        expect(mockSessionManager.startNew).toHaveBeenCalledWith(
-          expect.objectContaining({ kernel: { name: 'bash' } })
-        )
+        expect(mockSessionManager.startNew).toHaveBeenCalledWith(expect.objectContaining({ kernel: { name: 'bash' } }))
         expect(language).toBe('bash')
       })
 
@@ -306,9 +304,7 @@ describe('KernelClient', () => {
         const language = await client.connect('http://localhost:8888', 'bash')
 
         expect(language).toBeUndefined()
-        expect(mockSessionManager.startNew).toHaveBeenCalledWith(
-          expect.objectContaining({ kernel: { name: 'bash' } })
-        )
+        expect(mockSessionManager.startNew).toHaveBeenCalledWith(expect.objectContaining({ kernel: { name: 'bash' } }))
       })
 
       it('falls through when the kernelspecs GET returns a non-ok response', async () => {

@@ -2,7 +2,7 @@ import type { IDisplayData, IExecuteResult, IOutput } from '@jupyterlab/nbformat
 import { KernelManager, ServerConnection, SessionManager } from '@jupyterlab/services'
 import type { IKernelConnection } from '@jupyterlab/services/lib/kernel/kernel'
 import type { ISessionConnection } from '@jupyterlab/services/lib/session/session'
-import { KernelDiedError, type KernelspecSummary, KernelLaunchError, KernelNotRegisteredError } from './kernel-errors'
+import { KernelDiedError, KernelLaunchError, KernelNotRegisteredError, type KernelspecSummary } from './kernel-errors'
 import { DEFAULT_KERNEL_NAME } from './kernel-name'
 
 export interface ExecutionResult {

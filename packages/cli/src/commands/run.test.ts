@@ -1717,9 +1717,7 @@ describe('run command', () => {
 
         await action(HELLO_WORLD_FILE, { kernel: 'bash' })
 
-        expect(mockConstructor).toHaveBeenCalledWith(
-          expect.objectContaining({ kernelName: 'bash' })
-        )
+        expect(mockConstructor).toHaveBeenCalledWith(expect.objectContaining({ kernelName: 'bash' }))
       })
 
       it('echoes the resolved kernel in human output', async () => {
@@ -1735,9 +1733,7 @@ describe('run command', () => {
 
         await action(HELLO_WORLD_FILE, {})
 
-        expect(mockConstructor).toHaveBeenCalledWith(
-          expect.objectContaining({ kernelName: 'python3' })
-        )
+        expect(mockConstructor).toHaveBeenCalledWith(expect.objectContaining({ kernelName: 'python3' }))
         expect(getOutput(consoleLogSpy)).toContain('Resolved kernel: python3')
       })
 
@@ -1746,9 +1742,7 @@ describe('run command', () => {
 
         await action(HELLO_WORLD_FILE, { kernel: '   ' })
 
-        expect(mockConstructor).toHaveBeenCalledWith(
-          expect.objectContaining({ kernelName: 'python3' })
-        )
+        expect(mockConstructor).toHaveBeenCalledWith(expect.objectContaining({ kernelName: 'python3' }))
       })
 
       it('does not echo the resolved kernel in machine-output mode', async () => {
@@ -1765,9 +1759,7 @@ describe('run command', () => {
 
         await action(HELLO_WORLD_FILE, {})
 
-        expect(mockConstructor).toHaveBeenCalledWith(
-          expect.objectContaining({ kernelName: 'python3' })
-        )
+        expect(mockConstructor).toHaveBeenCalledWith(expect.objectContaining({ kernelName: 'python3' }))
       })
     })
 

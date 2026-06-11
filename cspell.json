@@ -52,6 +52,7 @@
     "dockerfiles",
     "dockerised",
     "dropna",
+    "ECONNREFUSED",
     "ename",
     "encodeddata",
     "eslint",
@@ -79,6 +80,7 @@
     "kimi",
     "kiro",
     "kpis",
+    "lumino",
     "macchiato",
     "millis",
     "mindsdb",
@@ -98,6 +100,7 @@
     "Pclass",
     "pgsql",
     "pnpm",
+    "preflight",
     "pyformat",
     "pyproject",
     "pyvenv",
@@ -144,6 +147,7 @@
     "venvs",
     "vscode",
     "windsurf",
-    "workflows"
+    "workflows",
+    "xeus"
   ]
 }

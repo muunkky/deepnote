@@ -1,9 +1,10 @@
 import { execFile } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 /**
  * Real-kernel integration suite — design-doc Sub-phase 1C, the headline (R7) plus
@@ -50,9 +51,16 @@ const venv = resolveVenv()
 // must also be present for a real run. Any missing → skip the whole suite.
 const integrationEnabled = process.env.RUN_INTEGRATION_TESTS === 'true' && venv !== null && existsSync(cliBin)
 
-const fixtures = join(here, 'fixtures')
-const bashImageFixture = join(fixtures, 'bash-image.deepnote')
-const pythonRegressionFixture = join(repoRoot, 'test-fixtures', 'simple.deepnote')
+const sourceFixtures = join(here, 'fixtures')
+const bashImageSource = join(sourceFixtures, 'bash-image.deepnote')
+const pythonRegressionSource = join(repoRoot, 'test-fixtures', 'simple.deepnote')
+
+// The CLI's `run` persists an execution snapshot into a `snapshots/` directory NEXT
+// TO the source file. To keep those artifacts out of the repo working tree (and CI's
+// `git status`), copy the fixtures into a throwaway temp dir and run from there.
+let workDir = ''
+let bashImageFixture = ''
+let pythonRegressionFixture = ''
 
 interface RunOutcome {
   exitCode: number
@@ -63,12 +71,13 @@ interface RunOutcome {
 /**
  * Run the built CLI and capture stdout/stderr/exit code. The CLI exits non-zero on a
  * failed run (e.g. missing kernel → InvalidUsage = 2), so a non-zero exit is data, not
- * a thrown error — normalise both into a {@link RunOutcome}.
+ * a thrown error — normalise both into a {@link RunOutcome}. Runs from the temp
+ * {@link workDir} so persisted snapshots never touch the repo.
  */
 async function runCli(args: string[]): Promise<RunOutcome> {
   try {
     const { stdout, stderr } = await execFileAsync('node', [cliBin, ...args], {
-      cwd: repoRoot,
+      cwd: workDir,
       maxBuffer: 32 * 1024 * 1024,
     })
     return { exitCode: 0, stdout, stderr }
@@ -85,6 +94,21 @@ describeIntegration('non-Python kernel — real CLI against real deepnote-toolki
     // Surface why the suite is (or isn't) running so a CI skip is never silent.
     // biome-ignore lint/suspicious/noConsole: integration diagnostics belong on the CI log.
     console.log(`[integration] RUN_INTEGRATION_TESTS=${process.env.RUN_INTEGRATION_TESTS} venv=${venv} cliBin=${cliBin}`)
+
+    // Copy fixtures into an isolated temp dir so the CLI's snapshot persistence lands
+    // there, not in the repo (the source `snapshots/` dir would otherwise be created
+    // next to the committed fixtures).
+    workDir = mkdtempSync(join(tmpdir(), 'deepnote-kernel-integration-'))
+    bashImageFixture = join(workDir, basename(bashImageSource))
+    pythonRegressionFixture = join(workDir, basename(pythonRegressionSource))
+    copyFileSync(bashImageSource, bashImageFixture)
+    copyFileSync(pythonRegressionSource, pythonRegressionFixture)
+  })
+
+  afterAll(() => {
+    if (workDir) {
+      rmSync(workDir, { recursive: true, force: true })
+    }
   })
 
   it('headline (R7): `--kernel bash` returns a non-text/plain image/png MIME bundle', async () => {

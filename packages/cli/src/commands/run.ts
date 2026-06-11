@@ -13,10 +13,9 @@ import {
   type ExecutionSummary,
   executableBlockTypeSet,
   type IOutput,
-  isBareSystemPython,
   type DeepnoteBlock as RuntimeDeepnoteBlock,
   resolvePythonExecutable,
-  selectPythonSpec,
+  selectPythonSpecWithHint,
 } from '@deepnote/runtime-core'
 import type { Command } from 'commander'
 import dotenv from 'dotenv'
@@ -240,36 +239,6 @@ function createPromptOnlyFile(prompt: string): DeepnoteFile {
 }
 
 /**
- * Resolve the Python interpreter *spec* via the shared {@link selectPythonSpec}
- * precedence chain (`--python` > `DEEPNOTE_PYTHON` > autodetect), and attach an
- * actionable `hint` when resolution lands on a bare system interpreter with no real
- * override.
- *
- * Mirrors the MCP consumer's `resolvePythonEnv` (`packages/mcp/src/tools/execution.ts`)
- * so every deepnote-run consumer surfaces the same ADR-001 warning. The hint fires
- * ONLY when the resolved spec is a bare system interpreter (`isBareSystemPython`) AND
- * the caller gave no real override — neither a non-blank `--python` argument nor a
- * non-blank `DEEPNOTE_PYTHON` env var. A blank value is not an override; it falls
- * through to autodetect just like an absent one, so it must NOT suppress the hint. A
- * bare system interpreter typically lacks `deepnote-toolkit`, so without this hint the
- * failure surfaces as an opaque import error deep inside execution rather than up front.
- */
-function resolvePythonSpecWithHint(explicit: string | undefined): { spec: string; hint?: string } {
-  const spec = selectPythonSpec({ explicit })
-  const isRealOverride = (value: string | undefined): boolean => value != null && value.trim().length > 0
-  const hasOverride = isRealOverride(explicit) || isRealOverride(process.env.DEEPNOTE_PYTHON)
-  if (isBareSystemPython(spec) && !hasOverride) {
-    return {
-      spec,
-      hint:
-        `Resolved Python to "${spec}" (system interpreter) which likely lacks deepnote-toolkit. ` +
-        `Set DEEPNOTE_PYTHON or pass --python pointing at a venv with deepnote-toolkit[server] installed.`,
-    }
-  }
-  return { spec }
-}
-
-/**
  * Common project setup: resolve path, parse/convert file, validate requirements.
  * Shared by both runDeepnoteProject and dryRunDeepnoteProject.
  *
@@ -324,7 +293,14 @@ async function setupProject(path: string | undefined, options: RunOptions): Prom
 
   dotenv.config({ path: join(workingDirectory, DEFAULT_ENV_FILE), quiet: true })
 
-  const { spec: pythonSpec, hint: pythonHint } = resolvePythonSpecWithHint(options.python)
+  // Shared ADR-001 resolver: `--python` > DEEPNOTE_PYTHON > autodetect, plus the
+  // bare-system-python hint. The same runtime-core helper backs the MCP consumer, so the
+  // two cannot diverge; only the printed surface noun (`--python`) is CLI-specific. The
+  // hint is a human-only status line, so it stays suppressed in machine-output mode.
+  const { spec: pythonSpec, hint: pythonHint } = selectPythonSpecWithHint({
+    explicit: options.python,
+    argLabel: '--python',
+  })
   if (pythonHint && !isMachineOutput) {
     log(getChalk().yellow(pythonHint))
   }

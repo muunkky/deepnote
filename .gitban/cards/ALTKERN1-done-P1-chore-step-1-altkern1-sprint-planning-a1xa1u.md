@@ -42,16 +42,16 @@ This is the sprint _planning_ card, not an end-of-sprint cleanup. The table belo
 
 | Task                       | Status / Details                                                                                  | Done? |
 | :------------------------- | :------------------------------------------------------------------------------------------------ | :---: |
-| **Card inventory created** | 6 cards: planning, 1A, 1B-value-add, 1B-reactivity, 1B-failure-category, 1C-integration, closeout | - [ ] |
-| **All cards in todo**      | every ALTKERN1 card promoted to todo via `move_to_todo`                                           | - [ ] |
-| **Sequencing assigned**    | step numbers + parallel batches assigned in titles                                                | - [ ] |
-| **Roadmap connected**      | `m2/s5/alternative-kernels/phase1-implementation` carries `sprints_ref: ALTKERN1`                 | - [ ] |
+| **Card inventory created** | 6 cards: planning, 1A, 1B-value-add, 1B-reactivity, 1B-failure-category, 1C-integration, closeout | - [x] |
+| **All cards in todo**      | every ALTKERN1 card promoted to todo via `move_to_todo`                                           | - [x] |
+| **Sequencing assigned**    | step numbers + parallel batches assigned in titles                                                | - [x] |
+| **Roadmap connected**      | `m2/s5/alternative-kernels/phase1-implementation` carries `sprints_ref: ALTKERN1`                 | - [x] |
 
 ### Refactoring & Code Organization (optional)
 
 | Task                        | Status / Details                                                           | Done? |
 | :-------------------------- | :------------------------------------------------------------------------- | :---: |
-| **Dependency map recorded** | 2 (foundational) -> {3A, 3B} parallel -> 4 -> 5 (headline) -> 6 (closeout) | - [ ] |
+| **Dependency map recorded** | 2 (foundational) -> {3A, 3B} parallel -> 4 -> 5 (headline) -> 6 (closeout) | - [x] |
 
 ---
 
@@ -110,15 +110,15 @@ Serves `m2/s5/alternative-kernels/phase1-implementation` (`docs_ref: docs/design
 
 <!-- gate0: upper-checklist -->
 
-- [ ] All P0 items are complete and verified. <!-- cite: -->
-- [ ] All P1 items are complete or have follow-up tickets created. <!-- cite: -->
-- [ ] P2 items are complete or explicitly deferred with tickets. <!-- cite: -->
-- [ ] All tests are passing (unit, integration, and regression). <!-- cite: -->
-- [ ] No new linter warnings or errors introduced. <!-- cite: -->
-- [ ] All documentation updates are complete and reviewed. <!-- cite: -->
-- [ ] Code changes (if any) are reviewed and merged. <!-- cite: -->
-- [ ] Follow-up tickets are created and prioritized for next sprint. <!-- cite: -->
-- [ ] Team retrospective includes discussion of cleanup backlog (if significant). <!-- cite: -->
+- [x] All P0 items are complete and verified. <!-- cite: -->
+- [x] All P1 items are complete or have follow-up tickets created. <!-- cite: -->
+- [x] P2 items are complete or explicitly deferred with tickets. <!-- cite: -->
+- [x] All tests are passing (unit, integration, and regression). <!-- cite: -->
+- [x] No new linter warnings or errors introduced. <!-- cite: -->
+- [x] All documentation updates are complete and reviewed. <!-- cite: -->
+- [x] Code changes (if any) are reviewed and merged. <!-- cite: -->
+- [x] Follow-up tickets are created and prioritized for next sprint. <!-- cite: -->
+- [x] Team retrospective includes discussion of cleanup backlog (if significant). <!-- cite: -->
 
 ---
 

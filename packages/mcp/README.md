@@ -107,6 +107,46 @@ Scopes:
 
 `deepnote_run` supports `.deepnote`, `.ipynb`, `.py`, and `.qmd` inputs.
 
+#### Selecting the Python interpreter
+
+`deepnote_run` needs a Python interpreter with `deepnote-toolkit[server]` installed.
+It resolves which interpreter to use with this precedence (most specific wins):
+
+1. The `pythonPath` argument passed to `deepnote_run` (per-invocation override).
+2. The **`DEEPNOTE_PYTHON`** environment variable set on the server process.
+3. Autodetected system Python (`python`, then `python3`).
+
+`DEEPNOTE_PYTHON` (and `pythonPath`) accept any of these forms:
+
+| Form       | Example                    |
+| ---------- | -------------------------- |
+| Executable | `/path/to/venv/bin/python` |
+| `bin/` dir | `/path/to/venv/bin`        |
+| Venv root  | `/path/to/venv`            |
+
+Set it when launching the server so an editor/host can publish the user's
+selected interpreter to both the MCP server and the CLI:
+
+```json
+{
+  "mcpServers": {
+    "deepnote": {
+      "command": "npx",
+      "args": ["@deepnote/mcp"],
+      "env": {
+        "DEEPNOTE_PYTHON": "/path/to/venv/bin/python"
+      }
+    }
+  }
+}
+```
+
+If neither `pythonPath` nor `DEEPNOTE_PYTHON` is provided and only a bare system
+interpreter (e.g. `python` / `python3`) is found, `deepnote_run` still attempts the
+run but returns a `pythonHint` field with an actionable message — a bare system
+Python usually lacks `deepnote-toolkit`, so this surfaces the problem at the tool
+boundary instead of as an opaque import error deep in execution.
+
 ### Snapshot Tools
 
 Snapshots store outputs separately from source files.

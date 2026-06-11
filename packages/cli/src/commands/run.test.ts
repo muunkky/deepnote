@@ -21,7 +21,28 @@ let mockServerPort: number | null = 8888
 const mockGetBlockDependencies = vi.fn()
 const mockGetUpstreamBlocks = vi.fn()
 
-// Mock @deepnote/runtime-core before importing run
+// Mock node:child_process so the REAL selectPythonSpec's autodetect leaf
+// (detectDefaultPython, called intra-module via execSync) resolves deterministically
+// to 'python' without spawning a real interpreter. We deliberately do NOT mock
+// selectPythonSpec itself — the precedence regression these tests guard must surface
+// here, so the CLI test exercises the genuine shared selector, not a duplicate implementation.
+vi.mock('node:child_process', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:child_process')>()
+  return {
+    ...actual,
+    execSync: vi.fn((command: string) => {
+      if (command === 'python --version') {
+        return Buffer.from('Python 3.11.0')
+      }
+      throw new Error(`command not found: ${command}`)
+    }),
+  }
+})
+
+// Mock @deepnote/runtime-core before importing run. ExecutionEngine and
+// resolvePythonExecutable are stubbed (no real server / filesystem probe), but
+// selectPythonSpec + detectDefaultPython are kept REAL so the precedence chain
+// (arg > DEEPNOTE_PYTHON > autodetect) is genuinely exercised here.
 vi.mock('@deepnote/runtime-core', async importOriginal => {
   const actual = await importOriginal<typeof import('@deepnote/runtime-core')>()
   return {
@@ -40,7 +61,6 @@ vi.mock('@deepnote/runtime-core', async importOriginal => {
         mockConstructor(config)
       }
     },
-    detectDefaultPython: () => 'python',
     resolvePythonExecutable: (pythonPath: string) => Promise.resolve(pythonPath),
   }
 })
@@ -178,6 +198,12 @@ describe('run command', () => {
 
       // Ensure DEEPNOTE_TOKEN is not set by default (tests that need it will stub it)
       delete process.env[DEEPNOTE_TOKEN_ENV]
+
+      // Ensure DEEPNOTE_PYTHON is unset by default so interpreter resolution is
+      // deterministic (autodetect). Now that run.ts routes through selectPythonSpec,
+      // an ambient DEEPNOTE_PYTHON would otherwise leak into the resolved pythonEnv.
+      // Tests that exercise the env tier stub it explicitly.
+      delete process.env.DEEPNOTE_PYTHON
 
       // Reset getBlockDependencies to return empty by default (no validation errors)
       mockGetBlockDependencies.mockResolvedValue([])
@@ -1673,6 +1699,150 @@ describe('run command', () => {
         // Should still succeed
         const parsed = JSON.parse(output)
         expect(parsed.success).toBe(true)
+      })
+    })
+
+    describe('python interpreter resolution (selectPythonSpec precedence)', () => {
+      // ADR-001: precedence is --python > DEEPNOTE_PYTHON > autodetect. These tests
+      // assert the resolved pythonEnv handed to the ExecutionEngine, proving the CLI
+      // converges on the shared selectPythonSpec selector (parity with the MCP server)
+      // rather than the old `options.python ?? detectDefaultPython()` chain
+      // that ignored DEEPNOTE_PYTHON.
+
+      it('uses --python when provided, even if DEEPNOTE_PYTHON is set (--python wins)', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', '/env/venv/bin/python')
+
+        await action(HELLO_WORLD_FILE, { python: '/flag/venv/bin/python' })
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: '/flag/venv/bin/python',
+          workingDirectory: expect.any(String),
+        })
+      })
+
+      it('honors DEEPNOTE_PYTHON when no --python is provided', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', '/env/venv/bin/python')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: '/env/venv/bin/python',
+          workingDirectory: expect.any(String),
+        })
+      })
+
+      it('falls back to autodetect when neither --python nor DEEPNOTE_PYTHON is set', async () => {
+        setupSuccessfulRun()
+        // undefined deletes the var (vitest), matching the real "DEEPNOTE_PYTHON unset"
+        // case. The real selectPythonSpec's autodetect leaf is driven by the mocked
+        // execSync above, which resolves to 'python'.
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: 'python',
+          workingDirectory: expect.any(String),
+        })
+      })
+
+      it('prefers --python over autodetect when DEEPNOTE_PYTHON is unset', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, { python: '/flag/venv/bin/python' })
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: '/flag/venv/bin/python',
+          workingDirectory: expect.any(String),
+        })
+      })
+
+      it('treats a blank DEEPNOTE_PYTHON as absent and falls through to autodetect', async () => {
+        setupSuccessfulRun()
+        // A blank env value must fall through the precedence chain exactly as an
+        // absent one does — not propagate '' to the engine. With the REAL selector
+        // wired here, this fails on the pre-fix `??` semantics.
+        vi.stubEnv('DEEPNOTE_PYTHON', '')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: 'python',
+          workingDirectory: expect.any(String),
+        })
+      })
+    })
+
+    describe('bare-system-python hint (ADR-001 parity with MCP consumer)', () => {
+      // ADR-001: every deepnote-run consumer must surface an actionable hint when
+      // interpreter resolution lands on a bare system `python` with no real override.
+      // The CLI half mirrors the MCP consumer's wording; the hint fires
+      // ONLY on bare autodetect with neither --python nor DEEPNOTE_PYTHON set. A blank
+      // signal at either tier is not an override — it falls through to autodetect, so it
+      // must NOT suppress the hint.
+      const HINT_FRAGMENT = 'likely lacks deepnote-toolkit'
+
+      it('logs the hint when resolution lands on bare system python with no override', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(getOutput(consoleLogSpy)).toContain(HINT_FRAGMENT)
+        expect(getOutput(consoleLogSpy)).toContain('DEEPNOTE_PYTHON')
+        expect(getOutput(consoleLogSpy)).toContain('--python')
+        expect(getOutput(consoleLogSpy)).toContain('deepnote-toolkit[server]')
+      })
+
+      it('does NOT log the hint when --python override is provided', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, { python: '/flag/venv/bin/python' })
+
+        expect(getOutput(consoleLogSpy)).not.toContain(HINT_FRAGMENT)
+      })
+
+      it('does NOT log the hint when DEEPNOTE_PYTHON override is set', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', '/env/venv/bin/python')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(getOutput(consoleLogSpy)).not.toContain(HINT_FRAGMENT)
+      })
+
+      it('logs the hint when DEEPNOTE_PYTHON is blank (blank is not an override)', async () => {
+        setupSuccessfulRun()
+        // Blank env falls through to autodetect → bare python, so the hint must fire.
+        vi.stubEnv('DEEPNOTE_PYTHON', '')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(getOutput(consoleLogSpy)).toContain(HINT_FRAGMENT)
+      })
+
+      it('does NOT log the hint when a non-bare interpreter is resolved via --python', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        // A path (not a bare `python`/`python3`) is non-bare even though it is also an override.
+        await action(HELLO_WORLD_FILE, { python: '/path/to/venv' })
+
+        expect(getOutput(consoleLogSpy)).not.toContain(HINT_FRAGMENT)
+      })
+
+      it('does NOT log the hint in machine-output mode', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+
+        // Machine output must stay clean JSON — the hint is a human-only status line.
+        expect(getOutput(consoleLogSpy)).not.toContain(HINT_FRAGMENT)
       })
     })
 

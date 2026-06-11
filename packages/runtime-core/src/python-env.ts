@@ -123,6 +123,108 @@ export function detectDefaultPython(): string {
 }
 
 /**
+ * Selects the Python interpreter *spec* to use, applying the shared precedence
+ * chain from ADR-001:
+ *
+ *   1. `explicit` — a per-invocation caller argument (CLI `--python`, MCP
+ *      `deepnote_run` `pythonPath`). Most specific signal, so it wins.
+ *   2. `process.env.DEEPNOTE_PYTHON` — the public interop contract by which an
+ *      editor/host publishes the user-selected interpreter when it spawns the
+ *      server or CLI.
+ *   3. {@link detectDefaultPython} — the autodetect fallback (matches today's CLI).
+ *
+ * An empty or whitespace-only signal at any tier is treated as **absent**, not as a
+ * present value: it falls through to the next tier exactly as `undefined` would. (A
+ * plain `??` chain would instead pass `""` straight through to the engine, which then
+ * fails on an empty interpreter path — the regression this guards against.) So a blank
+ * `explicit` arg or a blank `DEEPNOTE_PYTHON=` resolves to autodetect, never to `""`.
+ *
+ * Both the CLI and the MCP server call this so they can never disagree on which
+ * interpreter to run against.
+ *
+ * The returned value is a spec **string** (executable path, `bin/` directory, or
+ * venv root) — it is NOT a built spawn environment. Turning the spec into a
+ * concrete executable plus `PATH`/`VIRTUAL_ENV` happens inside the
+ * `ExecutionEngine` (`server-starter.ts` calls `resolvePythonExecutable` then
+ * `buildPythonEnv`), so callers get an identically-built environment for free
+ * simply by passing this spec as `RuntimeConfig.pythonEnv`.
+ *
+ * Keep this a pure precedence selector with no assembly; it is trivially
+ * unit-testable.
+ *
+ * @param options.explicit - The explicit caller-supplied spec, if any.
+ * @returns The selected Python interpreter spec string.
+ * @throws Error from {@link detectDefaultPython} if no spec is supplied, no
+ *   `DEEPNOTE_PYTHON` is set, and neither `python` nor `python3` is found.
+ */
+export function selectPythonSpec({ explicit }: { explicit?: string } = {}): string {
+  return firstNonBlank(explicit) ?? firstNonBlank(process.env.DEEPNOTE_PYTHON) ?? detectDefaultPython()
+}
+
+/**
+ * Normalizes an interpreter signal: returns the value unchanged when it carries a
+ * real spec, or `undefined` when it is absent, empty, or whitespace-only — so an
+ * empty/blank signal falls through the precedence chain instead of being treated
+ * as a present value.
+ */
+function firstNonBlank(value: string | undefined): string | undefined {
+  if (value == null || value.trim().length === 0) {
+    return undefined
+  }
+  return value
+}
+
+/**
+ * Selects the Python interpreter spec via {@link selectPythonSpec} and attaches an
+ * actionable `hint` when resolution lands on a bare system interpreter with no real
+ * override — the single source of truth for the ADR-001 bare-python warning shared by
+ * every `deepnote-run` consumer (CLI `deepnote run`, MCP `deepnote_run`).
+ *
+ * Previously this decision was copy-pasted into both consumers, so a change to the
+ * override semantics (e.g. the empty-string remediation that tightened `hasOverride`
+ * to a non-blank check) had to be applied in lockstep to both copies. Centralizing it
+ * here means CLI and MCP can never diverge on hint behaviour.
+ *
+ * The hint fires ONLY when BOTH hold:
+ *   1. the resolved spec is a bare system interpreter ({@link isBareSystemPython}), and
+ *   2. the caller gave no *real* override — neither a non-blank `explicit` argument nor
+ *      a non-blank `DEEPNOTE_PYTHON` env var.
+ *
+ * A blank/whitespace-only value is **not** an override: it falls through to autodetect
+ * in {@link selectPythonSpec} exactly as an absent one would, so it must NOT suppress the
+ * hint — otherwise an empty signal would both resolve to a bare interpreter AND silence
+ * the warning that it likely lacks the toolkit.
+ *
+ * A bare system interpreter typically lacks `deepnote-toolkit`, so without this hint the
+ * failure surfaces as an opaque import error deep inside execution rather than up front at
+ * the consumer boundary. The consumer is responsible for *surfacing* the hint (the CLI
+ * prints it on a human status line, gated behind `!isMachineOutput`; the MCP tool returns
+ * it as `pythonHint`); this helper only *computes* it.
+ *
+ * @param options.explicit - The explicit caller-supplied spec, if any (CLI `--python`,
+ *   MCP `pythonPath`).
+ * @param options.argLabel - The caller-surface noun embedded in the hint so each consumer
+ *   names its own argument (`'--python'` for the CLI, `'pythonPath'` for the MCP tool).
+ * @returns `{ spec }`, plus `hint` when the bare-system-python-without-override gate fires.
+ */
+export function selectPythonSpecWithHint({ explicit, argLabel }: { explicit?: string; argLabel: string }): {
+  spec: string
+  hint?: string
+} {
+  const spec = selectPythonSpec({ explicit })
+  const hasOverride = firstNonBlank(explicit) != null || firstNonBlank(process.env.DEEPNOTE_PYTHON) != null
+  if (isBareSystemPython(spec) && !hasOverride) {
+    return {
+      spec,
+      hint:
+        `Resolved Python to "${spec}" (system interpreter) which likely lacks deepnote-toolkit. ` +
+        `Set DEEPNOTE_PYTHON or pass ${argLabel} pointing at a venv with deepnote-toolkit[server] installed.`,
+    }
+  }
+  return { spec }
+}
+
+/**
  * Checks if the given string is a bare system Python command (e.g. 'python', 'python3', 'python3.11')
  * as opposed to an absolute/relative path to a Python executable.
  */

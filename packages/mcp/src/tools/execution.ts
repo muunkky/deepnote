@@ -22,7 +22,7 @@ import {
   slugifyProjectName,
   splitDeepnoteFile,
 } from '@deepnote/convert'
-import { ExecutionEngine, executableBlockTypeSet } from '@deepnote/runtime-core'
+import { ExecutionEngine, executableBlockTypeSet, selectPythonSpecWithHint } from '@deepnote/runtime-core'
 import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { formatOutput } from '../utils.js'
@@ -94,6 +94,18 @@ function getErrorCode(error: unknown): string | undefined {
   if (typeof error !== 'object' || error === null) return undefined
   const maybeCode = Reflect.get(error, 'code')
   return typeof maybeCode === 'string' ? maybeCode : undefined
+}
+
+/**
+ * Resolve the Python interpreter spec to hand to {@link ExecutionEngine} via the shared
+ * {@link selectPythonSpecWithHint} helper from `@deepnote/runtime-core` — the single
+ * source of truth for the ADR-001 precedence chain (arg > `DEEPNOTE_PYTHON` > autodetect)
+ * and the bare-system-python hint. The CLI consumer (`deepnote run`) calls the same helper,
+ * so the two can never diverge; only the caller-surface noun differs (`pythonPath` here,
+ * `--python` in the CLI). Returns the selected `spec` plus an optional actionable `hint`.
+ */
+function resolvePythonEnv(pythonPath: string | undefined): { spec: string; hint?: string } {
+  return selectPythonSpecWithHint({ explicit: pythonPath, argLabel: 'pythonPath' })
 }
 
 export const executionTools: Tool[] = [
@@ -390,8 +402,9 @@ async function handleRun(args: Record<string, unknown>) {
 
   // Actually run the notebooks
   const workingDir = path.dirname(originalPath)
+  const { spec: pythonEnv, hint: pythonHint } = resolvePythonEnv(pythonPath)
   const engine = new ExecutionEngine({
-    pythonEnv: pythonPath || 'python',
+    pythonEnv,
     workingDirectory: workingDir,
   })
 
@@ -467,6 +480,7 @@ async function handleRun(args: Record<string, unknown>) {
           },
       results: compact ? results.filter(r => !r.success || r.error) : results,
       ...(outputSummaries && outputSummaries.length > 0 ? { outputSummaries } : {}),
+      ...(pythonHint ? { pythonHint } : {}),
       hint:
         snapshotPath && !includeOutputSummary
           ? 'Use deepnote_snapshot_load to inspect outputs, errors, and debug info'
@@ -555,8 +569,9 @@ async function handleRunBlock(
 
   // Run the specific block
   const workingDir = path.dirname(originalPath)
+  const { spec: pythonEnv, hint: pythonHint } = resolvePythonEnv(pythonPath)
   const engine = new ExecutionEngine({
-    pythonEnv: pythonPath || 'python',
+    pythonEnv,
     workingDirectory: workingDir,
   })
 
@@ -582,6 +597,7 @@ async function handleRunBlock(
               executedBlocks: summary.executedBlocks,
               failedBlocks: summary.failedBlocks,
               durationMs: summary.totalDurationMs,
+              ...(pythonHint ? { pythonHint } : {}),
             },
             null,
             2

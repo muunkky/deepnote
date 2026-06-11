@@ -22,7 +22,7 @@ import {
   slugifyProjectName,
   splitDeepnoteFile,
 } from '@deepnote/convert'
-import { ExecutionEngine, executableBlockTypeSet, isBareSystemPython, selectPythonSpec } from '@deepnote/runtime-core'
+import { ExecutionEngine, executableBlockTypeSet, selectPythonSpecWithHint } from '@deepnote/runtime-core'
 import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { formatOutput } from '../utils.js'
@@ -97,36 +97,15 @@ function getErrorCode(error: unknown): string | undefined {
 }
 
 /**
- * Resolve the Python interpreter spec to hand to {@link ExecutionEngine}, applying
- * the shared precedence chain (arg > `DEEPNOTE_PYTHON` > autodetect) from
- * `@deepnote/runtime-core`'s {@link selectPythonSpec}.
- *
- * Returns the selected `spec` plus an optional actionable `hint`. The hint fires
- * ONLY when the resolved spec is a bare system interpreter (`isBareSystemPython`)
- * AND the caller gave no real override — neither a non-blank `pythonPath` argument
- * nor a non-blank `DEEPNOTE_PYTHON` env var (a blank value is not an override; it
- * falls through to autodetect just like an absent one). A bare system interpreter
- * typically lacks
- * `deepnote-toolkit`, so without this hint the failure would surface as an opaque
- * import error deep inside execution rather than at the tool boundary.
+ * Resolve the Python interpreter spec to hand to {@link ExecutionEngine} via the shared
+ * {@link selectPythonSpecWithHint} helper from `@deepnote/runtime-core` — the single
+ * source of truth for the ADR-001 precedence chain (arg > `DEEPNOTE_PYTHON` > autodetect)
+ * and the bare-system-python hint. The CLI consumer (`deepnote run`) calls the same helper,
+ * so the two can never diverge; only the caller-surface noun differs (`pythonPath` here,
+ * `--python` in the CLI). Returns the selected `spec` plus an optional actionable `hint`.
  */
 function resolvePythonEnv(pythonPath: string | undefined): { spec: string; hint?: string } {
-  const spec = selectPythonSpec({ explicit: pythonPath })
-  // An override only counts if it is a real (non-blank) signal. A blank `pythonPath`
-  // or `DEEPNOTE_PYTHON=` falls through to autodetect in selectPythonSpec, so it must
-  // NOT suppress the bare-python hint — otherwise an empty signal would both resolve
-  // to a bare interpreter AND silence the warning that it likely lacks the toolkit.
-  const isRealOverride = (value: string | undefined): boolean => value != null && value.trim().length > 0
-  const hasOverride = isRealOverride(pythonPath) || isRealOverride(process.env.DEEPNOTE_PYTHON)
-  if (isBareSystemPython(spec) && !hasOverride) {
-    return {
-      spec,
-      hint:
-        `Resolved Python to "${spec}" (system interpreter) which likely lacks deepnote-toolkit. ` +
-        `Set DEEPNOTE_PYTHON or pass pythonPath to a venv with deepnote-toolkit[server] installed.`,
-    }
-  }
-  return { spec }
+  return selectPythonSpecWithHint({ explicit: pythonPath, argLabel: 'pythonPath' })
 }
 
 export const executionTools: Tool[] = [

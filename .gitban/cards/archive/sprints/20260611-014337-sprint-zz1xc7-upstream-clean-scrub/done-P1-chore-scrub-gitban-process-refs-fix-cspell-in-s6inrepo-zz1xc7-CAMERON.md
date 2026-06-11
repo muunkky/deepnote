@@ -36,7 +36,7 @@ gitban-ism tokens to remove from shipped comments/strings — grep the full `ups
 |     **3. Make Changes**     | Reword comments/JSDoc; fix spellings                                                                     |          - [x] Changes are implemented.           |
 |     **4. Test/Verify**      | `pnpm spell-check` exits 0; grep returns nothing; `pnpm typecheck` + suites unchanged                    |        - [x] Changes are tested/verified.         |
 | **5. Update Documentation** | N/A — this IS comment/doc text                                                                           |  - [x] Documentation is updated [if applicable].  |
-|     **6. Review/Merge**     | gitban reviewer                                                                                          |      - [ ] Changes are reviewed and merged.       |
+|     **6. Review/Merge**     | gitban reviewer                                                                                          |      - [x] Changes are reviewed and merged.       |
 
 #### Work Notes
 
@@ -79,7 +79,7 @@ gitban-ism tokens to remove from shipped comments/strings — grep the full `ups
 - [x] All planned changes are implemented.
 - [x] Changes are tested/verified (cspell exits 0, grep clean, suites unchanged).
 - [x] Documentation is updated (N/A — comment text).
-- [ ] Changes are reviewed (gitban reviewer).
+- [x] Changes are reviewed (gitban reviewer).
 - [x] Pull request is merged or changes are committed.
 - [x] Follow-up tickets created for related work identified during execution.
 

@@ -9,6 +9,8 @@ import {
   generateSortingKey,
   isAgentBlock,
   isExecutableBlock,
+  isValueAddBlockType,
+  UnsupportedBlockOnKernelError,
 } from '@deepnote/blocks'
 import type { IOutput } from '@jupyterlab/nbformat'
 import {
@@ -19,6 +21,7 @@ import {
 } from './agent-handler'
 import { toPythonLiteral } from './javascript'
 import { KernelClient } from './kernel-client'
+import { DEFAULT_KERNEL_NAME, isNonPythonKernel } from './kernel-name'
 import { type ServerInfo, startServer, stopServer } from './server-starter'
 import type { BlockExecutionResult, ExecutionSummary, RuntimeConfig } from './types'
 
@@ -250,6 +253,18 @@ export class ExecutionEngine {
       await options.onBlockStart?.(block, i, totalBlocks)
 
       try {
+        // ADR-004 Decision point 1: hard-fail value-add blocks on a non-Python
+        // kernel at the dispatch seam — before the agent branch and before
+        // `createPythonCode` below — so no `_dntk`-prefixed Python is ever
+        // generated, let alone dispatched to an alien kernel. Plain `code`
+        // (and markdown, which is not executable) still run on any kernel.
+        if (
+          isNonPythonKernel(this.config.kernelName ?? DEFAULT_KERNEL_NAME, this.kernelLanguage) &&
+          isValueAddBlockType(block.type)
+        ) {
+          throw new UnsupportedBlockOnKernelError(block.type, this.config.kernelName ?? DEFAULT_KERNEL_NAME)
+        }
+
         if (isAgentBlock(block)) {
           const notebook = file.project.notebooks[notebookIndex]
           const agentBlockIndex = notebook?.blocks.findIndex(b => b.id === block.id) ?? -1

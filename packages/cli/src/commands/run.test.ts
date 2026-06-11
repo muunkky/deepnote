@@ -3,9 +3,11 @@ import os from 'node:os'
 import { join } from 'node:path'
 import { deserializeDeepnoteFile } from '@deepnote/blocks'
 import type { DatabaseIntegrationConfig } from '@deepnote/database-integrations'
+import { KernelDiedError, KernelLaunchError, KernelNotRegisteredError } from '@deepnote/runtime-core'
 import { Command } from 'commander'
 import { afterEach, beforeEach, describe, expect, it, type Mock, type MockedFunction, vi } from 'vitest'
 import { DEEPNOTE_TOKEN_ENV, DEFAULT_INTEGRATIONS_FILE } from '../constants'
+import { ExitCode } from '../exit-codes'
 import type { ApiIntegration } from '../integrations/fetch-integrations'
 import { ApiError } from '../utils/api'
 import type { saveExecutionSnapshot } from '../utils/output-persistence'
@@ -1122,6 +1124,174 @@ describe('run command', () => {
         expect(parsed.success).toBe(false)
         expect(parsed.error).toContain('Failed to start server')
         expect(process.exitCode).toBe(1)
+      })
+    })
+
+    // Card qajbsg / Sub-phase 1B (KD-6, KD-8): the four kernel-failure classes
+    // must each surface on a stable machine-readable `failureCategory` field in
+    // `--output json`, with no two collapsing to the same value. The load-bearing
+    // case is `kernel-died` vs `in-block`: both flow through the per-block error
+    // path (`onBlockDone`) where `result.error` is otherwise flattened to a
+    // string — the discriminant must be captured while the typed instance is live.
+    describe('failureCategory discriminant (KD-6 / 4 failure classes)', () => {
+      it('emits failureCategory "missing-kernel" and exit code InvalidUsage for KernelNotRegisteredError (site a, pre-flight)', async () => {
+        mockStart.mockRejectedValue(
+          new KernelNotRegisteredError('rust', [{ name: 'python3', displayName: 'Python 3', language: 'python' }])
+        )
+        mockStop.mockResolvedValue(undefined)
+
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+
+        const parsed = getJsonOutput(consoleLogSpy) as { success: boolean; failureCategory?: string }
+        expect(parsed.success).toBe(false)
+        expect(parsed.failureCategory).toBe('missing-kernel')
+        expect(process.exitCode).toBe(ExitCode.InvalidUsage)
+      })
+
+      it('emits failureCategory "kernel-launch" and exit code Error for KernelLaunchError (site a, startNew rejection)', async () => {
+        mockStart.mockRejectedValue(new KernelLaunchError('rust', new Error('POST /api/kernels 500')))
+        mockStop.mockResolvedValue(undefined)
+
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+
+        const parsed = getJsonOutput(consoleLogSpy) as { success: boolean; failureCategory?: string }
+        expect(parsed.success).toBe(false)
+        expect(parsed.failureCategory).toBe('kernel-launch')
+        expect(process.exitCode).toBe(ExitCode.Error)
+      })
+
+      it('reports RunResult.failureCategory "in-block" for an ordinary in-block user error (site b)', async () => {
+        mockStart.mockResolvedValue(undefined)
+        mockRunProject.mockImplementation(async (_file, options) => {
+          options?.onBlockStart?.({ id: 'b1', type: 'code', blockGroup: 'g1', sortingKey: 'a0', metadata: {} }, 0, 1)
+          options?.onBlockDone?.({
+            blockId: 'b1',
+            blockType: 'code',
+            success: false,
+            outputs: [],
+            executionCount: 1,
+            durationMs: 50,
+            error: new Error('NameError: name "x" is not defined'),
+          })
+          return { totalBlocks: 1, executedBlocks: 1, failedBlocks: 1, totalDurationMs: 50 }
+        })
+        mockStop.mockResolvedValue(undefined)
+
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+
+        const parsed = getJsonOutput(consoleLogSpy) as {
+          success: boolean
+          failureCategory?: string
+          blocks: Array<{ failureCategory?: string }>
+        }
+        expect(parsed.success).toBe(false)
+        expect(parsed.failureCategory).toBe('in-block')
+        expect(parsed.blocks[0]?.failureCategory).toBe('in-block')
+        expect(process.exitCode).toBe(1)
+      })
+
+      it('reports RunResult.failureCategory "kernel-died" for a mid-run KernelDiedError surfaced through onBlockDone (site b — survives the string-flattening boundary)', async () => {
+        mockStart.mockResolvedValue(undefined)
+        mockRunProject.mockImplementation(async (_file, options) => {
+          options?.onBlockStart?.({ id: 'b1', type: 'code', blockGroup: 'g1', sortingKey: 'a0', metadata: {} }, 0, 1)
+          options?.onBlockDone?.({
+            blockId: 'b1',
+            blockType: 'code',
+            success: false,
+            outputs: [],
+            executionCount: 1,
+            durationMs: 50,
+            error: new KernelDiedError(),
+          })
+          return { totalBlocks: 1, executedBlocks: 1, failedBlocks: 1, totalDurationMs: 50 }
+        })
+        mockStop.mockResolvedValue(undefined)
+
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+
+        const parsed = getJsonOutput(consoleLogSpy) as {
+          success: boolean
+          failureCategory?: string
+          blocks: Array<{ failureCategory?: string }>
+        }
+        expect(parsed.success).toBe(false)
+        expect(parsed.failureCategory).toBe('kernel-died')
+        expect(parsed.blocks[0]?.failureCategory).toBe('kernel-died')
+        expect(process.exitCode).toBe(1)
+      })
+
+      it('Capstone: all four failure classes carry distinct failureCategory values (kernel-died NOT collapsed into in-block)', async () => {
+        // (1) pre-flight KernelNotRegisteredError -> 'missing-kernel'
+        mockStart.mockRejectedValueOnce(new KernelNotRegisteredError('rust', []))
+        mockStop.mockResolvedValue(undefined)
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+        const missing = getJsonOutput(consoleLogSpy) as { failureCategory?: string }
+
+        // (2) startNew-rejection KernelLaunchError -> 'kernel-launch'
+        consoleLogSpy.mockClear()
+        mockStart.mockReset()
+        mockStart.mockRejectedValueOnce(new KernelLaunchError('rust'))
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+        const launch = getJsonOutput(consoleLogSpy) as { failureCategory?: string }
+
+        // (3) mid-run KernelDiedError through onBlockDone -> 'kernel-died'
+        consoleLogSpy.mockClear()
+        mockStart.mockReset()
+        mockStart.mockResolvedValue(undefined)
+        mockRunProject.mockImplementationOnce(async (_file, options) => {
+          options?.onBlockDone?.({
+            blockId: 'b1',
+            blockType: 'code',
+            success: false,
+            outputs: [],
+            executionCount: 1,
+            durationMs: 10,
+            error: new KernelDiedError(),
+          })
+          return { totalBlocks: 1, executedBlocks: 1, failedBlocks: 1, totalDurationMs: 10 }
+        })
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+        const died = getJsonOutput(consoleLogSpy) as { failureCategory?: string }
+
+        // (4) ordinary in-block user error -> 'in-block'
+        consoleLogSpy.mockClear()
+        mockRunProject.mockImplementationOnce(async (_file, options) => {
+          options?.onBlockDone?.({
+            blockId: 'b1',
+            blockType: 'code',
+            success: false,
+            outputs: [],
+            executionCount: 1,
+            durationMs: 10,
+            error: new Error('NameError'),
+          })
+          return { totalBlocks: 1, executedBlocks: 1, failedBlocks: 1, totalDurationMs: 10 }
+        })
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+        const inBlock = getJsonOutput(consoleLogSpy) as { failureCategory?: string }
+
+        const categories = [
+          missing.failureCategory,
+          launch.failureCategory,
+          died.failureCategory,
+          inBlock.failureCategory,
+        ]
+        expect(categories).toEqual(['missing-kernel', 'kernel-launch', 'kernel-died', 'in-block'])
+        // All four distinct — no collapse.
+        expect(new Set(categories).size).toBe(4)
+        // The load-bearing guarantee: kernel-died and in-block are NOT the same value.
+        expect(died.failureCategory).not.toBe(inBlock.failureCategory)
+      })
+
+      it('emits failureCategory in the toon payload for a pre-flight KernelNotRegisteredError', async () => {
+        mockStart.mockRejectedValue(new KernelNotRegisteredError('rust', []))
+        mockStop.mockResolvedValue(undefined)
+
+        await action(HELLO_WORLD_FILE, { output: 'toon' })
+
+        const output = getOutput(consoleLogSpy)
+        expect(output).toContain('failureCategory: missing-kernel')
+        expect(process.exitCode).toBe(ExitCode.InvalidUsage)
       })
     })
 

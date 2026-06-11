@@ -14,6 +14,10 @@ import {
   executableBlockTypeSet,
   type IOutput,
   isNonPythonKernel,
+  KernelDiedError,
+  type KernelFailureCategory,
+  KernelLaunchError,
+  KernelNotRegisteredError,
   type DeepnoteBlock as RuntimeDeepnoteBlock,
   resolvePythonExecutable,
   selectKernelName,
@@ -131,6 +135,13 @@ interface BlockResult {
   durationMs: number
   outputs: IOutput[]
   error?: string | undefined
+  /**
+   * Machine-readable failure class (KD-6 site b). Captured in `onBlockDone` from
+   * the still-typed `result.error` BEFORE it is flattened to `.message`, so a
+   * mid-run `KernelDiedError` (`'kernel-died'`) stays distinct from an ordinary
+   * in-block user error (`'in-block'`). `undefined` on successful blocks.
+   */
+  failureCategory?: KernelFailureCategory | undefined
 }
 
 /** Diagnosis info for a failed block */
@@ -185,6 +196,13 @@ interface RunResult extends ExecutionSummary {
   success: boolean
   path: string
   blocks: BlockResult[] | BlockWithContext[]
+  /**
+   * Machine-readable failure class for the run (KD-6). One of the four
+   * `KernelFailureCategory` values when the run failed; `undefined` on success.
+   * Threaded from the failing block's `BlockResult.failureCategory` (success
+   * path) or the caught kernel error's `category` (outer catch).
+   */
+  failureCategory?: KernelFailureCategory
   /** Diagnosis info for failed blocks (when machine output is enabled) */
   failedBlockDiagnosis?: BlockDiagnosis[]
   /** Project-level context info (when --context is enabled) */
@@ -590,16 +608,30 @@ export function createRunAction(program: Command): (path: string | undefined, op
         error instanceof FileResolutionError ||
         error instanceof MissingInputError ||
         error instanceof MissingIntegrationError ||
+        // KD-6 site (a): a requested kernel that is not registered is a user/usage
+        // error (mirrors a bad argument), so it maps to InvalidUsage. Other kernel
+        // failures (launch/died) are runtime Errors. Exit codes are NOT otherwise
+        // subdivided — the four classes are distinguished on `failureCategory`.
+        error instanceof KernelNotRegisteredError ||
         isAuthApiError
           ? ExitCode.InvalidUsage
           : ExitCode.Error
+      // KD-6 site (a): read the typed kernel error's `category` discriminant
+      // directly (these instances survive `startExecutionEngine` unwrapped) and
+      // surface it as `failureCategory` in the machine payloads.
+      const failureCategory: KernelFailureCategory | undefined =
+        error instanceof KernelNotRegisteredError ||
+        error instanceof KernelLaunchError ||
+        error instanceof KernelDiedError
+          ? error.category
+          : undefined
       if (options.output === 'json') {
-        outputJson({ success: false, error: message })
+        outputJson({ success: false, error: message, ...(failureCategory && { failureCategory }) })
         process.exitCode = exitCode
         return
       }
       if (options.output === 'toon') {
-        outputToon({ success: false, error: message })
+        outputToon({ success: false, error: message, ...(failureCategory && { failureCategory }) })
         process.exitCode = exitCode
         return
       }
@@ -1073,6 +1105,20 @@ async function startExecutionEngine(engine: ExecutionEngine, isMachineOutput: bo
       }
     }
 
+    // KD-6 site (a): preserve the typed kernel-failure family so the outer catch
+    // can read its `category` discriminant. Wrapping these in a plain Error here
+    // would flatten `missing-kernel` / `kernel-launch` / `kernel-died` to a
+    // string and the outer catch would have no `failureCategory` to emit. A
+    // missing/unlaunchable kernel is also not the "install deepnote-toolkit"
+    // server-startup failure the generic hint describes.
+    if (
+      error instanceof KernelNotRegisteredError ||
+      error instanceof KernelLaunchError ||
+      error instanceof KernelDiedError
+    ) {
+      throw error
+    }
+
     throw new Error(
       `Failed to start server: ${message}\n\nMake sure deepnote-toolkit is installed:\n  pip install deepnote-toolkit[server]`
     )
@@ -1144,6 +1190,14 @@ function createRunProjectCallbacks({
         success: result.success,
         durationMs: result.durationMs,
         outputs: result.outputs,
+        // KD-6 site (b): capture the discriminant from the STILL-TYPED `result.error`
+        // here, before it is flattened to `.message` on the next line. A mid-run
+        // `KernelDiedError` must report `'kernel-died'`, not collapse into `'in-block'`.
+        failureCategory: result.success
+          ? undefined
+          : result.error instanceof KernelDiedError
+            ? 'kernel-died'
+            : 'in-block',
         error: result.error?.message,
       })
 
@@ -1321,6 +1375,12 @@ async function buildMachineRunResult({
     failedBlocks: summary.failedBlocks,
     totalDurationMs: summary.totalDurationMs,
     blocks: blockResults,
+    // KD-6 site (b): surface the run-level failure class by reading the already-
+    // captured per-block discriminant — NO `instanceof` on a stringified error.
+    // The first failing block's category represents the run; defaults to
+    // `'in-block'` if a failure was counted without a typed category.
+    failureCategory:
+      summary.failedBlocks > 0 ? (blockResults.find(b => !b.success)?.failureCategory ?? 'in-block') : undefined,
   }
 
   const shouldIncludeContext = options.context || summary.failedBlocks > 0

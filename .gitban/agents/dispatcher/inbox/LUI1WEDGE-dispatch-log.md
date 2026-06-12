@@ -150,3 +150,30 @@ check .` already passes — `void` satisfies both without an unused-suppression)
   api-types contract sample). (2) Root `tsconfig.json` now excludes `**/*.capstone.ts` from the
   general typecheck glob — minimal fix for a pre-existing scaffold `TS2307` (capstones typecheck via
   the dedicated `check:types-subpath`). Reviewer to scrutinize the shared-config change.
+
+### Batch 2 — `x71bcm` (step 3) — COMPLETE → done
+
+- Reviewer-1 **APPROVAL** (commit `e88fd33`, both gates). Two non-blocking follow-ups: L1
+  capability-coupling-gap, L2 test-depth-gap.
+- Planner **reopened `x71bcm`** (done→todo) for **L1** as a sprint-card reopen (latent correctness
+  bug: a non-Python kernel wrongly nulled `kernelLanguage` when the Python interpreter is
+  mis-installed; the existing bash test masked it). **L2** appended to closeout card `od8esg`
+  (Item 1) — waits on step 4A (`hlai4c`) landing a constructible `ExecutionEngine` to spy on.
+- Executor-2 fixed L1 (`b10b73c`): `resolveCapabilities` early-returns for non-Python kernels
+  before any Python probe; +1 regression test (bash kernel + unresolvable python → `kernelLanguage:'bash'`).
+  Fast-forward merged. 23/23 package tests green; biome/tsc/cspell clean.
+- Reviewer-2 **APPROVAL** (`b10b73c`), no new follow-ups. Close-out: 44/44 boxes, `x71bcm` → **done**
+  (board commit `2c367c6`).
+- **b2 DONE → 2/12.** Pushes used the standing `npm_config_workspace_concurrency=1
+  VITEST_MAX_WORKERS=2 VITEST_MIN_WORKERS=1 VITEST_TEST_TIMEOUT=30000` env.
+
+### Batch 3 — DRIFT DECISION: serialize 4A → 4B (was planned parallel)
+
+- Pre-batch drift check: `hlai4c` (4A) and `e6e3lt` (4B) claim disjoint *logic* files
+  (`run-queue.ts`/`session.ts` vs `save.ts`), but **both modify four shared integration files**:
+  `api-types.ts`, `router.ts`, `index.ts`, README. 4A is "the biggest/riskiest card" and adds
+  WS-upgrade handling that restructures `server.ts`/`router.ts`.
+- **Resolution: SERIALIZE.** Dispatch `hlai4c` (4A) first → merge/review/close → then `e6e3lt` (4B)
+  on the updated base. Converts 4 structural merge conflicts (incl. the WS-upgrade router reshape)
+  into clean additive edits on 4B. Cost = wall-clock only; both P0, correctness preferred.
+- **➡️ Dispatching `hlai4c` (4A) executor-1.**

@@ -7,10 +7,10 @@ and streams ordered, run-id-tagged execution events over a WebSocket. It compose
 never reaches the browser.
 
 > **Status (m3/s1):** the package boundary, the canonical API-contract module, the
-> `createServer` factory, `GET /api/project`, and the **execution surface** — the
+> `createServer` factory, `GET /api/project`, the **execution surface** — the
 > single-concurrency run-serialization queue, the `POST /…/run` routes, and the
-> `ws` `/api/stream` event fan-out — are in place. Save (`POST /api/project/save`)
-> lands in step 4B.
+> `ws` `/api/stream` event fan-out — and the **save-safety gate**
+> (`POST /api/project/save`) are in place.
 
 ## Layout (ADR-007 §6)
 
@@ -169,6 +169,55 @@ result outputs (`execute_result`/`display_data`/`error`) are **never** dropped.
 
 **Deferred to m3/s5:** run-all coalescing (P4), running-cancel (P6), and `runScope:'with-upstream'`
 — s1 ships queued-cancel (P5) only.
+
+## `POST /api/project/save` — atomic save (the save-safety gate)
+
+`POST /api/project/save` writes the `.deepnote` file back to disk. It is the gate that proves
+a save can **never silently corrupt or clobber** the user's file — it ships before any editing UI
+exists. Three guarantees:
+
+- **Semantic round-trip, _not_ byte-equality.** The serializer re-canonicalizes (sorting keys,
+  field order via the zod schema), so the **first** save of a not-yet-canonical file reformats
+  untouched lines — the documented `bash-image.deepnote` 1263→1374-byte growth — and is
+  **idempotent thereafter**: a second no-op save produces an empty `git diff`. "No content loss"
+  means `deserialize(serialize(project))` deep-equals `project`, never byte-identity with the
+  original on-disk bytes.
+- **Atomic temp-then-rename.** The canonical YAML is written to `path + '.tmp-<uuid>'` **in the
+  same directory** (rename is only atomic within a filesystem), then `fs.rename`d over the target.
+  A crash mid-write can never leave a half-written `.deepnote`; on any failure the temp is removed
+  and the original is untouched.
+- **External-change detection (KD-7) — no clobber.** Before writing, the on-disk bytes are
+  re-hashed; if that SHA-256 no longer equals the request's `openHash`, the save **refuses** with
+  `409` and hands back the current on-disk content — **no write is performed** — so a concurrent
+  editor's edit is never overwritten.
+
+**Request:** `POST /api/project/save`
+
+```jsonc
+// body (SaveProjectRequest)
+{
+  "project": {
+    /* a full DeepnoteFile */
+  },
+  "openHash": "<the openHash from GET /api/project>", // optimistic-concurrency token
+}
+```
+
+**Responses:**
+
+| Status                                                            | When                                                                                                      |
+| :---------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------- |
+| `200 { savedHash, bytesWritten }`                                 | written atomically; `savedHash` is the SHA-256 of the persisted bytes — adopt it as your next `openHash`   |
+| `409 { error:'external-change', currentProject, currentHash }`    | the on-disk hash ≠ `openHash` (an external edit since open); **no write performed** — reconcile and retry  |
+| `400 { error }`                                                   | malformed body (not JSON, or missing `project`/`openHash`); the save never runs                           |
+| `500 { error }`                                                   | a genuine write/rename failure (temp already cleaned up; original untouched)                               |
+
+> **Open→save loop (s1 caveat).** The save body is a **full `DeepnoteFile`**, but the
+> `GET /api/project` `ApiProject` envelope currently exposes only `metadata` + `project` (not the
+> file-level `version`/`environment`/`execution`). An editor that reconstructs a `DeepnoteFile`
+> purely from `ApiProject` therefore can't yet round-trip losslessly; carrying the full file in the
+> open envelope is tracked as a follow-up (`ad6kmb`). The save endpoint itself round-trips a full
+> `DeepnoteFile` with zero loss.
 
 ## Dependencies
 

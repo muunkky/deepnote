@@ -177,3 +177,22 @@ check .` already passes — `void` satisfies both without an unused-suppression)
   on the updated base. Converts 4 structural merge conflicts (incl. the WS-upgrade router reshape)
   into clean additive edits on 4B. Cost = wall-clock only; both P0, correctness preferred.
 - **➡️ Dispatching `hlai4c` (4A) executor-1.**
+
+### Batch 3 — `hlai4c` (4A) + `e6e3lt` (4B), serialized — COMPLETE → 4/12
+
+**`hlai4c` (step 4A, run-serialization queue):** executor-1 (`71599bf`+`955c41d`, 45 tests, M2 AST
+invariant), reviewer-1 APPROVAL. 3 follow-ups (L1 totalBlocks contract, L2 engine-reset, L3 config
+surface) → **closeout-append `od8esg` Items 2-4** (no reopen). done `de4beec`.
+
+**`e6e3lt` (step 4B, save-safety gate):** executor-1 (`d890e4d`, 58 tests) + filed backlog card
+`ad6kmb` (open→save ApiProject contract gap, P1, correctly out-of-scope). reviewer-1 APPROVAL with 3
+follow-ups; **planner REOPENED** (L1 save-route 400-not-500 was a real blocker for step-5 parity tests;
+L2/L3 rode along). executor-2 (`31f9a87`, 59 tests: schema-validate→400, symmetric raw-Buffer hash,
+contract-typed wire bodies). reviewer-2 APPROVAL, no new follow-ups. done.
+  - Merge-gate fix: `e6e3lt`'s README needed prettier (`b7a9d46`) — first push of 4B code failed
+    pre-push `prettier:check`; fixed at the gate, re-pushed green (full CI, 2372+ tests).
+
+**Serialize decision paid off:** zero merge conflicts on the 4 shared integration files; 4B built
+cleanly on 4A's settled api-types/router/index/README surface. Full package suite 59/59.
+
+- **➡️ Next: batch 4 — `wd2nil` (step 5, server integration tests, parity with `deepnote run`) — PHASE BARRIER.**

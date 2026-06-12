@@ -52,8 +52,15 @@ export interface RuntimeServer {
   /**
    * Bind the HTTP listener. Resolves with the OS-assigned port once listening.
    * Pass `0` to let the OS choose a free port (used by the lifecycle test).
+   *
+   * `host` constrains the bind interface. Omitted, Node binds the unspecified
+   * address (all interfaces) — fine for the in-process lifecycle test. The
+   * `deepnote serve` command passes `'127.0.0.1'` so the listener is reachable
+   * only from the local machine and never `0.0.0.0` (a security boundary, not a
+   * default — exposing a kernel-backed run surface on every interface would let
+   * any host on the network drive the user's kernel).
    */
-  listen(port: number): Promise<number>
+  listen(port: number, host?: string): Promise<number>
   /** Stop listening, close the WS server + the session's engine, and release the port. */
   close(): Promise<void>
 }
@@ -188,7 +195,7 @@ function handleClientMessage(session: ServerSession, queue: RunQueue, data: WebS
 /** Wrap a `node:http` server in the {@link RuntimeServer} listen/close surface. */
 function httpHandle(http: Server): RuntimeServer {
   return {
-    listen(port: number): Promise<number> {
+    listen(port: number, host?: string): Promise<number> {
       return new Promise<number>((resolve, reject) => {
         const onError = (err: Error): void => {
           http.off('listening', onListening)
@@ -202,7 +209,13 @@ function httpHandle(http: Server): RuntimeServer {
         }
         http.once('error', onError)
         http.once('listening', onListening)
-        http.listen(port)
+        // `host` omitted ⇒ Node binds the unspecified address. The `serve` command always
+        // passes `'127.0.0.1'`; passing `undefined` here is only the lifecycle-test path.
+        if (host === undefined) {
+          http.listen(port)
+        } else {
+          http.listen(port, host)
+        }
       })
     },
     close(): Promise<void> {

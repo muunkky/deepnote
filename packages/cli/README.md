@@ -465,6 +465,55 @@ deepnote open my-project.deepnote
 deepnote open my-project.deepnote -o json
 ```
 
+### `serve [path]`
+
+Boot a local Node server over a `.deepnote` project and serve it at a `http://localhost` URL.
+The server answers `GET /api/project` with the project tree and streams run events over a
+WebSocket. Path is optional: when omitted, the CLI discovers the first `.deepnote` file in the
+current directory. By default the command is **headless** (it does not open a browser); pass
+`--open` to launch one at the served URL.
+
+```bash
+deepnote serve my-project.deepnote
+```
+
+> **Localhost-only (trust note).** `serve` binds the loopback interface (`127.0.0.1`) and
+> **never** `0.0.0.0`. The server fronts a live kernel, so it is reachable only from your own
+> machine — treat the URL as trusted-local and do not put it behind a public proxy without
+> adding your own authentication.
+
+Press `Ctrl-C` to stop: the server and the underlying kernel shut down cleanly, leaving no
+orphaned process.
+
+**Options:**
+
+| Option             | Description                                                          | Default           |
+| ------------------ | -------------------------------------------------------------------- | ----------------- |
+| `--port <port>`    | Port to start probing from (falls back to the next free port)        | `8080`            |
+| `--no-open`        | Do not open a browser at the served URL                              | `true` (headless) |
+| `--python <path>`  | Path to Python interpreter or virtual environment                    | auto-detected     |
+| `--kernel <name>`  | Jupyter kernel to run the notebook against                           | `python3`         |
+| `--static-dir <p>` | Directory of a built static UI to serve alongside the API (advanced) | unset             |
+
+When the start port is taken, `serve` probes upward for a free one and reports the
+**actually-bound** URL, so the printed address is always the one the server is listening on.
+
+**Examples:**
+
+```bash
+# Serve the first .deepnote file in the current directory, headless
+deepnote serve
+
+# Serve a specific file
+deepnote serve my-project.deepnote
+
+# Serve and open a browser at the URL
+deepnote serve my-project.deepnote --open
+
+# Start probing from a specific port (falls back if taken)
+deepnote serve my-project.deepnote --port 3000
+```
+
 ### `validate <path>`
 
 Validate a `.deepnote` file against the schema.

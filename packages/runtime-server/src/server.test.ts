@@ -32,4 +32,34 @@ describe('createServer (scaffold stub)', () => {
     // they are not yet wired to behaviour.
     expect(() => createServer({ runQueueDepth: 8, wsHighWaterMark: 8 * 1024 * 1024 })).not.toThrow()
   })
+
+  it('listen(port, host) constrains the bind to that interface', async () => {
+    const server = createServer()
+
+    // Bind explicitly to loopback (the `deepnote serve` path). The OS picks the port.
+    const port = await server.listen(0, '127.0.0.1')
+    expect(port).toBeGreaterThan(0)
+
+    // Reachable on loopback…
+    expect(await canConnect(port)).toBe(true)
+    const address = await boundAddress(port)
+    // …and bound to loopback, not the unspecified address — the security guarantee
+    // the serve command relies on (never 0.0.0.0).
+    expect(address).toBe('127.0.0.1')
+
+    await server.close()
+    expect(await canConnect(port)).toBe(false)
+  })
 })
+
+/** Resolve the local address a connection to `port` lands on, or null if unreachable. */
+function boundAddress(port: number): Promise<string | null> {
+  return new Promise<string | null>(resolve => {
+    const socket = createConnection({ host: '127.0.0.1', port }, () => {
+      const addr = socket.localAddress ?? null
+      socket.destroy()
+      void resolve(addr)
+    })
+    socket.once('error', () => void resolve(null))
+  })
+}

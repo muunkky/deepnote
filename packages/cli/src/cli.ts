@@ -16,6 +16,7 @@ import { createIntegrationsEditAction } from './commands/integrations/edit-integ
 import { createLintAction } from './commands/lint'
 import { createOpenAction } from './commands/open'
 import { createRunAction } from './commands/run'
+import { createServeAction } from './commands/serve'
 import { createStatsAction } from './commands/stats'
 import { createValidateAction } from './commands/validate'
 import { generateCompletionScript } from './completions'
@@ -398,6 +399,53 @@ ${c.bold('Exit Codes:')}
 `
     })
     .action(createOpenAction(program))
+
+  // Serve command - boot a local Node host over a .deepnote project
+  program
+    .command('serve')
+    .description('Serve a .deepnote project from a local server (browser/API at http://localhost)')
+    .argument('[path]', 'Path to a .deepnote file or directory (defaults to the first .deepnote in the cwd)')
+    .option('--port <port>', 'Port to start probing from (falls back to the next free port if taken)')
+    .option('--no-open', 'Do not open a browser at the served URL (serve defaults to headless)')
+    .option('--python <path>', 'Path to Python (executable, bin directory, or venv root)')
+    .option('--kernel <name>', 'Jupyter kernel to run the notebook against (default: python3)')
+    .option(
+      '--static-dir <path>',
+      'Directory of a built static UI to serve alongside the API (advanced; defaults unset)'
+    )
+    .addHelpText('after', () => {
+      const c = getChalk()
+      return `
+${c.bold('Description:')}
+  Boots a local server over a .deepnote project and serves it at a localhost URL.
+  The server answers ${c.dim('GET /api/project')} with the project tree and streams run
+  events over a WebSocket. It binds ${c.bold('localhost only')} (never 0.0.0.0): the
+  server fronts a live kernel, so it is reachable from your machine alone — treat the
+  URL as trusted-local.
+
+${c.bold('Shutdown:')}
+  Press ${c.dim('Ctrl-C')} to stop the server and the kernel cleanly (no orphaned process).
+
+${c.bold('Examples:')}
+  ${c.dim('# Serve the first .deepnote file in the current directory, headless')}
+  $ deepnote serve
+
+  ${c.dim('# Serve a specific file')}
+  $ deepnote serve my-project.deepnote
+
+  ${c.dim('# Serve and open a browser at the URL')}
+  $ deepnote serve my-project.deepnote --open
+
+  ${c.dim('# Start probing from a specific port (falls back if taken)')}
+  $ deepnote serve my-project.deepnote --port 3000
+
+${c.bold('Exit Codes:')}
+  ${c.dim('0')}  Stopped cleanly (Ctrl-C)
+  ${c.dim('1')}  Runtime error (server failed to start)
+  ${c.dim('2')}  Invalid usage (file not found, not a .deepnote file, bad --port)
+`
+    })
+    .action(createServeAction(program))
 
   // Convert command - convert between notebook formats
   program

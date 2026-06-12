@@ -86,3 +86,14 @@ batch 1 (`87ifqe`). Keep `.gitban` board commits separate from code commits (the
   always-on `pnpm test` — intentional, stronger than madge, not debt. (2) The literal AC grep
   `git grep -iE 'react|vite|apps/'` false-positives on `@deepnote/reactivity`/`vitest` (zero real
   frontend coupling); recommend the P7 slice-integrity card tighten it to import-form/word-boundary.
+- Reviewer **APPROVAL** (both gates; capstone reproduced incl. non-vacuity TS2322 check). Router →
+  close-out + planner. Planner: **L1** (grep precision) folded into `dx99dj` acceptance criteria
+  (the in-sprint owner of the slice-integrity CI grep — no separate card exists); **L2** (`ws`
+  declared-unused) duplicate-dropped (sibling `hlai4c` step-4A requires importing/using `ws`).
+  No sprint extension, no closeout-append, no new/blocked/deferred cards.
+- Close-out: all 37 checkboxes resolved (6 completed, 13 honest `n/a` w/ inline reasons — no
+  fabricated deploy/test work, no false deferrals). `87ifqe` → **done** (board commit `bccd976`).
+  Post-merge validation green: 7/7 tests, build, `/types` capstone, `pnpm install --frozen-lockfile`.
+- Cleaned a stray `packages/convert/.gitban/` (hook-audit artifact from an agent's bad-CWD hook
+  invocation — untracked noise, not board state).
+- **b1 DONE → 1/12. Next: b2 `x71bcm` (step 3, GET /api/project).**

@@ -30,3 +30,36 @@ for `@deepnote/runtime-server`. The grounding design doc is `docs/designs/m3-s1-
 (and ADR-007 server/SPA package layout) — follow it for the package layout, entrypoint, and dependency
 wiring. Honour the card's checkboxes and acceptance criteria exactly; tick boxes only for work that is
 durably committed on your worktree branch.
+
+---
+
+## Router directive — review 1: APPROVED → close out
+
+Use `.venv/Scripts/python.exe` to run Python commands.
+
+The code for the gitban card with id 87ifqe has been **approved** as of commit `20970b6`
+(review file `.gitban/agents/reviewer/inbox/LUI1WEDGE-87ifqe-reviewer-1.md`, verdict APPROVAL —
+both gates PASS, capstone reproduced end-to-end including a non-vacuity check). Please use the
+gitban tools to update the gitban card and begin the tasks required to properly complete it.
+
+### Card Close-out tasks
+- Use gitban's checkbox tools to ensure all checkboxes on the card are checked off for completed
+  work if not already.
+- Do not mark any work as deferred. This card will be closed and archived and likely never seen again.
+- Use gitban's complete card tool to submit and validate if not already completed.
+- **Close-out items: none blocking.** Per the reviewer:
+  - The terminal-stage Completion-Checklist / TDD / Feature-Work-Phases boxes that are genuinely
+    n/a for a **non-published scaffold** (production deploy, monitoring/alerting, staging,
+    performance testing, integration tests) are correctly out of this card's scope — they belong
+    to the closeout/PR pipeline, not this card. Do not fabricate deployment work to tick them. If
+    the gitban completion validator requires them resolved, mark them n/a per the card's existing
+    convention rather than claiming false work.
+  - The two non-blocking follow-ups (L1 slice-integrity-grep-precision, L2 declared-unused-dep) are
+    being routed to the **planner** — do **NOT** fix them on this card. They are owned by other
+    cards (the canonical slice-integrity CI-script card, and step-4a `hlai4c` execute-stream-ws,
+    respectively). The reviewer explicitly said "no action needed on this card" for both.
+- This card **IS in a sprint** (LUI1WEDGE), so do **NOT** push a feature branch or open a PR — the
+  dispatcher owns sprint lifecycle.
+
+Note: You are closing out this card only. The dispatcher owns sprint lifecycle — do not close,
+archive, or finalize the sprint itself.

@@ -99,3 +99,22 @@ A maintainer who has only `upstream/main` plus this one branch can check it out,
 * [ ] Code changes (if any) are reviewed and merged.
 * [ ] Follow-up tickets are created and prioritized for next sprint.
 * [ ] Team retrospective includes discussion of cleanup backlog (if significant).
+
+
+
+## Slice-integrity grep precision (planner — LUI1WEDGE 87ifqe review 1, item L1)
+
+The literal slice-integrity grep currently written into this card's acceptance criteria — `git grep -iE 'react|vite|apps/'` — is word-boundary-free and **false-positives on benign substrings** that have ZERO real frontend coupling:
+
+- `reactivity` — the legitimate `@deepnote/reactivity` dependency, and the `reactivity:'python'|'disabled'` capability enum — matches `react`.
+- `vitest` — the test runner — matches `vite`.
+
+If the broad regex ships as the canonical slice-integrity / boundary CI gate, it will false-positive on **every** package that depends on `@deepnote/reactivity` or uses `vitest`, making a genuinely-clean boundary gate un-passable (and pressuring someone to disable it). The grep must test the AC's actual intent — no React/Vite framework, no `apps/` import edge — without colliding with `reactivity`/`vitest`.
+
+**Acceptance criteria (additive — supersedes the literal broad regex above):**
+
+- [ ] The slice-integrity grep uses **import-form / word-boundary matching**, not the bare `-iE 'react|vite|apps/'` substring regex. Concretely it must match framework imports and the `apps/` edge while NOT matching `reactivity`/`vitest`, e.g.: `from ['"](react|react-dom|vite)['"]`, `\breact\b`/`\bvite\b`, `@vitejs`, and `from ['"]\.\./apps` (or equivalent path-import form for the `apps/` edge).
+- [ ] A regression assertion proves the tightened grep returns **nothing** on the real slice even though the slice legitimately contains the strings `reactivity` and/or `vitest` (i.e. the precise grep does not false-positive on the `@deepnote/reactivity` dep or the `vitest` runner), while still catching a planted `import 'react'` / `from '../apps/...'` line.
+- [ ] Both occurrences of the literal `git grep -iE 'react|vite|apps/'` in this card (the "Slice-integrity grep" Deferred Work / Cleanup row and the "Observable outcomes" capstone line) are read as **intent**, satisfied by the tightened import-form grep above — the broad substring form is NOT the gate that ships.
+
+Source: card 87ifqe review 1 (reviewer-approved scaffold; forward-looking scoping note, "no action on card 87ifqe"). This card owns the slice-integrity CI grep in LUI1WEDGE, so the precision requirement is folded in here rather than duplicated into a new card.

@@ -83,10 +83,10 @@ Close out sprint ALTKERN1: archive done cards, generate the sprint summary, upda
 - [x] Every item under `## Sprint Retrospective` has exactly one deferral-type row marked `true` in its inline grid (exactly-one-true constraint) <!-- cite: commit:96af4e0 -->
 - [x] Every item has its `Action taken:` field filled in matching the chosen deferral type (card id for backlog/sprint, prose for note-only, commit hash for fixed-with-note) <!-- cite: commit:b0cebce -->
 - [x] Every item's two per-item checkboxes (`Item {N} classified`, `Item {N} actioned`) are ticked <!-- cite: commit:eb95f5e -->
-- [ ] Sprint summary generated via `generate_archive_summary`
+- [x] Sprint summary generated via `generate_archive_summary` <!-- cite: commit:21f79d7 -->
 - [x] Roadmap updated for any stories this sprint completed <!-- cite: roadmap:m2/s5/alternative-kernels/phase1-implementation -->
 - [x] `CHANGELOG.md` updated for any user-visible changes landed this sprint <!-- cite: commit:e4b8ea6 -->
-- [ ] All sprint cards archived via `archive_cards`
+- [x] All sprint cards archived via `archive_cards` <!-- cite: commit:21f79d7 -->
 
 
 ### Item 1: Confirm Sub-phase 1C (obcn7z) owns the live-kernel e2e + typed-error contract proof

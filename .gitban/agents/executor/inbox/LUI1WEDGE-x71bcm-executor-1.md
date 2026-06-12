@@ -36,3 +36,19 @@ the card's Required Reading table lists the exact source files/lines to reuse (t
 `startEngine()` split, resolution sequence from `run.ts`, capability flags). Honour the card's
 checkboxes and the capstone (deep-equal vs `deserializeDeepnoteFile` on a real fixture, **no kernel
 started**) exactly; tick boxes only for work durably committed on your worktree branch.
+
+## ⚠️ Before you finish — run the project's lint + spell gates (the b1 push-blocker)
+
+The project's pre-push runs `pnpm lintAndFormat && pnpm typecheck && pnpm test && pnpm spell-check`. In
+batch 1 the executor ran tests/typecheck/build but **not** lint or spell-check, which blocked the
+dispatcher's push (biome import-order/format + `useConsistentTypeDefinitions`, and cspell on British
+`behavioural`). Do **not** repeat this. Before you return, run on your worktree:
+
+```bash
+pnpm exec biome check --write packages/runtime-server   # auto-fix import order / formatting / lint
+pnpm spell-check                                         # cspell — add new terms to docs-dictionary.txt (not source)
+```
+
+Fix anything biome can't auto-fix (e.g. prefer `interface` over `type X = {…}` for object types), and
+re-run until both are clean. Commit the fixes on your worktree branch. This is part of "tests pass before
+merge" — a lint/spell failure is a completion failure, not a follow-up.

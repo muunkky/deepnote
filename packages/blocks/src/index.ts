@@ -1,7 +1,13 @@
 export { UnsupportedBlockTypeError } from './blocks'
 export { isAgentBlock } from './blocks/agent-blocks'
 export { createDataFrameConfig } from './blocks/data-frame'
-export { INPUT_BLOCK_TYPES, isExecutableBlock, isExecutableBlockType } from './blocks/executable-blocks'
+export {
+  INPUT_BLOCK_TYPES,
+  isExecutableBlock,
+  isExecutableBlockType,
+  isValueAddBlockType,
+  VALUE_ADD_BLOCK_TYPES,
+} from './blocks/executable-blocks'
 export { escapePythonString, sanitizePythonVariableName } from './blocks/python-utils'
 export type { SqlCacheMode, SqlCellVariableType } from './blocks/sql-blocks'
 export { createPythonCodeForSqlBlockWithConnectionJson } from './blocks/sql-blocks'
@@ -46,6 +52,7 @@ export {
   ParseError,
   ProhibitedYamlFeatureError,
   SchemaValidationError,
+  UnsupportedBlockOnKernelError,
   YamlParseError,
 } from './errors'
 export { createMarkdown, stripMarkdown } from './markdown'

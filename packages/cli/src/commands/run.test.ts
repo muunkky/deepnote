@@ -1,11 +1,14 @@
 import fs from 'node:fs'
 import os from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { deserializeDeepnoteFile } from '@deepnote/blocks'
 import type { DatabaseIntegrationConfig } from '@deepnote/database-integrations'
+import { KernelDiedError, KernelLaunchError, KernelNotRegisteredError } from '@deepnote/runtime-core'
 import { Command } from 'commander'
 import { afterEach, beforeEach, describe, expect, it, type Mock, type MockedFunction, vi } from 'vitest'
 import { DEEPNOTE_TOKEN_ENV, DEFAULT_INTEGRATIONS_FILE } from '../constants'
+import { ExitCode } from '../exit-codes'
 import type { ApiIntegration } from '../integrations/fetch-integrations'
 import { ApiError } from '../utils/api'
 import type { saveExecutionSnapshot } from '../utils/output-persistence'
@@ -21,7 +24,28 @@ let mockServerPort: number | null = 8888
 const mockGetBlockDependencies = vi.fn()
 const mockGetUpstreamBlocks = vi.fn()
 
-// Mock @deepnote/runtime-core before importing run
+// Mock node:child_process so the REAL selectPythonSpec's autodetect leaf
+// (detectDefaultPython, called intra-module via execSync) resolves deterministically
+// to 'python' without spawning a real interpreter. We deliberately do NOT mock
+// selectPythonSpec itself — the precedence regression these tests guard must surface
+// here, so the CLI test exercises the genuine shared selector, not a duplicate implementation.
+vi.mock('node:child_process', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:child_process')>()
+  return {
+    ...actual,
+    execSync: vi.fn((command: string) => {
+      if (command === 'python --version') {
+        return Buffer.from('Python 3.11.0')
+      }
+      throw new Error(`command not found: ${command}`)
+    }),
+  }
+})
+
+// Mock @deepnote/runtime-core before importing run. ExecutionEngine and
+// resolvePythonExecutable are stubbed (no real server / filesystem probe), but
+// selectPythonSpec + detectDefaultPython are kept REAL so the precedence chain
+// (arg > DEEPNOTE_PYTHON > autodetect) is genuinely exercised here.
 vi.mock('@deepnote/runtime-core', async importOriginal => {
   const actual = await importOriginal<typeof import('@deepnote/runtime-core')>()
   return {
@@ -36,11 +60,10 @@ vi.mock('@deepnote/runtime-core', async importOriginal => {
         return mockServerPort
       }
 
-      constructor(config: { pythonEnv: string; workingDirectory: string }) {
+      constructor(config: { pythonEnv: string; workingDirectory: string; kernelName?: string }) {
         mockConstructor(config)
       }
     },
-    detectDefaultPython: () => 'python',
     resolvePythonExecutable: (pythonPath: string) => Promise.resolve(pythonPath),
   }
 })
@@ -111,13 +134,72 @@ function getJsonOutput(spy: Mock): unknown {
   return JSON.parse(calls)
 }
 
-// Example files relative to project root
-const HELLO_WORLD_FILE = join('examples', '1_hello_world.deepnote')
-const BLOCKS_FILE = join('examples', '2_blocks.deepnote')
-const INTEGRATIONS_FILE = join('examples', '3_integrations.deepnote')
+// Example fixtures are anchored to this test module's own directory, not to
+// process.cwd(). CWD-relative paths (join('examples', …)) only resolve when
+// vitest happens to be launched from the repo root; running the suite from
+// packages/cli (or any other CWD) would point the fixtures at a non-existent
+// file, routing every action(…) call through FileResolutionError before it
+// reaches the code under test — silently masking real regressions (e.g. the
+// failureCategory assertions). Resolving from import.meta.url makes the
+// fixture base CWD-independent. Walk up four levels from
+// packages/cli/src/commands → repo root, where examples/ lives.
+const MODULE_DIR = dirname(fileURLToPath(import.meta.url)) // packages/cli/src/commands
+const REPO_ROOT = join(MODULE_DIR, '..', '..', '..', '..') // packages/cli/src/commands -> <repo-root>
+const EXAMPLES_DIR = join(REPO_ROOT, 'examples') // -> <repo-root>/examples
+const HELLO_WORLD_FILE = join(EXAMPLES_DIR, '1_hello_world.deepnote')
+const BLOCKS_FILE = join(EXAMPLES_DIR, '2_blocks.deepnote')
+const INTEGRATIONS_FILE = join(EXAMPLES_DIR, '3_integrations.deepnote')
+
+// Multi-format conversion fixtures (.ipynb/.py/.qmd) live at <repo-root>/test-fixtures/formats.
+// Anchored to the same module-relative REPO_ROOT so they share the CWD-independent base.
+const TEST_FIXTURES_FORMATS_DIR = join(REPO_ROOT, 'test-fixtures', 'formats')
+const JUPYTER_FILE = join(TEST_FIXTURES_FORMATS_DIR, 'jupyter', 'basic.ipynb')
+const PERCENT_FILE = join(TEST_FIXTURES_FORMATS_DIR, 'percent', 'basic-cells.percent.py')
+const QUARTO_FILE = join(TEST_FIXTURES_FORMATS_DIR, 'quarto', 'basic.qmd')
+
+// Fail loudly and precisely if a fixture is missing/relocated, instead of
+// letting the absence surface as an opaque FileResolutionError buried inside
+// an unrelated assertion. This runs at module load, before any test (and
+// before the describe-body resolveUpstreamTargetPair calls), so a bad
+// base dir — or a single missing fixture file inside an intact dir — is
+// caught immediately with the offending absolute path.
+for (const fixtureDir of [EXAMPLES_DIR, TEST_FIXTURES_FORMATS_DIR]) {
+  if (!fs.existsSync(fixtureDir)) {
+    throw new Error(`Test fixture dir missing at ${fixtureDir} — check REPO_ROOT (resolved from import.meta.url)`)
+  }
+}
+for (const fixtureFile of [HELLO_WORLD_FILE, BLOCKS_FILE, INTEGRATIONS_FILE, JUPYTER_FILE, PERCENT_FILE, QUARTO_FILE]) {
+  if (!fs.existsSync(fixtureFile)) {
+    throw new Error(`Test fixture file missing at ${fixtureFile} — check REPO_ROOT (resolved from import.meta.url)`)
+  }
+}
 
 function parseDeepnoteFixture(path: string) {
   return deserializeDeepnoteFile(fs.readFileSync(path, 'utf-8'))
+}
+
+/**
+ * Resolve a real upstream/target executable-block pair from a fixture notebook
+ * that has at least two executable blocks. Used by the reactivity-bypass tests
+ * so `--block` targets a block that genuinely exists (the mocked engine does not
+ * validate block ids, but the dry-run path does) and that has an upstream
+ * dependency for the python3-arm dependency-resolution assertion.
+ */
+function resolveUpstreamTargetPair(path: string): { upstreamBlockId: string; targetBlockId: string } {
+  const fixture = parseDeepnoteFixture(path)
+  const notebook = fixture.project.notebooks.find(
+    candidate => candidate.blocks.filter(block => block.type === 'code' || block.type.startsWith('input-')).length >= 2
+  )
+  if (!notebook) {
+    throw new Error('Expected notebook with at least two executable blocks in fixture')
+  }
+  const executableBlocks = notebook.blocks.filter(block => block.type === 'code' || block.type.startsWith('input-'))
+  const upstreamBlockId = executableBlocks[0]?.id
+  const targetBlockId = executableBlocks[executableBlocks.length - 1]?.id
+  if (!upstreamBlockId || !targetBlockId) {
+    throw new Error('Expected executable blocks in fixture notebook')
+  }
+  return { upstreamBlockId, targetBlockId }
 }
 
 // Test helpers
@@ -179,6 +261,12 @@ describe('run command', () => {
       // Ensure DEEPNOTE_TOKEN is not set by default (tests that need it will stub it)
       delete process.env[DEEPNOTE_TOKEN_ENV]
 
+      // Ensure DEEPNOTE_PYTHON is unset by default so interpreter resolution is
+      // deterministic (autodetect). Now that run.ts routes through selectPythonSpec,
+      // an ambient DEEPNOTE_PYTHON would otherwise leak into the resolved pythonEnv.
+      // Tests that exercise the env tier stub it explicitly.
+      delete process.env.DEEPNOTE_PYTHON
+
       // Reset getBlockDependencies to return empty by default (no validation errors)
       mockGetBlockDependencies.mockResolvedValue([])
       mockGetUpstreamBlocks.mockResolvedValue({
@@ -233,6 +321,7 @@ describe('run command', () => {
       expect(mockConstructor).toHaveBeenCalledWith({
         pythonEnv: 'python',
         workingDirectory: expect.stringContaining('examples'),
+        kernelName: 'python3',
       })
     })
 
@@ -244,6 +333,7 @@ describe('run command', () => {
       expect(mockConstructor).toHaveBeenCalledWith({
         pythonEnv: '/path/to/venv',
         workingDirectory: expect.any(String),
+        kernelName: 'python3',
       })
     })
 
@@ -255,6 +345,7 @@ describe('run command', () => {
       expect(mockConstructor).toHaveBeenCalledWith({
         pythonEnv: 'python',
         workingDirectory: '/custom/work/dir',
+        kernelName: 'python3',
       })
     })
 
@@ -1072,6 +1163,174 @@ describe('run command', () => {
       })
     })
 
+    // Card qajbsg / Sub-phase 1B (KD-6, KD-8): the four kernel-failure classes
+    // must each surface on a stable machine-readable `failureCategory` field in
+    // `--output json`, with no two collapsing to the same value. The load-bearing
+    // case is `kernel-died` vs `in-block`: both flow through the per-block error
+    // path (`onBlockDone`) where `result.error` is otherwise flattened to a
+    // string — the discriminant must be captured while the typed instance is live.
+    describe('failureCategory discriminant (KD-6 / 4 failure classes)', () => {
+      it('emits failureCategory "missing-kernel" and exit code InvalidUsage for KernelNotRegisteredError (site a, pre-flight)', async () => {
+        mockStart.mockRejectedValue(
+          new KernelNotRegisteredError('rust', [{ name: 'python3', displayName: 'Python 3', language: 'python' }])
+        )
+        mockStop.mockResolvedValue(undefined)
+
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+
+        const parsed = getJsonOutput(consoleLogSpy) as { success: boolean; failureCategory?: string }
+        expect(parsed.success).toBe(false)
+        expect(parsed.failureCategory).toBe('missing-kernel')
+        expect(process.exitCode).toBe(ExitCode.InvalidUsage)
+      })
+
+      it('emits failureCategory "kernel-launch" and exit code Error for KernelLaunchError (site a, startNew rejection)', async () => {
+        mockStart.mockRejectedValue(new KernelLaunchError('rust', new Error('POST /api/kernels 500')))
+        mockStop.mockResolvedValue(undefined)
+
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+
+        const parsed = getJsonOutput(consoleLogSpy) as { success: boolean; failureCategory?: string }
+        expect(parsed.success).toBe(false)
+        expect(parsed.failureCategory).toBe('kernel-launch')
+        expect(process.exitCode).toBe(ExitCode.Error)
+      })
+
+      it('reports RunResult.failureCategory "in-block" for an ordinary in-block user error (site b)', async () => {
+        mockStart.mockResolvedValue(undefined)
+        mockRunProject.mockImplementation(async (_file, options) => {
+          options?.onBlockStart?.({ id: 'b1', type: 'code', blockGroup: 'g1', sortingKey: 'a0', metadata: {} }, 0, 1)
+          options?.onBlockDone?.({
+            blockId: 'b1',
+            blockType: 'code',
+            success: false,
+            outputs: [],
+            executionCount: 1,
+            durationMs: 50,
+            error: new Error('NameError: name "x" is not defined'),
+          })
+          return { totalBlocks: 1, executedBlocks: 1, failedBlocks: 1, totalDurationMs: 50 }
+        })
+        mockStop.mockResolvedValue(undefined)
+
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+
+        const parsed = getJsonOutput(consoleLogSpy) as {
+          success: boolean
+          failureCategory?: string
+          blocks: Array<{ failureCategory?: string }>
+        }
+        expect(parsed.success).toBe(false)
+        expect(parsed.failureCategory).toBe('in-block')
+        expect(parsed.blocks[0]?.failureCategory).toBe('in-block')
+        expect(process.exitCode).toBe(1)
+      })
+
+      it('reports RunResult.failureCategory "kernel-died" for a mid-run KernelDiedError surfaced through onBlockDone (site b — survives the string-flattening boundary)', async () => {
+        mockStart.mockResolvedValue(undefined)
+        mockRunProject.mockImplementation(async (_file, options) => {
+          options?.onBlockStart?.({ id: 'b1', type: 'code', blockGroup: 'g1', sortingKey: 'a0', metadata: {} }, 0, 1)
+          options?.onBlockDone?.({
+            blockId: 'b1',
+            blockType: 'code',
+            success: false,
+            outputs: [],
+            executionCount: 1,
+            durationMs: 50,
+            error: new KernelDiedError(),
+          })
+          return { totalBlocks: 1, executedBlocks: 1, failedBlocks: 1, totalDurationMs: 50 }
+        })
+        mockStop.mockResolvedValue(undefined)
+
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+
+        const parsed = getJsonOutput(consoleLogSpy) as {
+          success: boolean
+          failureCategory?: string
+          blocks: Array<{ failureCategory?: string }>
+        }
+        expect(parsed.success).toBe(false)
+        expect(parsed.failureCategory).toBe('kernel-died')
+        expect(parsed.blocks[0]?.failureCategory).toBe('kernel-died')
+        expect(process.exitCode).toBe(1)
+      })
+
+      it('Capstone: all four failure classes carry distinct failureCategory values (kernel-died NOT collapsed into in-block)', async () => {
+        // (1) pre-flight KernelNotRegisteredError -> 'missing-kernel'
+        mockStart.mockRejectedValueOnce(new KernelNotRegisteredError('rust', []))
+        mockStop.mockResolvedValue(undefined)
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+        const missing = getJsonOutput(consoleLogSpy) as { failureCategory?: string }
+
+        // (2) startNew-rejection KernelLaunchError -> 'kernel-launch'
+        consoleLogSpy.mockClear()
+        mockStart.mockReset()
+        mockStart.mockRejectedValueOnce(new KernelLaunchError('rust'))
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+        const launch = getJsonOutput(consoleLogSpy) as { failureCategory?: string }
+
+        // (3) mid-run KernelDiedError through onBlockDone -> 'kernel-died'
+        consoleLogSpy.mockClear()
+        mockStart.mockReset()
+        mockStart.mockResolvedValue(undefined)
+        mockRunProject.mockImplementationOnce(async (_file, options) => {
+          options?.onBlockDone?.({
+            blockId: 'b1',
+            blockType: 'code',
+            success: false,
+            outputs: [],
+            executionCount: 1,
+            durationMs: 10,
+            error: new KernelDiedError(),
+          })
+          return { totalBlocks: 1, executedBlocks: 1, failedBlocks: 1, totalDurationMs: 10 }
+        })
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+        const died = getJsonOutput(consoleLogSpy) as { failureCategory?: string }
+
+        // (4) ordinary in-block user error -> 'in-block'
+        consoleLogSpy.mockClear()
+        mockRunProject.mockImplementationOnce(async (_file, options) => {
+          options?.onBlockDone?.({
+            blockId: 'b1',
+            blockType: 'code',
+            success: false,
+            outputs: [],
+            executionCount: 1,
+            durationMs: 10,
+            error: new Error('NameError'),
+          })
+          return { totalBlocks: 1, executedBlocks: 1, failedBlocks: 1, totalDurationMs: 10 }
+        })
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+        const inBlock = getJsonOutput(consoleLogSpy) as { failureCategory?: string }
+
+        const categories = [
+          missing.failureCategory,
+          launch.failureCategory,
+          died.failureCategory,
+          inBlock.failureCategory,
+        ]
+        expect(categories).toEqual(['missing-kernel', 'kernel-launch', 'kernel-died', 'in-block'])
+        // All four distinct — no collapse.
+        expect(new Set(categories).size).toBe(4)
+        // The load-bearing guarantee: kernel-died and in-block are NOT the same value.
+        expect(died.failureCategory).not.toBe(inBlock.failureCategory)
+      })
+
+      it('emits failureCategory in the toon payload for a pre-flight KernelNotRegisteredError', async () => {
+        mockStart.mockRejectedValue(new KernelNotRegisteredError('rust', []))
+        mockStop.mockResolvedValue(undefined)
+
+        await action(HELLO_WORLD_FILE, { output: 'toon' })
+
+        const output = getOutput(consoleLogSpy)
+        expect(output).toContain('failureCategory: missing-kernel')
+        expect(process.exitCode).toBe(ExitCode.InvalidUsage)
+      })
+    })
+
     describe('-o toon option', () => {
       it('outputs TOON result on success', async () => {
         setupSuccessfulRun({ totalBlocks: 2, executedBlocks: 2, failedBlocks: 0, totalDurationMs: 200 })
@@ -1676,6 +1935,348 @@ describe('run command', () => {
       })
     })
 
+    describe('kernel selection (selectKernelName precedence + --kernel thread)', () => {
+      // ADR-003 / design-doc Sub-phase 1A: --kernel feeds the explicit tier of the
+      // REAL selectKernelName (kept un-mocked via ...actual), resolving the kernelName
+      // handed to the ExecutionEngine. The runtime-core kernel-client suite separately
+      // proves connect() drives SessionManager.startNew with { name: kernelName }; these
+      // tests prove the CLI half of the composed thread (resolution + echo + config).
+
+      it('threads --kernel into the ExecutionEngine config (kernelName=bash)', async () => {
+        setupSuccessfulRun()
+
+        await action(HELLO_WORLD_FILE, { kernel: 'bash' })
+
+        expect(mockConstructor).toHaveBeenCalledWith(expect.objectContaining({ kernelName: 'bash' }))
+      })
+
+      it('echoes the resolved kernel in human output', async () => {
+        setupSuccessfulRun()
+
+        await action(HELLO_WORLD_FILE, { kernel: 'bash' })
+
+        expect(getOutput(consoleLogSpy)).toContain('Resolved kernel: bash')
+      })
+
+      it('defaults to python3 with no --kernel and still echoes the resolved kernel', async () => {
+        setupSuccessfulRun()
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(mockConstructor).toHaveBeenCalledWith(expect.objectContaining({ kernelName: 'python3' }))
+        expect(getOutput(consoleLogSpy)).toContain('Resolved kernel: python3')
+      })
+
+      it('treats a whitespace-only --kernel as absent (falls through to python3)', async () => {
+        setupSuccessfulRun()
+
+        await action(HELLO_WORLD_FILE, { kernel: '   ' })
+
+        expect(mockConstructor).toHaveBeenCalledWith(expect.objectContaining({ kernelName: 'python3' }))
+      })
+
+      it('does not echo the resolved kernel in machine-output mode', async () => {
+        setupSuccessfulRun()
+
+        await action(HELLO_WORLD_FILE, { kernel: 'bash', output: 'json' })
+
+        expect(getOutput(consoleLogSpy)).not.toContain('Resolved kernel:')
+      })
+
+      it('does not consult DEEPNOTE_PYTHON for kernel selection', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', '/some/python')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(mockConstructor).toHaveBeenCalledWith(expect.objectContaining({ kernelName: 'python3' }))
+      })
+    })
+
+    describe('reactivity bypass on non-Python kernel (ADR-004 pt 2 / design-doc KD-5)', () => {
+      // The Python-AST analyzers (getUpstreamBlocks for --block dependency resolution,
+      // getBlockDependencies for whole-notebook input validation) are Python-only. On a
+      // non-Python kernel run.ts must NOT invoke them — it skips the subprocess up front,
+      // emits a "Reactivity is Python-only" notice, and runs blocks in existing order.
+      // The observable contract per KD-5 is "the analyzer is not invoked" (NOT "no error
+      // surfaced", which both sites already guaranteed via try/catch). isNonPythonKernel /
+      // selectKernelName / DEFAULT_KERNEL_NAME are kept REAL (...actual) so the genuine
+      // name-based gate is exercised, not a duplicate.
+
+      const REACTIVITY_NOTICE_FRAGMENT = 'Reactivity is Python-only'
+      // Real executable block ids (the mocked engine does not validate ids, but the
+      // dry-run path's assertExecutableBlockExists does, so use genuine fixture blocks).
+      // Resolved lazily in beforeEach — the fixture path is relative to the test CWD,
+      // which is only correct inside a running test, not at describe-collection time.
+      let upstreamBlockId: string
+      let targetBlockId: string
+      beforeEach(() => {
+        ;({ upstreamBlockId, targetBlockId } = resolveUpstreamTargetPair(BLOCKS_FILE))
+      })
+
+      it('does NOT call getUpstreamBlocks on a non-Python --block run, and runs the block in order', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { kernel: 'bash', block: targetBlockId })
+
+        expect(mockGetUpstreamBlocks).not.toHaveBeenCalled()
+        // Block still runs (in existing order) with no resolved upstream deps.
+        expect(mockRunProject).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.objectContaining({ blockId: targetBlockId, blockIds: undefined })
+        )
+      })
+
+      it('does NOT call getBlockDependencies on a non-Python whole-notebook run (input validation skipped)', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { kernel: 'bash' })
+
+        expect(mockGetBlockDependencies).not.toHaveBeenCalled()
+        // Run still proceeds normally.
+        expect(mockStart).toHaveBeenCalled()
+        expect(mockRunProject).toHaveBeenCalled()
+      })
+
+      it('emits the "Reactivity is Python-only" notice on a non-Python --block run', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { kernel: 'bash', block: targetBlockId })
+
+        expect(getOutput(consoleLogSpy)).toContain(REACTIVITY_NOTICE_FRAGMENT)
+      })
+
+      it('emits the "Reactivity is Python-only" notice on a non-Python whole-notebook run', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { kernel: 'bash' })
+
+        expect(getOutput(consoleLogSpy)).toContain(REACTIVITY_NOTICE_FRAGMENT)
+      })
+
+      it('still calls both analyzers on python3 (regression — bypass does not fire on the default kernel)', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { block: targetBlockId })
+
+        expect(mockGetUpstreamBlocks).toHaveBeenCalled()
+        expect(mockGetBlockDependencies).toHaveBeenCalled()
+        expect(getOutput(consoleLogSpy)).not.toContain(REACTIVITY_NOTICE_FRAGMENT)
+      })
+
+      it('suppresses the notice in machine-output mode (still bypasses the analyzer)', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { kernel: 'bash', block: targetBlockId, output: 'json' })
+
+        expect(mockGetUpstreamBlocks).not.toHaveBeenCalled()
+        expect(getOutput(consoleLogSpy)).not.toContain(REACTIVITY_NOTICE_FRAGMENT)
+      })
+
+      it('bypasses getUpstreamBlocks during dry-run on a non-Python kernel', async () => {
+        setupSuccessfulRun()
+
+        await action(BLOCKS_FILE, { kernel: 'bash', block: targetBlockId, dryRun: true })
+
+        expect(mockGetUpstreamBlocks).not.toHaveBeenCalled()
+      })
+
+      it('capstone: non-Python --block with an upstream dependency skips getUpstreamBlocks entirely; identical python3 run resolves the dependency', async () => {
+        // The fixture target block HAS an upstream dependency, so the python3 arm
+        // genuinely resolves an upstream and the non-Python arm genuinely forgoes that
+        // resolution — the user-visible difference KD-5 specifies.
+        const fixture = parseDeepnoteFixture(BLOCKS_FILE)
+        const allBlocks = fixture.project.notebooks.flatMap(notebook => notebook.blocks)
+        const upstreamBlock = allBlocks.find(block => block.id === upstreamBlockId)
+        const targetBlock = allBlocks.find(block => block.id === targetBlockId)
+        if (!upstreamBlock || !targetBlock) {
+          throw new Error('Expected upstream and target blocks in fixture notebook')
+        }
+        const resolvedUpstream = {
+          status: 'success' as const,
+          blocksToExecuteWithDeps: [upstreamBlock, targetBlock],
+          newlyComputedBlocksContentDeps: [],
+        }
+
+        // --- non-Python arm: analyzer NOT invoked, notice emitted, block runs in order ---
+        setupSuccessfulRun()
+        mockGetUpstreamBlocks.mockResolvedValue(resolvedUpstream)
+
+        await action(BLOCKS_FILE, { kernel: 'bash', block: targetBlockId })
+
+        expect(mockGetUpstreamBlocks).not.toHaveBeenCalled()
+        expect(getOutput(consoleLogSpy)).toContain(REACTIVITY_NOTICE_FRAGMENT)
+        expect(mockRunProject).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.objectContaining({ blockId: targetBlockId, blockIds: undefined })
+        )
+
+        // --- python3 arm (identical invocation): analyzer IS invoked, dependency resolved ---
+        vi.clearAllMocks()
+        setupSuccessfulRun()
+        mockGetBlockDependencies.mockResolvedValue([])
+        mockGetUpstreamBlocks.mockResolvedValue(resolvedUpstream)
+
+        await action(BLOCKS_FILE, { block: targetBlockId })
+
+        expect(mockGetUpstreamBlocks).toHaveBeenCalledTimes(1)
+        expect(getOutput(consoleLogSpy)).not.toContain(REACTIVITY_NOTICE_FRAGMENT)
+        expect(mockRunProject).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.objectContaining({ blockId: targetBlockId, blockIds: [upstreamBlockId, targetBlockId] })
+        )
+      })
+    })
+
+    describe('python interpreter resolution (selectPythonSpec precedence)', () => {
+      // ADR-001: precedence is --python > DEEPNOTE_PYTHON > autodetect. These tests
+      // assert the resolved pythonEnv handed to the ExecutionEngine, proving the CLI
+      // converges on the shared selectPythonSpec selector (parity with the MCP server)
+      // rather than the old `options.python ?? detectDefaultPython()` chain
+      // that ignored DEEPNOTE_PYTHON.
+
+      it('uses --python when provided, even if DEEPNOTE_PYTHON is set (--python wins)', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', '/env/venv/bin/python')
+
+        await action(HELLO_WORLD_FILE, { python: '/flag/venv/bin/python' })
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: '/flag/venv/bin/python',
+          workingDirectory: expect.any(String),
+          kernelName: 'python3',
+        })
+      })
+
+      it('honors DEEPNOTE_PYTHON when no --python is provided', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', '/env/venv/bin/python')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: '/env/venv/bin/python',
+          workingDirectory: expect.any(String),
+          kernelName: 'python3',
+        })
+      })
+
+      it('falls back to autodetect when neither --python nor DEEPNOTE_PYTHON is set', async () => {
+        setupSuccessfulRun()
+        // undefined deletes the var (vitest), matching the real "DEEPNOTE_PYTHON unset"
+        // case. The real selectPythonSpec's autodetect leaf is driven by the mocked
+        // execSync above, which resolves to 'python'.
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: 'python',
+          workingDirectory: expect.any(String),
+          kernelName: 'python3',
+        })
+      })
+
+      it('prefers --python over autodetect when DEEPNOTE_PYTHON is unset', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, { python: '/flag/venv/bin/python' })
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: '/flag/venv/bin/python',
+          workingDirectory: expect.any(String),
+          kernelName: 'python3',
+        })
+      })
+
+      it('treats a blank DEEPNOTE_PYTHON as absent and falls through to autodetect', async () => {
+        setupSuccessfulRun()
+        // A blank env value must fall through the precedence chain exactly as an
+        // absent one does — not propagate '' to the engine. With the REAL selector
+        // wired here, this fails on the pre-fix `??` semantics.
+        vi.stubEnv('DEEPNOTE_PYTHON', '')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(mockConstructor).toHaveBeenCalledWith({
+          pythonEnv: 'python',
+          workingDirectory: expect.any(String),
+          kernelName: 'python3',
+        })
+      })
+    })
+
+    describe('bare-system-python hint (ADR-001 parity with MCP consumer)', () => {
+      // ADR-001: every deepnote-run consumer must surface an actionable hint when
+      // interpreter resolution lands on a bare system `python` with no real override.
+      // The CLI half mirrors the MCP consumer's wording; the hint fires
+      // ONLY on bare autodetect with neither --python nor DEEPNOTE_PYTHON set. A blank
+      // signal at either tier is not an override — it falls through to autodetect, so it
+      // must NOT suppress the hint.
+      const HINT_FRAGMENT = 'likely lacks deepnote-toolkit'
+
+      it('logs the hint when resolution lands on bare system python with no override', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(getOutput(consoleLogSpy)).toContain(HINT_FRAGMENT)
+        expect(getOutput(consoleLogSpy)).toContain('DEEPNOTE_PYTHON')
+        expect(getOutput(consoleLogSpy)).toContain('--python')
+        expect(getOutput(consoleLogSpy)).toContain('deepnote-toolkit[server]')
+      })
+
+      it('does NOT log the hint when --python override is provided', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, { python: '/flag/venv/bin/python' })
+
+        expect(getOutput(consoleLogSpy)).not.toContain(HINT_FRAGMENT)
+      })
+
+      it('does NOT log the hint when DEEPNOTE_PYTHON override is set', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', '/env/venv/bin/python')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(getOutput(consoleLogSpy)).not.toContain(HINT_FRAGMENT)
+      })
+
+      it('logs the hint when DEEPNOTE_PYTHON is blank (blank is not an override)', async () => {
+        setupSuccessfulRun()
+        // Blank env falls through to autodetect → bare python, so the hint must fire.
+        vi.stubEnv('DEEPNOTE_PYTHON', '')
+
+        await action(HELLO_WORLD_FILE, {})
+
+        expect(getOutput(consoleLogSpy)).toContain(HINT_FRAGMENT)
+      })
+
+      it('does NOT log the hint when a non-bare interpreter is resolved via --python', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        // A path (not a bare `python`/`python3`) is non-bare even though it is also an override.
+        await action(HELLO_WORLD_FILE, { python: '/path/to/venv' })
+
+        expect(getOutput(consoleLogSpy)).not.toContain(HINT_FRAGMENT)
+      })
+
+      it('does NOT log the hint in machine-output mode', async () => {
+        setupSuccessfulRun()
+        vi.stubEnv('DEEPNOTE_PYTHON', undefined)
+
+        await action(HELLO_WORLD_FILE, { output: 'json' })
+
+        // Machine output must stay clean JSON — the hint is a human-only status line.
+        expect(getOutput(consoleLogSpy)).not.toContain(HINT_FRAGMENT)
+      })
+    })
+
     describe('--input flag', () => {
       it('passes inputs to runFile', async () => {
         setupSuccessfulRun()
@@ -2240,10 +2841,10 @@ describe('run command', () => {
     let consoleErrorSpy: Mock
     let programErrorSpy: Mock
 
-    // Test fixtures for different formats
-    const JUPYTER_FILE = join('test-fixtures', 'formats', 'jupyter', 'basic.ipynb')
-    const PERCENT_FILE = join('test-fixtures', 'formats', 'percent', 'basic-cells.percent.py')
-    const QUARTO_FILE = join('test-fixtures', 'formats', 'quarto', 'basic.qmd')
+    // Multi-format fixtures (JUPYTER_FILE / PERCENT_FILE / QUARTO_FILE) are
+    // defined at module scope (anchored to the module-relative
+    // TEST_FIXTURES_FORMATS_DIR, not process.cwd()) and validated by the
+    // module-load fixture-file guard above.
 
     beforeEach(() => {
       vi.clearAllMocks()

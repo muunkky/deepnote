@@ -9,9 +9,20 @@ export {
 } from './agent-handler'
 export type { ExecutionOptions } from './execution-engine'
 export { ExecutionEngine, executableBlockTypeSet, executableBlockTypes } from './execution-engine'
-export type { ExecutionCallbacks, ExecutionResult } from './kernel-client'
+export type { ExecutionCallbacks, ExecutionResult, KernelClientOptions } from './kernel-client'
 export { createJsonWebSocketFactory, KernelClient } from './kernel-client'
-export { buildPythonEnv, detectDefaultPython, resolvePythonExecutable } from './python-env'
+export type { KernelFailureCategory, KernelspecSummary } from './kernel-errors'
+export { KernelDiedError, KernelLaunchError, KernelNotRegisteredError } from './kernel-errors'
+export type { SelectKernelNameOptions } from './kernel-name'
+export { DEFAULT_KERNEL_NAME, isNonPythonKernel, selectKernelName } from './kernel-name'
+export {
+  buildPythonEnv,
+  detectDefaultPython,
+  isBareSystemPython,
+  resolvePythonExecutable,
+  selectPythonSpec,
+  selectPythonSpecWithHint,
+} from './python-env'
 export type { ServerInfo, ServerOptions } from './server-starter'
 export { findConsecutiveAvailablePorts, startServer, stopServer, waitForServer } from './server-starter'
 export type { BlockExecutionResult, ExecutionSummary, RuntimeConfig } from './types'

@@ -206,6 +206,27 @@ The `skills/deepnote/` directory contains reference documentation used by AI age
 - **Formatter:** Biome + Prettier (for md/yaml)
 - **Type Checker:** TypeScript 5.9.3
 
+## Working with gitban
+
+This repo uses **gitban** — the board lives in git under `.gitban/`, and an
+agent scaffold lives in `.claude/`.
+
+- New here? Read **`.gitban/README.md`** for the fastest path to the board.
+  For the full plan → decompose → execute → land workflow, see
+  **`.gitban/docs/development-lifecycle.md`**.
+- **Never directly edit gitban-managed state.** The paths `.gitban/cards/`
+  (including `archive/`), `.gitban/roadmap/`, and `.gitban/audit/` are
+  hard-protected — no `Write`, `Edit`, `sed`, `cat >>`, `cd`-prefixed `mv`, or
+  any other non-MCP mutation. All mutations go through gitban MCP tools
+  (`create_card`, `edit_card`, `move_to_todo`, `upsert_roadmap`, etc.). A
+  `validate-no-direct-gitban-state-edit.sh` PreToolUse hook blocks direct
+  writes. Soft-protected paths (`.gitban/templates/`, `*.example.{json,yaml}`)
+  emit an advisory only. Agent inboxes (`.gitban/agents/*/inbox/`) are
+  intentionally unprotected.
+- After upgrading the gitban package, run the `sync` MCP tool to refresh the
+  shipped skills, hooks, and docs. Your `CLAUDE.md`/`AGENTS.md` is never
+  overwritten — pull updates by diffing against `.claude/CLAUDE.md.gitban`.
+
 ## Getting Help
 
 - Check existing tests for examples

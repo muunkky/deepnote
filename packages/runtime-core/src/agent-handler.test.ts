@@ -1,13 +1,127 @@
-import type { DeepnoteFile, McpServerConfig } from '@deepnote/blocks'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type { AgentBlock, DeepnoteFile, McpServerConfig } from '@deepnote/blocks'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  type AgentStreamEvent,
   buildSystemPrompt,
   createBlocksWithAttachedOutputsFromCollectedOutputs,
+  executeAgentBlock,
   mergeMcpConfigs,
   resolveEnvVars,
   serializeNotebookContext,
   serializeNotebookContextFromBlocks,
 } from './agent-handler'
+
+// --- Recorded-provider harness for the executeAgentBlock tool-loop ---------
+//
+// `executeAgentBlock` hard-imports `ToolLoopAgent` from 'ai' and `createOpenAI`
+// from '@ai-sdk/openai' with no dependency-injection seam, so to exercise the
+// REAL tool-loop (not the execution-engine boundary mock) we replace those two
+// modules. `ai` is only partially mocked: the real `tool` and `stepCountIs`
+// helpers are preserved (the module evaluates them at import time and the loop
+// passes `stepCountIs(maxTurns)` to the agent), while `ToolLoopAgent` is swapped
+// for a fake whose `.stream()` returns a recorded `fullStream` + `text`. No
+// network, no OPENAI_API_KEY: the recorded cassette below drives the loop end to
+// end. See the `executeAgentBlock` describe block for the chosen approach and
+// rationale.
+const agentMocks = vi.hoisted(() => {
+  // The recorded provider cassette: the `fullStream` parts a single agent turn
+  // emits, plus the final assistant text. Mutated per-test before invoking.
+  const cassette: { fullStream: unknown[]; text: string } = { fullStream: [], text: '' }
+  // Captures the settings the production code passed to `new ToolLoopAgent(...)`
+  // so tests can assert model/turn-cap wiring (stopWhen via stepCountIs).
+  const captured: { settings: Record<string, unknown> | null } = { settings: null }
+
+  class FakeToolLoopAgent {
+    constructor(settings: Record<string, unknown>) {
+      captured.settings = settings
+    }
+    async stream(_opts: unknown) {
+      const parts = cassette.fullStream
+      return {
+        async *[Symbol.asyncIterator]() {},
+        fullStream: (async function* () {
+          for (const part of parts) {
+            yield part
+          }
+        })(),
+        text: Promise.resolve(cassette.text),
+      }
+    }
+  }
+
+  return { cassette, captured, FakeToolLoopAgent }
+})
+
+// --- Fake MCP client registry for the executeAgentBlock MCP lifecycle ------
+//
+// `executeAgentBlock` hard-imports `createMCPClient` from '@ai-sdk/mcp' and
+// `Experimental_StdioMCPTransport` from '@ai-sdk/mcp/mcp-stdio', then for each
+// merged server config does `createMCPClient({ transport })`, `client.tools()`,
+// and in the `finally` `client.close()`. To drive the client-instantiation path
+// and the close-error `finally` branch (earlier tests only used
+// `mcpServers: []`), we mock both modules. The transport is an inert stub; the
+// client factory pops the next fake client off a FIFO queue the test fills, so a
+// test can hand executeAgentBlock a mix of healthy and `.close()`-rejecting
+// clients and assert per-client close behavior.
+const mcpMocks = vi.hoisted(() => {
+  interface FakeMcpClient {
+    tools: ReturnType<typeof vi.fn>
+    close: ReturnType<typeof vi.fn>
+  }
+  // FIFO queue of clients to hand out, one per createMCPClient call (i.e. per
+  // merged server config, in order). Filled per-test in beforeEach/each test.
+  const clientQueue: FakeMcpClient[] = []
+  // Records the transport-construction args so a test can assert the stdio
+  // transport is wired from the resolved server config if it ever needs to.
+  const transportArgs: unknown[] = []
+
+  const createMCPClient = vi.fn(async (_opts: unknown) => {
+    const client = clientQueue.shift()
+    if (client == null) {
+      throw new Error('mcpMocks: createMCPClient called more times than clients were queued')
+    }
+    return client
+  })
+
+  class FakeStdioMCPTransport {
+    constructor(opts: unknown) {
+      transportArgs.push(opts)
+    }
+  }
+
+  return { clientQueue, transportArgs, createMCPClient, FakeStdioMCPTransport }
+})
+
+vi.mock('ai', async importOriginal => {
+  const actual = await importOriginal<typeof import('ai')>()
+  return {
+    ...actual,
+    ToolLoopAgent: agentMocks.FakeToolLoopAgent,
+  }
+})
+
+// `executeAgentBlock` calls `createOpenAI({...})` at the top of the function and
+// then `openai(modelName)` / `openai.chat(modelName)`. Stub it so no real client
+// is constructed and no key/network is touched; the model object is opaque to the
+// loop (it only flows into the agent settings, which our fake ignores).
+vi.mock('@ai-sdk/openai', () => {
+  const openai = Object.assign((modelName: string) => ({ modelId: modelName }), {
+    chat: (modelName: string) => ({ modelId: modelName, api: 'chat' }),
+  })
+  return {
+    createOpenAI: () => openai,
+  }
+})
+
+// Stub the MCP client factory so executeAgentBlock's client-instantiation +
+// close `finally` branch run against fakes (no child process spawned).
+vi.mock('@ai-sdk/mcp', () => ({
+  createMCPClient: mcpMocks.createMCPClient,
+}))
+
+vi.mock('@ai-sdk/mcp/mcp-stdio', () => ({
+  Experimental_StdioMCPTransport: mcpMocks.FakeStdioMCPTransport,
+}))
 
 describe('resolveEnvVars', () => {
   let prevTestHost: string | undefined
@@ -494,5 +608,331 @@ describe('mergeMcpConfigs', () => {
     const result = mergeMcpConfigs([serverA], [serverC])
     expect(result).toHaveLength(2)
     expect(result.map(s => s.name).sort()).toEqual(['server-a', 'server-c'])
+  })
+})
+
+// =============================================================================
+// executeAgentBlock — the live tool-loop
+// =============================================================================
+//
+// COVERAGE APPROACH (recorded provider):
+// We invoke `executeAgentBlock` DIRECTLY against a recorded provider stream
+// rather than skipping an integration test. `executeAgentBlock` has no DI seam
+// (it hard-imports `ToolLoopAgent`/`createOpenAI`), so we use
+// `vi.mock` to inject the recorded stream: `ai` is partially mocked
+// (`ToolLoopAgent` -> fake, real `tool`/`stepCountIs` preserved) and
+// `@ai-sdk/openai` is stubbed. The fake agent's `.stream()` replays a recorded
+// cassette of `fullStream` parts, so the REAL loop body at agent-handler.ts:215
+// runs and we assert the stream -> tool-call mapping end to end.
+//
+// RATIONALE for recorded-over-skipped: the loop's logic worth protecting is the
+// `fullStream` part -> `onAgentEvent` mapping (text-delta / reasoning-delta /
+// tool-call / tool-result). A recorded cassette exercises that mapping
+// deterministically with zero network and NO OPENAI_API_KEY, which a skipped
+// test would not. The only thing not covered here is real provider wire-format
+// drift, which is the explicitly out-of-scope live-keyed E2E residual.
+
+function makeAgentBlock(overrides?: Partial<AgentBlock>): AgentBlock {
+  return {
+    id: 'agent-block-1',
+    type: 'agent',
+    content: 'Load the dataset and summarize it.',
+    blockGroup: 'bg1',
+    sortingKey: 'a0',
+    metadata: { deepnote_agent_model: 'auto' },
+    ...overrides,
+  } as AgentBlock
+}
+
+describe('executeAgentBlock', () => {
+  // Snapshot env we touch so tests stay isolated and order-independent.
+  let prevApiKey: string | undefined
+  let prevModel: string | undefined
+  let prevBaseUrl: string | undefined
+
+  beforeEach(() => {
+    prevApiKey = process.env.OPENAI_API_KEY
+    prevModel = process.env.OPENAI_MODEL
+    prevBaseUrl = process.env.OPENAI_BASE_URL
+    // The whole point: the loop must run with NO real key in CI.
+    delete process.env.OPENAI_API_KEY
+    delete process.env.OPENAI_MODEL
+    delete process.env.OPENAI_BASE_URL
+    agentMocks.cassette.fullStream = []
+    agentMocks.cassette.text = ''
+    agentMocks.captured.settings = null
+    // Reset MCP fake-client state between tests.
+    mcpMocks.clientQueue.length = 0
+    mcpMocks.transportArgs.length = 0
+    mcpMocks.createMCPClient.mockClear()
+  })
+
+  afterEach(() => {
+    const restore = (key: string, value: string | undefined) => {
+      if (value === undefined) {
+        delete process.env[key]
+      } else {
+        process.env[key] = value
+      }
+    }
+    restore('OPENAI_API_KEY', prevApiKey)
+    restore('OPENAI_MODEL', prevModel)
+    restore('OPENAI_BASE_URL', prevBaseUrl)
+  })
+
+  function makeContext(overrides?: Partial<Parameters<typeof executeAgentBlock>[1]>) {
+    return {
+      openAiToken: 'fixture-token-not-a-real-key',
+      mcpServers: [],
+      notebookContext: '# Notebook: Test\n\n(empty)',
+      addAndExecuteCodeBlock: vi.fn(async (_args: { code: string }) => 'fixture code output'),
+      addMarkdownBlock: vi.fn(async (_args: { content: string }) => 'fixture markdown output'),
+      ...overrides,
+    } as Parameters<typeof executeAgentBlock>[1]
+  }
+
+  // Scenario 1 (Capstone) + Scenario 3 (no API key) -------------------------
+  it('maps a recorded fullStream to add_code_block/add_markdown_block tool events and returns the final text (no OPENAI_API_KEY required)', async () => {
+    expect(process.env.OPENAI_API_KEY).toBeUndefined()
+
+    // Recorded cassette: one agent turn that reasons, calls add_code_block,
+    // gets its output, calls add_markdown_block, then emits the summary text.
+    agentMocks.cassette.fullStream = [
+      { type: 'reasoning-delta', text: 'I should load the data first.' },
+      { type: 'tool-call', toolName: 'add_code_block', input: { code: 'import pandas as pd' } },
+      { type: 'tool-result', toolName: 'add_code_block', output: 'fixture code output' },
+      { type: 'tool-call', toolName: 'add_markdown_block', input: { content: '## Summary' } },
+      { type: 'tool-result', toolName: 'add_markdown_block', output: 'fixture markdown output' },
+      { type: 'text-delta', text: 'Loaded the dataset and ' },
+      { type: 'text-delta', text: 'wrote a summary.' },
+    ]
+    agentMocks.cassette.text = 'Loaded the dataset and wrote a summary.'
+
+    const events: AgentStreamEvent[] = []
+    const result = await executeAgentBlock(makeAgentBlock(), makeContext({ onAgentEvent: e => void events.push(e) }))
+
+    // The loop maps each fullStream part to the right AgentStreamEvent shape.
+    expect(events).toEqual([
+      { type: 'reasoning_delta', text: 'I should load the data first.' },
+      { type: 'tool_called', toolName: 'add_code_block' },
+      { type: 'tool_output', toolName: 'add_code_block', output: 'fixture code output' },
+      { type: 'tool_called', toolName: 'add_markdown_block' },
+      { type: 'tool_output', toolName: 'add_markdown_block', output: 'fixture markdown output' },
+      { type: 'text_delta', text: 'Loaded the dataset and ' },
+      { type: 'text_delta', text: 'wrote a summary.' },
+    ])
+
+    // The final assistant text is surfaced from streamResult.text.
+    expect(result.finalOutput).toBe('Loaded the dataset and wrote a summary.')
+  })
+
+  it('stringifies non-string tool-result output before emitting tool_output', async () => {
+    agentMocks.cassette.fullStream = [
+      { type: 'tool-call', toolName: 'add_code_block', input: { code: 'x = 1' } },
+      // Some tools return structured output; the loop JSON-stringifies it.
+      { type: 'tool-result', toolName: 'add_code_block', output: { rows: 3, ok: true } },
+    ]
+    agentMocks.cassette.text = ''
+
+    const events: AgentStreamEvent[] = []
+    await executeAgentBlock(makeAgentBlock(), makeContext({ onAgentEvent: e => void events.push(e) }))
+
+    expect(events).toEqual([
+      { type: 'tool_called', toolName: 'add_code_block' },
+      { type: 'tool_output', toolName: 'add_code_block', output: JSON.stringify({ rows: 3, ok: true }) },
+    ])
+  })
+
+  // Scenario 1 edge: empty/null stream terminates cleanly --------------------
+  it('returns empty finalOutput and emits no events when the stream is empty', async () => {
+    agentMocks.cassette.fullStream = []
+    agentMocks.cassette.text = ''
+
+    const events: AgentStreamEvent[] = []
+    const result = await executeAgentBlock(makeAgentBlock(), makeContext({ onAgentEvent: e => void events.push(e) }))
+
+    expect(events).toEqual([])
+    expect(result.finalOutput).toBe('')
+  })
+
+  it('does not throw when no onAgentEvent callback is provided', async () => {
+    agentMocks.cassette.fullStream = [{ type: 'text-delta', text: 'hello' }]
+    agentMocks.cassette.text = 'hello'
+
+    const result = await executeAgentBlock(makeAgentBlock(), makeContext({ onAgentEvent: undefined }))
+    expect(result.finalOutput).toBe('hello')
+  })
+
+  // Scenario 2: model precedence + maxTurns wiring (behavior-verified) -------
+  describe('model precedence and turn cap', () => {
+    it('uses block.metadata.deepnote_agent_model when it is not "auto"', async () => {
+      const block = makeAgentBlock({ metadata: { deepnote_agent_model: 'gpt-4o-mini' } })
+      await executeAgentBlock(block, makeContext())
+      expect(agentMocks.captured.settings?.model).toMatchObject({ modelId: 'gpt-4o-mini' })
+    })
+
+    it('falls back to OPENAI_MODEL env when metadata model is "auto"', async () => {
+      process.env.OPENAI_MODEL = 'gpt-4o'
+      await executeAgentBlock(makeAgentBlock(), makeContext())
+      expect(agentMocks.captured.settings?.model).toMatchObject({ modelId: 'gpt-4o' })
+    })
+
+    it('falls back to the gpt-5 literal when metadata is "auto" and OPENAI_MODEL is unset', async () => {
+      expect(process.env.OPENAI_MODEL).toBeUndefined()
+      await executeAgentBlock(makeAgentBlock(), makeContext())
+      expect(agentMocks.captured.settings?.model).toMatchObject({ modelId: 'gpt-5' })
+    })
+
+    it('uses the openai.chat() variant when OPENAI_BASE_URL is set (compatible provider)', async () => {
+      process.env.OPENAI_BASE_URL = 'https://compat.example/v1'
+      await executeAgentBlock(makeAgentBlock(), makeContext())
+      expect(agentMocks.captured.settings?.model).toMatchObject({ api: 'chat' })
+    })
+
+    it('caps the loop at maxTurns=10 via stepCountIs (stopWhen wired to the agent)', async () => {
+      // `stepCountIs(10)` is the real helper (only ToolLoopAgent is mocked): it returns
+      // a predicate `({ steps }) => steps.length === 10`. We assert the captured
+      // `stopWhen` actually fires at 10 steps and NOT at 9 — proving the cap VALUE is
+      // 10, not merely that some stop condition was wired. A regression to any other
+      // cap (or `toBeDefined`-only wiring) fails this.
+      await executeAgentBlock(makeAgentBlock(), makeContext())
+
+      const stopWhen = agentMocks.captured.settings?.stopWhen as (arg: { steps: unknown[] }) => boolean
+      expect(typeof stopWhen).toBe('function')
+
+      const stepsOfLength = (n: number) => ({ steps: Array.from({ length: n }, () => ({})) })
+      expect(stopWhen(stepsOfLength(9))).toBe(false)
+      expect(stopWhen(stepsOfLength(10))).toBe(true)
+      expect(stopWhen(stepsOfLength(11))).toBe(false)
+    })
+  })
+
+  // Scenario: tool-binding identity ----------------------------------------
+  //
+  // The fake ToolLoopAgent replays recorded `tool-result` parts; it never
+  // invokes the registered tools' `execute`. So the `makeContext` callbacks are
+  // never called and a swapped/dropped `execute` binding would slip through.
+  // These tests close that gap by asserting on the tool objects the production
+  // code passed to `new ToolLoopAgent(...)`: the real `tool()` helper is
+  // preserved (only ToolLoopAgent is mocked), so `captured.settings.tools[name]`
+  // is the real wrapped tool and its `.execute` is the exact context callback.
+  describe('agent-tool execute bindings', () => {
+    interface WrappedTool {
+      execute?: unknown
+    }
+
+    it('binds add_code_block.execute to context.addAndExecuteCodeBlock', async () => {
+      const context = makeContext()
+      await executeAgentBlock(makeAgentBlock(), context)
+
+      const tools = agentMocks.captured.settings?.tools as Record<string, WrappedTool>
+      expect(tools.add_code_block).toBeDefined()
+      // Identity, not just "is a function": a swapped binding (e.g. wired to
+      // addMarkdownBlock) would fail this even though both are vi.fns.
+      expect(tools.add_code_block.execute).toBe(context.addAndExecuteCodeBlock)
+    })
+
+    it('binds add_markdown_block.execute to context.addMarkdownBlock', async () => {
+      const context = makeContext()
+      await executeAgentBlock(makeAgentBlock(), context)
+
+      const tools = agentMocks.captured.settings?.tools as Record<string, WrappedTool>
+      expect(tools.add_markdown_block).toBeDefined()
+      expect(tools.add_markdown_block.execute).toBe(context.addMarkdownBlock)
+    })
+
+    it('does not cross-wire the two tool execute bindings', async () => {
+      const context = makeContext()
+      await executeAgentBlock(makeAgentBlock(), context)
+
+      const tools = agentMocks.captured.settings?.tools as Record<string, WrappedTool>
+      // Guard the swap explicitly: each tool must NOT carry the other's callback.
+      expect(tools.add_code_block.execute).not.toBe(context.addMarkdownBlock)
+      expect(tools.add_markdown_block.execute).not.toBe(context.addAndExecuteCodeBlock)
+    })
+  })
+
+  // Scenario: MCP client lifecycle + close-error finally --------------------
+  //
+  // The earlier tests used `mcpServers: []`, so neither the
+  // client-instantiation path (createMCPClient per merged config) nor the
+  // close-error `finally` branch (agent-handler.ts:247-256) was ever entered.
+  // Here we drive executeAgentBlock with non-empty `mcpServers`, injecting fake
+  // clients via the mocked `createMCPClient`, and assert the close behavior:
+  // every client is closed, and a client whose `.close()` rejects is caught
+  // per-client without aborting the others or the returned result.
+  describe('MCP client lifecycle', () => {
+    function makeFakeClient(overrides?: { closeRejects?: boolean; tools?: Record<string, unknown> }) {
+      const closeImpl = overrides?.closeRejects
+        ? vi.fn(async () => {
+            throw new Error('close failed')
+          })
+        : vi.fn(async () => {})
+      return {
+        tools: vi.fn(async () => overrides?.tools ?? {}),
+        close: closeImpl,
+      }
+    }
+
+    const serverA: McpServerConfig = { name: 'mcp-a', command: 'cmd-a' }
+    const serverB: McpServerConfig = { name: 'mcp-b', command: 'cmd-b' }
+
+    it('closes every client on the happy path (two healthy clients)', async () => {
+      const clientA = makeFakeClient()
+      const clientB = makeFakeClient()
+      mcpMocks.clientQueue.push(clientA, clientB)
+
+      agentMocks.cassette.fullStream = []
+      agentMocks.cassette.text = 'done'
+
+      const result = await executeAgentBlock(makeAgentBlock(), makeContext({ mcpServers: [serverA, serverB] }))
+
+      // Both configs instantiated a client...
+      expect(mcpMocks.createMCPClient).toHaveBeenCalledTimes(2)
+      // ...and both were closed exactly once, with no throw escaping.
+      expect(clientA.close).toHaveBeenCalledTimes(1)
+      expect(clientB.close).toHaveBeenCalledTimes(1)
+      expect(result.finalOutput).toBe('done')
+    })
+
+    it('catches a per-client close() rejection without aborting other closes or the result', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      // First client rejects on close; second is healthy and must STILL be closed.
+      const rejecting = makeFakeClient({ closeRejects: true })
+      const healthy = makeFakeClient()
+      mcpMocks.clientQueue.push(rejecting, healthy)
+
+      agentMocks.cassette.fullStream = [{ type: 'text-delta', text: 'ok' }]
+      agentMocks.cassette.text = 'ok'
+
+      // The finally must swallow the close rejection: executeAgentBlock resolves.
+      const result = await executeAgentBlock(makeAgentBlock(), makeContext({ mcpServers: [serverA, serverB] }))
+
+      expect(rejecting.close).toHaveBeenCalledTimes(1)
+      // The healthy client is still closed even though an earlier close rejected.
+      expect(healthy.close).toHaveBeenCalledTimes(1)
+      // The result is unaffected by the close error.
+      expect(result.finalOutput).toBe('ok')
+      // The error is logged per-client with the offending server name.
+      expect(errorSpy).toHaveBeenCalledTimes(1)
+      expect(String(errorSpy.mock.calls[0]?.[0])).toContain('mcp-a')
+
+      errorSpy.mockRestore()
+    })
+
+    it('merges MCP tool sets into the agent settings alongside the built-in tools', async () => {
+      const clientA = makeFakeClient({ tools: { search_docs: { description: 'search' } } })
+      mcpMocks.clientQueue.push(clientA)
+
+      await executeAgentBlock(makeAgentBlock(), makeContext({ mcpServers: [serverA] }))
+
+      const tools = agentMocks.captured.settings?.tools as Record<string, unknown>
+      // MCP-provided tool is present...
+      expect(tools.search_docs).toBeDefined()
+      // ...without displacing the two built-in authoring tools.
+      expect(tools.add_code_block).toBeDefined()
+      expect(tools.add_markdown_block).toBeDefined()
+      expect(clientA.tools).toHaveBeenCalledTimes(1)
+    })
   })
 })

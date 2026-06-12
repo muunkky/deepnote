@@ -272,6 +272,7 @@ ${c.bold('Examples:')}
     .description('Run a notebook file (.deepnote, .ipynb, .py, .qmd)')
     .argument('[path]', 'Path to a notebook file (.deepnote, .ipynb, .py, .qmd)')
     .option('--python <path>', 'Path to Python (executable, bin directory, or venv root)')
+    .option('--kernel <name>', 'Jupyter kernel to run the notebook against (default: python3)')
     .option('--cwd <path>', 'Working directory for execution (defaults to file directory)')
     .option('--notebook <name>', 'Run only the specified notebook')
     .option('--block <id>', 'Run only the specified block')

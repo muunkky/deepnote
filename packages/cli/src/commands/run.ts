@@ -9,13 +9,19 @@ import { getBlockDependencies, getUpstreamBlocks } from '@deepnote/reactivity'
 import {
   type AgentStreamEvent,
   type BlockExecutionResult,
-  detectDefaultPython,
   ExecutionEngine,
   type ExecutionSummary,
   executableBlockTypeSet,
   type IOutput,
+  isNonPythonKernel,
+  KernelDiedError,
+  type KernelFailureCategory,
+  KernelLaunchError,
+  KernelNotRegisteredError,
   type DeepnoteBlock as RuntimeDeepnoteBlock,
   resolvePythonExecutable,
+  selectKernelName,
+  selectPythonSpecWithHint,
 } from '@deepnote/runtime-core'
 import type { Command } from 'commander'
 import dotenv from 'dotenv'
@@ -49,6 +55,31 @@ import { saveExecutionSnapshot } from '../utils/output-persistence'
 import { DEFAULT_API_URL } from './integrations'
 
 /**
+ * User-facing notice emitted when reactivity dependency analysis is skipped
+ * because the active kernel is non-Python (ADR-004 Decision pt 2 / design-doc
+ * KD-5). Phase-1 reactivity (the Python-AST analyzer) is Python-only, so on a
+ * non-Python kernel we skip the analyzer up front rather than spawning a
+ * subprocess we know will fail on non-Python source, and run blocks in their
+ * existing notebook order without dependency resolution.
+ */
+const REACTIVITY_PYTHON_ONLY_NOTICE =
+  'Reactivity is Python-only; running without dependency analysis (blocks run in order).'
+
+/**
+ * Emit the reactivity-bypass notice for a non-Python kernel, suppressed in
+ * machine-output mode (mirrors the other user-facing notices in this command).
+ * Centralised so both analyzer call sites (`resolveUpstreamExecutionBlockIds`
+ * and `validateRequirements`) emit identical text.
+ */
+function emitReactivityPythonOnlyNotice(isMachineOutput: boolean): void {
+  if (isMachineOutput) {
+    debug(REACTIVITY_PYTHON_ONLY_NOTICE)
+    return
+  }
+  log(getChalk().yellow(REACTIVITY_PYTHON_ONLY_NOTICE))
+}
+
+/**
  * Error thrown when required inputs are missing.
  * This is a user error (exit code 2), not a runtime error.
  */
@@ -78,6 +109,7 @@ export class MissingIntegrationError extends Error {
 
 export interface RunOptions {
   python?: string
+  kernel?: string
   cwd?: string
   notebook?: string
   block?: string
@@ -103,6 +135,13 @@ interface BlockResult {
   durationMs: number
   outputs: IOutput[]
   error?: string | undefined
+  /**
+   * Machine-readable failure class (KD-6 site b). Captured in `onBlockDone` from
+   * the still-typed `result.error` BEFORE it is flattened to `.message`, so a
+   * mid-run `KernelDiedError` (`'kernel-died'`) stays distinct from an ordinary
+   * in-block user error (`'in-block'`). `undefined` on successful blocks.
+   */
+  failureCategory?: KernelFailureCategory | undefined
 }
 
 /** Diagnosis info for a failed block */
@@ -157,6 +196,13 @@ interface RunResult extends ExecutionSummary {
   success: boolean
   path: string
   blocks: BlockResult[] | BlockWithContext[]
+  /**
+   * Machine-readable failure class for the run (KD-6). One of the four
+   * `KernelFailureCategory` values when the run failed; `undefined` on success.
+   * Threaded from the failing block's `BlockResult.failureCategory` (success
+   * path) or the caught kernel error's `category` (outer catch).
+   */
+  failureCategory?: KernelFailureCategory
   /** Diagnosis info for failed blocks (when machine output is enabled) */
   failedBlockDiagnosis?: BlockDiagnosis[]
   /** Project-level context info (when --context is enabled) */
@@ -184,6 +230,7 @@ interface ProjectSetup {
   workingDirectory: string
   file: DeepnoteFile
   pythonEnv: string
+  kernelName: string
   inputs: Record<string, unknown>
   isMachineOutput: boolean
   convertedFile: ConvertedFile
@@ -293,7 +340,27 @@ async function setupProject(path: string | undefined, options: RunOptions): Prom
 
   dotenv.config({ path: join(workingDirectory, DEFAULT_ENV_FILE), quiet: true })
 
-  const pythonEnv = await resolvePythonExecutable(options.python ?? detectDefaultPython())
+  // Shared ADR-001 resolver: `--python` > DEEPNOTE_PYTHON > autodetect, plus the
+  // bare-system-python hint. The same runtime-core helper backs the MCP consumer, so the
+  // two cannot diverge; only the printed surface noun (`--python`) is CLI-specific. The
+  // hint is a human-only status line, so it stays suppressed in machine-output mode.
+  const { spec: pythonSpec, hint: pythonHint } = selectPythonSpecWithHint({
+    explicit: options.python,
+    argLabel: '--python',
+  })
+  if (pythonHint && !isMachineOutput) {
+    log(getChalk().yellow(pythonHint))
+  }
+  const pythonEnv = await resolvePythonExecutable(pythonSpec)
+
+  // ADR-003 kernel selector: --kernel > notebook-declared language (Phase 2,
+  // not wired) > 'python3'. A separate pure resolver from the interpreter axis;
+  // it reads no env. The resolved kernel is echoed for the "deterministic and
+  // visible" criterion (suppressed in machine-output mode).
+  const kernelName = selectKernelName({ explicit: options.kernel })
+  if (!isMachineOutput) {
+    log(getChalk().dim(`Resolved kernel: ${kernelName}`))
+  }
 
   const inputs = parseInputs(options.input)
 
@@ -331,13 +398,23 @@ async function setupProject(path: string | undefined, options: RunOptions): Prom
   })
 
   // Validate that all requirements are met (inputs, integrations) - exit code 2 if not
-  await validateRequirements(file, inputs, pythonEnv, allIntegrations, options.notebook)
+  await validateRequirements(file, inputs, pythonEnv, allIntegrations, kernelName, isMachineOutput, options.notebook)
 
   // Inject integration environment variables into process.env
   // This allows SQL blocks to access database connections
   injectIntegrationEnvVars(allIntegrations, workingDirectory)
 
-  return { absolutePath, workingDirectory, file, pythonEnv, inputs, isMachineOutput, convertedFile, allIntegrations }
+  return {
+    absolutePath,
+    workingDirectory,
+    file,
+    pythonEnv,
+    kernelName,
+    inputs,
+    isMachineOutput,
+    convertedFile,
+    allIntegrations,
+  }
 }
 
 /**
@@ -428,9 +505,24 @@ function assertExecutableBlockExists(blockId: string, notebooks: DeepnoteFile['p
 async function resolveUpstreamExecutionBlockIds(
   file: DeepnoteFile,
   options: { notebook?: string; block?: string },
-  pythonInterpreter: string
+  pythonInterpreter: string,
+  kernelName: string,
+  isMachineOutput: boolean
 ): Promise<string[] | undefined> {
   if (!options.block) {
+    return undefined
+  }
+
+  // ADR-004 Decision pt 2 / design-doc KD-5: reactivity (the Python-AST DAG
+  // analyzer) is Python-only. On a non-Python kernel, skip `getUpstreamBlocks`
+  // entirely rather than spawning a subprocess we know will fail on non-Python
+  // source, emit a notice, and run the requested block in existing order (no
+  // dependency resolution). This reuses the fatal-branch fallback shape below
+  // (`return undefined` => single block, no upstream deps). The name-based check
+  // (`isNonPythonKernel`) is correct here because this site runs pre-connect, so
+  // no kernelspec `language` is available yet.
+  if (isNonPythonKernel(kernelName)) {
+    emitReactivityPythonOnlyNotice(isMachineOutput)
     return undefined
   }
 
@@ -516,16 +608,30 @@ export function createRunAction(program: Command): (path: string | undefined, op
         error instanceof FileResolutionError ||
         error instanceof MissingInputError ||
         error instanceof MissingIntegrationError ||
+        // KD-6 site (a): a requested kernel that is not registered is a user/usage
+        // error (mirrors a bad argument), so it maps to InvalidUsage. Other kernel
+        // failures (launch/died) are runtime Errors. Exit codes are NOT otherwise
+        // subdivided — the four classes are distinguished on `failureCategory`.
+        error instanceof KernelNotRegisteredError ||
         isAuthApiError
           ? ExitCode.InvalidUsage
           : ExitCode.Error
+      // KD-6 site (a): read the typed kernel error's `category` discriminant
+      // directly (these instances survive `startExecutionEngine` unwrapped) and
+      // surface it as `failureCategory` in the machine payloads.
+      const failureCategory: KernelFailureCategory | undefined =
+        error instanceof KernelNotRegisteredError ||
+        error instanceof KernelLaunchError ||
+        error instanceof KernelDiedError
+          ? error.category
+          : undefined
       if (options.output === 'json') {
-        outputJson({ success: false, error: message })
+        outputJson({ success: false, error: message, ...(failureCategory && { failureCategory }) })
         process.exitCode = exitCode
         return
       }
       if (options.output === 'toon') {
-        outputToon({ success: false, error: message })
+        outputToon({ success: false, error: message, ...(failureCategory && { failureCategory }) })
         process.exitCode = exitCode
         return
       }
@@ -693,8 +799,8 @@ async function listInputs(path: string, options: RunOptions): Promise<void> {
  * Also validates that all requirements (inputs, integrations) are met.
  */
 async function dryRunDeepnoteProject(path: string, options: RunOptions): Promise<void> {
-  const { absolutePath, file, isMachineOutput, pythonEnv } = await setupProject(path, options)
-  const blockIds = await resolveUpstreamExecutionBlockIds(file, options, pythonEnv)
+  const { absolutePath, file, isMachineOutput, pythonEnv, kernelName } = await setupProject(path, options)
+  const blockIds = await resolveUpstreamExecutionBlockIds(file, options, pythonEnv, kernelName, isMachineOutput)
   const executableBlocks = collectExecutableBlocks(file, { ...options, blockIds })
 
   const notebookCount = options.notebook ? 1 : file.project.notebooks.length
@@ -746,6 +852,8 @@ async function validateRequirements(
   providedInputs: Record<string, unknown>,
   pythonInterpreter: string,
   integrations: DatabaseIntegrationConfig[],
+  kernelName: string,
+  isMachineOutput: boolean,
   notebookName?: string
 ): Promise<void> {
   const notebooks = notebookName ? file.project.notebooks.filter(n => n.name === notebookName) : file.project.notebooks
@@ -776,6 +884,20 @@ async function validateRequirements(
   }
 
   // === Check for missing inputs ===
+  // ADR-004 Decision pt 2 / design-doc KD-5: the input-validation analyzer
+  // (`getBlockDependencies`) is the Python-AST analyzer and is Python-only. On a
+  // non-Python kernel, skip it up front (no subprocess spawn we know will fail on
+  // non-Python source), emit the notice, and skip input validation — a runtime
+  // failure surfaces the issue instead. The integration check above is NOT
+  // reactivity-related and must always run, so this guard sits after it. The
+  // name-based check (`isNonPythonKernel`) is correct here because this site runs
+  // pre-connect, so no kernelspec `language` is available yet. The existing
+  // try/catch below remains as a safety net for the Python path.
+  if (isNonPythonKernel(kernelName)) {
+    emitReactivityPythonOnlyNotice(isMachineOutput)
+    return
+  }
+
   // Get dependency info for all blocks
   let deps: Awaited<ReturnType<typeof getBlockDependencies>>
   try {
@@ -841,8 +963,17 @@ async function validateRequirements(
 }
 
 async function runDeepnoteProject(path: string | undefined, options: RunOptions): Promise<void> {
-  const { absolutePath, workingDirectory, pythonEnv, inputs, isMachineOutput, convertedFile, file, allIntegrations } =
-    await setupProject(path, options)
+  const {
+    absolutePath,
+    workingDirectory,
+    pythonEnv,
+    kernelName,
+    inputs,
+    isMachineOutput,
+    convertedFile,
+    file,
+    allIntegrations,
+  } = await setupProject(path, options)
 
   debug(`Inputs: ${JSON.stringify(inputs)}`)
 
@@ -853,6 +984,7 @@ async function runDeepnoteProject(path: string | undefined, options: RunOptions)
   const engine = new ExecutionEngine({
     pythonEnv,
     workingDirectory,
+    kernelName,
   })
   const restoreConsoleDebug = suppressMachineOutputDebugNoise(isMachineOutput)
   let engineStarted = false
@@ -865,7 +997,7 @@ async function runDeepnoteProject(path: string | undefined, options: RunOptions)
 
     // Track execution timing for snapshot
     const executionStartedAt = new Date().toISOString()
-    const blockIds = await resolveUpstreamExecutionBlockIds(file, options, pythonEnv)
+    const blockIds = await resolveUpstreamExecutionBlockIds(file, options, pythonEnv, kernelName, isMachineOutput)
 
     // Use runProject instead of runFile since we may have converted the file in memory
     const summary = await engine.runProject(file, {
@@ -973,6 +1105,20 @@ async function startExecutionEngine(engine: ExecutionEngine, isMachineOutput: bo
       }
     }
 
+    // KD-6 site (a): preserve the typed kernel-failure family so the outer catch
+    // can read its `category` discriminant. Wrapping these in a plain Error here
+    // would flatten `missing-kernel` / `kernel-launch` / `kernel-died` to a
+    // string and the outer catch would have no `failureCategory` to emit. A
+    // missing/unlaunchable kernel is also not the "install deepnote-toolkit"
+    // server-startup failure the generic hint describes.
+    if (
+      error instanceof KernelNotRegisteredError ||
+      error instanceof KernelLaunchError ||
+      error instanceof KernelDiedError
+    ) {
+      throw error
+    }
+
     throw new Error(
       `Failed to start server: ${message}\n\nMake sure deepnote-toolkit is installed:\n  pip install deepnote-toolkit[server]`
     )
@@ -1044,6 +1190,14 @@ function createRunProjectCallbacks({
         success: result.success,
         durationMs: result.durationMs,
         outputs: result.outputs,
+        // KD-6 site (b): capture the discriminant from the STILL-TYPED `result.error`
+        // here, before it is flattened to `.message` on the next line. A mid-run
+        // `KernelDiedError` must report `'kernel-died'`, not collapse into `'in-block'`.
+        failureCategory: result.success
+          ? undefined
+          : result.error instanceof KernelDiedError
+            ? 'kernel-died'
+            : 'in-block',
         error: result.error?.message,
       })
 
@@ -1221,6 +1375,12 @@ async function buildMachineRunResult({
     failedBlocks: summary.failedBlocks,
     totalDurationMs: summary.totalDurationMs,
     blocks: blockResults,
+    // KD-6 site (b): surface the run-level failure class by reading the already-
+    // captured per-block discriminant — NO `instanceof` on a stringified error.
+    // The first failing block's category represents the run; defaults to
+    // `'in-block'` if a failure was counted without a typed category.
+    failureCategory:
+      summary.failedBlocks > 0 ? (blockResults.find(b => !b.success)?.failureCategory ?? 'in-block') : undefined,
   }
 
   const shouldIncludeContext = options.context || summary.failedBlocks > 0

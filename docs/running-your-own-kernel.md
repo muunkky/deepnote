@@ -6,6 +6,82 @@ noContent: false
 
 If you need to work with different language then Python, the Jupyter ecosystem provides you with a vast selection of other kernels. You can now run them in Deepnote!
 
+## Running a non-Python kernel with the open-source CLI
+
+> This section answers [deepnote/deepnote#154](https://github.com/deepnote/deepnote/issues/154):
+> running a notebook against a non-Python Jupyter kernel from the open-source
+> `@deepnote/cli`. The Dockerfile / `DEFAULT_KERNEL_NAME` instructions further down
+> are for the hosted Deepnote product; this section is for the local CLI.
+
+The CLI runs your notebook against the **deepnote-toolkit** Jupyter server, which can
+host any kernel registered in your Python environment — not just Python. Phase 1
+ships the core path: select a kernel with `--kernel`, run single-language code and
+markdown, and get real outputs back (including binary MIME bundles like `image/png`).
+
+### Which languages run
+
+Any Jupyter kernel that is **registered as a kernelspec** in the environment you point
+`--python` at. A notebook that contains only **code** and **markdown** blocks runs on
+any such kernel. Pure-pip kernels (no system packages) are the easiest to set up — for
+example [`bash_kernel`](https://pypi.org/project/bash_kernel/). Heavier kernels such as
+[`IJulia`](https://github.com/JuliaLang/IJulia.jl) (Julia) or
+[`IRkernel`](https://github.com/IRkernel/IRkernel) (R) work too, provided their language
+runtime and kernelspec are installed.
+
+### Install and register a kernel
+
+The kernel must live in the **same environment** the toolkit server runs from (the one
+`--python` resolves to). Using `bash_kernel` as the worked example:
+
+```bash
+# In the venv that has deepnote-toolkit[server] installed:
+pip install bash_kernel
+python -m bash_kernel.install --sys-prefix     # registers the "bash" kernelspec
+```
+
+Confirm the kernelspec is registered:
+
+```bash
+jupyter kernelspec list        # should list "bash" alongside "python3"
+```
+
+### Run it
+
+```bash
+deepnote run my-notebook.deepnote --kernel bash --python path/to/venv
+```
+
+- `--kernel <name>` selects the kernelspec to launch (default: `python3`). The name must
+  match a registered kernelspec exactly — it is **not** the language label.
+- `--python <path>` points at the environment that has `deepnote-toolkit[server]` **and**
+  your kernel installed (a venv root, a `bin/` directory, or a Python executable).
+- `-o json` emits a machine-readable result for scripting/CI, including each block's
+  output MIME bundles.
+
+### What does and doesn't work on a non-Python kernel (Phase 1)
+
+Phase 1 is honest about its limits:
+
+- **Plain `code` and `markdown` blocks run** on the selected kernel and return their
+  outputs — including rich, non-`text/plain` bundles (e.g. a bash cell that pipes a PNG
+  to the kernel's `display` helper returns an `image/png`).
+- **Deepnote value-add blocks hard-fail.** SQL, chart/visualization, input, and agent
+  blocks are implemented as generated Python (`_dntk`-prefixed) that only runs on the
+  Python kernel. On a non-Python kernel the run stops at that block with a clear error —
+  `<blockType> blocks require the Python kernel; this notebook is running on '<kernel>'` —
+  rather than dispatching Python to an alien kernel and failing opaquely.
+- **Reactivity is bypassed.** Dependency analysis is a Python-AST analyzer, so on a
+  non-Python kernel it is skipped and blocks run in their existing notebook order. The
+  CLI prints `Reactivity is Python-only; running without dependency analysis (blocks run
+in order).`
+- **Requesting an unregistered kernel fails legibly.** `--kernel no_such_kernel` returns
+  `Kernel 'no_such_kernel' is not registered. Installed kernels: ...` (and, with
+  `-o json`, `"failureCategory": "missing-kernel"`) — never an opaque server 500.
+
+These are deliberate Phase-1 boundaries. A notebook-declared `language` field, a
+`--list-kernels` discovery surface, and a configurable per-kernel startup timeout are
+planned for later phases.
+
 <Callout status="warning">
 **Deepnote's support for other kernels is still in its early days.**
 

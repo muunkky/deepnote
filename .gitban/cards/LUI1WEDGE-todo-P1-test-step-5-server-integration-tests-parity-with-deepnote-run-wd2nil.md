@@ -53,10 +53,11 @@
 - **Then:** the failure surfaces as `missing-kernel` end-to-end (the typed discriminant, not a stringified message), and the consumer gets a terminal event (does not hang).
 - **Priority:** Critical
 
-### Scenario 3: serve smoke (e2e)
+### Scenario 3: serve smoke (e2e) — incl. real-socket loopback-bind guard
 - **Given:** `deepnote serve fixture.deepnote --no-open` against a real venv.
 - **When:** the server boots and a client hits `GET /api/project`.
 - **Then:** the project tree is returned; the server shuts down cleanly.
+- **And (security boundary — reviewer-1 L2):** the served process is asserted bound to loopback and **not reachable off-host**. Because this is the one place in the wedge where `deepnote serve` binds a *real* socket, this smoke is the real-socket guard for the loopback guarantee that step-6 (`zq7q0g`) only proves at the unit layer. Assert on the **server-side** bound address (read the listener's own `AddressInfo` — `address.address === '127.0.0.1'`, never `0.0.0.0`), NOT the client-side `socket.localAddress` (a loopback connection always reports `127.0.0.1` regardless of the server's bind interface — the exact false-positive B1 rejected on `zq7q0g`). Optionally also enumerate a non-internal IPv4 from `os.networkInterfaces()` and assert a connect to `that-ip:port` is refused (skip when the host has no non-loopback IPv4). The negative leg must **fail** if the server bound `0.0.0.0`. (Reviewer report `.gitban/agents/reviewer/inbox/LUI1WEDGE-zq7q0g-reviewer-1.md` §FOLLOW-UP L2.)
 - **Priority:** High
 
 ### Scenario 4: mid-run kernel death is terminal (real)
@@ -124,6 +125,7 @@ The wedge's headline promise — "the server runs your project exactly the way `
 - [ ] **Capstone:** the streamed `IOutput`s from a server-driven run-all **deep-equal** `deepnote run --output json`'s for the same fixture, covering 100% of executable block types — green in the `integration-kernels` job.
 - [ ] A deliberately-missing kernel yields `missing-kernel` end-to-end (typed discriminant) with a terminal event (no hang).
 - [ ] `deepnote serve fixture.deepnote --no-open` serves a `GET /api/project` returning the tree (integration smoke) and shuts down cleanly.
+- [ ] **(reviewer-1 L2 — real-socket loopback guard)** The serve smoke asserts on the **server-side** bound `AddressInfo` that the live process is bound to loopback (`127.0.0.1`, never `0.0.0.0`) — a real-socket negative leg that **fails** if the server bound all-interfaces. This is the wedge's only end-to-end guard for the loopback security boundary; step-6 (`zq7q0g`) proves it at the unit layer only. Must NOT rely on the client-side `socket.localAddress` (the B1 false-positive).
 - [ ] The suite runs only under `test:integration` / `integration-kernels` (never in mocked `pnpm test`).
 
 ## Acceptance Criteria

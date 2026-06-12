@@ -53,6 +53,7 @@
 * [ ] `deepnote serve project.deepnote --no-open` starts and serves `GET /api/project`.
 * [ ] Port-in-use falls back to the next free port and reports the chosen URL.
 * [ ] Binds `localhost`, never `0.0.0.0`.
+* [ ] **(reviewer-1 L1, folded into the B1 rework)** Once the B1 fix exposes the server-side bound `AddressInfo`, the pre-existing omitted-host `listen` overload (the `listen(0)` lifecycle path, all-interfaces) is pinned to its bound interface using that same accessor — assert it binds the unspecified address (`0.0.0.0` / `::`) so BOTH `listen` overloads are characterised: with-host loopback (B1's positive+negative legs) and without-host all-interfaces. The pre-existing lifecycle test today only proves the port is reachable/released via `canConnect` over loopback, not the bind interface. If the B1 rework's negative leg already covers the omitted-host case, mark this done as already covered rather than adding a duplicate test. (`packages/runtime-server/src/server.test.ts`; reviewer report `.gitban/agents/reviewer/inbox/LUI1WEDGE-zq7q0g-reviewer-1.md` §FOLLOW-UP L1.)
 * [ ] Ctrl-C stops the toolkit server (`engine.stop()`); no orphaned process.
 * [ ] The sliced `serve.ts` carries no `apps/` token (no default static-dir string).
 

@@ -187,3 +187,33 @@ Gate 2 (code-quality): B1 — the runtime-server `listen(port, host)` test is a 
 
 Production code verified correct end-to-end by the reviewer; card structure passed Gate 1. No code
 rewrite required beyond the test fix and a server-side bound-address accessor.
+
+## Executor close-out (executor-2) — B1 + B2 rework
+
+**Status:** complete. Gate-2 rework applied; code committed on the worktree branch (commit `8ab721c`). Completion tag `LUI1WEDGE-zq7q0g-done` re-pointed to `8ab721c`. Left in `in_progress` for the reviewer.
+
+### B1 (Gate-2 blocker) — fixed
+The `server.test.ts` loopback test was a false positive: its `boundAddress` helper read the **client** socket's `localAddress` over a loopback connection (always `127.0.0.1` regardless of the server's bind interface), so it passed even when the server bound `0.0.0.0`.
+
+Fix:
+- `packages/runtime-server/src/server.ts` — added a `boundAddress(): string | null` accessor to the `RuntimeServer` handle that reads the **authoritative server-side** `AddressInfo.address` from `http.address()` (new `addressInfo()` helper). Forwarded it through both the session-bound return path and the no-session `httpHandle`. `listen`'s number return shape is unchanged (kept the ~10 `await listen(0)` call sites stable).
+- `packages/runtime-server/src/server.test.ts` — replaced the client-side helper. The loopback test now asserts `server.boundAddress() === '127.0.0.1'` (and `!== '0.0.0.0'`, and `null` after close). Added the **negative leg**: a new test for the omitted-host path asserting the server-side address is the unspecified address (`'0.0.0.0'` or `'::'`, and NOT `127.0.0.1`).
+
+**Mutation-verified:** temporarily mutated the impl's host branch to `http.listen(port, '0.0.0.0')` → the loopback test FAILED (`expected '0.0.0.0' to be '127.0.0.1'`, reading the real server-side address), proving the guard is real. Reverted; clean suite green again. This also covers the acceptance-criterion L1 fold-in (both `listen` overloads now characterised: with-host loopback positive+negative, and without-host all-interfaces).
+
+### B2 (typecheck blocker) — fixed
+`serve.ts`'s `SessionLike` interface (`{ close() }`) was too narrow for `createServer({ session })`, which requires the full `ServerSession`; the per-package dist-resolution typecheck (`pnpm -r exec tsc --noEmit`) failed with TS2739.
+
+Fix (`packages/cli/src/commands/serve.ts`): typed `ServeDeps.createSession` as returning `ServerSession` (imported from `@deepnote/runtime-server`), removed the redundant `SessionLike`. The production `new Session()` satisfies `ServerSession`. `serve.test.ts`'s fake session now satisfies `ServerSession` — `close` is the real spy; `apiProject`/`startEngine`/`runProject`/`save` are guard stubs that throw if the thin action ever touches them (it doesn't). No weakening of `CreateServerOptions.session` in runtime-server.
+
+### Gates (all green)
+- `pnpm typecheck` — **BOTH halves** (`tsc -p tsconfig.json` and `pnpm -r exec tsc --noEmit`): PASS. The B2 defect that blocked the dispatcher's push is resolved.
+- `pnpm exec vitest run packages/runtime-server packages/cli` (from repo root, `VITEST_MAX_WORKERS=2`): **1076 passed / 0 failed** (server.test.ts now 4 tests, +1 negative leg).
+- `biome check --write` on the 4 touched TS files: clean (reordered one import).
+- Card observable `git grep -iE 'apps/' -- packages/cli/src/commands/serve.ts`: **nothing** (PASS). Bound-port truthfulness unchanged (serve still reports the resolved `listen()` port).
+
+### Scope honesty
+runtime-server tests bind **real** loopback sockets (the `boundAddress()` assertion is on a live listener). The cli suite-6 tests remain **mocked** (fake server/session, no real kernel) — the real serve integration smoke remains the step-5 card (`wd2nil`), unchanged by this rework. Did NOT touch the production `serve.ts` bind logic (reviewer verified it correct); B1 changed only the server-side accessor and the test.
+
+### Deferred / follow-ups
+None. No tech debt.

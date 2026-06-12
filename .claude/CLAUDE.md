@@ -45,13 +45,13 @@ We work **in lockstep with gitban on the fork**, then slice clean PRs out for up
    maintainer signals interest. (This is the #288 pattern.)
 
 3. **Decompose from monolith.** Developing with Gitban will naturally generate PRs that are many times
-   larger than most projets would ever allow. Instead of trying to change our process, we will accept
+   larger than most projects would ever allow. Instead of trying to change our process, we will accept
    that we will create monoliths and then create prs parsed out into smaller diffs/prs that map 1-1 with
    upstream repo expectations. As a result, we will likely have two sets of PRs on our fork: one is the
    final diff from a gitban sprint or batch. The other is diffs that are parcelled out in perfect
    accordance with the contribution guidance that map 1 to 1 with the prs we plan to push upstream 
 
-5. **Slice two diffs per issue — both as PRs on the fork, both linked from the issue:**
+4. **Slice two diffs per issue — both as PRs on the fork, both linked from the issue:**
    - **Contribution diff (clean / "without gitban")** — branch `contrib/<slug>` cut from
      `upstream/main`: **code only**. No `.gitban/`, no `.claude/`. This _is_ the upstream-ready PR — the
      exact diff we'd open against `deepnote/deepnote` once invited.

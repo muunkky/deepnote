@@ -27,5 +27,14 @@ export default defineConfig({
     },
     setupFiles: [path.resolve(__dirname, 'test-helpers/expect-url-with-query-params.ts')],
     bail: 1,
+    // Constrained-environment tuning — opt-in via env only. When these env vars are unset (the
+    // default, including CI and every maintainer machine) vitest uses its own defaults, so behaviour
+    // is unchanged. On a low-memory / no-swap box the default worker fan-out thrashes the machine
+    // (multi-minute transform/import) and the Python-subprocess tests (reactivity DAG, cli stats)
+    // miss the 5s default timeout, which `bail: 1` then turns into a whole-suite failure. The local
+    // dispatcher push sets VITEST_MAX_WORKERS / VITEST_TEST_TIMEOUT to run the suite reliably.
+    ...(process.env.VITEST_MAX_WORKERS ? { maxWorkers: Number(process.env.VITEST_MAX_WORKERS) } : {}),
+    ...(process.env.VITEST_MIN_WORKERS ? { minWorkers: Number(process.env.VITEST_MIN_WORKERS) } : {}),
+    ...(process.env.VITEST_TEST_TIMEOUT ? { testTimeout: Number(process.env.VITEST_TEST_TIMEOUT) } : {}),
   },
 })

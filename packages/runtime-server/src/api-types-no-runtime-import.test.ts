@@ -37,7 +37,7 @@ function collectModuleReferences(source: string): { specifier: string; typeOnly:
     if (named && ts.isNamespaceImport(named)) return false
     // `import { type A, type B }` — every named specifier must be inline-type-only.
     if (named && ts.isNamedImports(named)) {
-      return named.elements.every((el) => el.isTypeOnly)
+      return named.elements.every(el => el.isTypeOnly)
     }
     return false
   }
@@ -46,7 +46,7 @@ function collectModuleReferences(source: string): { specifier: string; typeOnly:
     if (node.isTypeOnly) return true
     const clause = node.exportClause
     if (clause && ts.isNamedExports(clause)) {
-      return clause.elements.every((el) => el.isTypeOnly)
+      return clause.elements.every(el => el.isTypeOnly)
     }
     // `export * from '...'` is a runtime re-export.
     return false
@@ -55,11 +55,7 @@ function collectModuleReferences(source: string): { specifier: string; typeOnly:
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       refs.push({ specifier: node.moduleSpecifier.text, typeOnly: isTypeOnlyImport(node) })
-    } else if (
-      ts.isExportDeclaration(node) &&
-      node.moduleSpecifier &&
-      ts.isStringLiteral(node.moduleSpecifier)
-    ) {
+    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
       refs.push({ specifier: node.moduleSpecifier.text, typeOnly: isTypeOnlyExport(node) })
     }
     ts.forEachChild(node, visit)
@@ -79,7 +75,7 @@ describe('api-types.ts is runtime-import-free (ADR-007 §6)', () => {
     // assertion is vacuous and the contract could drift undetected).
     expect(refs.length).toBeGreaterThan(0)
 
-    const runtimeRefs = refs.filter((r) => !r.typeOnly).map((r) => r.specifier)
+    const runtimeRefs = refs.filter(r => !r.typeOnly).map(r => r.specifier)
     expect(runtimeRefs).toEqual([])
   })
 

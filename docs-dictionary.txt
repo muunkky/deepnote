@@ -269,6 +269,8 @@ obrazovky
 
 # British English
 behaviour
+behavioural
+behaviourally
 strikethrough
 
 # Terms from docs

@@ -4,12 +4,14 @@ import { createServer } from './server'
 
 /** Resolve true if a TCP connection to `port` on localhost is accepted. */
 function canConnect(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
+  return new Promise<boolean>(resolve => {
     const socket = createConnection({ host: '127.0.0.1', port }, () => {
       socket.destroy()
-      resolve(true)
+      // `resolve` returns void; the explicit `void` keeps biome's type-unaware
+      // per-file lint pass (pre-commit) from misreading it as a floating promise.
+      void resolve(true)
     })
-    socket.once('error', () => resolve(false))
+    socket.once('error', () => void resolve(false))
   })
 }
 

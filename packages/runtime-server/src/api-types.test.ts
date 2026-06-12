@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type {
-  ApiProject,
-  FailureEvent,
-  RunId,
-  WsClientMessage,
-  WsServerEvent,
-} from './api-types'
+import type { ApiProject, FailureEvent, RunId, WsClientMessage, WsServerEvent } from './api-types'
 
 /**
  * Contract surface test: the canonical identifiers exist and have the design-doc

@@ -25,7 +25,6 @@ export type {
   WsClientMessage,
   WsServerEvent,
 } from './api-types'
-
+export type { CreateServerOptions, RuntimeServer } from './server'
 // The Node host factory (real routing arrives in steps 3 / 4A / 4B).
 export { createServer } from './server'
-export type { CreateServerOptions, RuntimeServer } from './server'

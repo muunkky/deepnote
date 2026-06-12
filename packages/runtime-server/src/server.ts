@@ -9,7 +9,7 @@
  * deps; it must never import a frontend toolchain.
  */
 
-import { type Server, createServer as createHttpServer } from 'node:http'
+import { createServer as createHttpServer, type Server } from 'node:http'
 
 /** Options accepted by {@link createServer}. Expanded in later phases. */
 export interface CreateServerOptions {
@@ -75,7 +75,7 @@ export function createServer(_options: CreateServerOptions = {}): RuntimeServer 
     },
     close(): Promise<void> {
       return new Promise<void>((resolve, reject) => {
-        http.close((err) => (err ? reject(err) : resolve()))
+        http.close(err => (err ? reject(err) : resolve()))
       })
     },
   }

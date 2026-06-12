@@ -15,12 +15,7 @@
  * types entry stays *honest* (there).
  */
 
-import type {
-  ApiProject,
-  KernelFailureCategory,
-  WsClientMessage,
-  WsServerEvent,
-} from '@deepnote/runtime-server/types'
+import type { ApiProject, KernelFailureCategory, WsClientMessage, WsServerEvent } from '@deepnote/runtime-server/types'
 
 // Use each identifier at the type level so an unused-import or a broken export
 // surfaces as a typecheck error rather than passing vacuously.
@@ -42,4 +37,7 @@ export const describeEvent = (): string => {
   }
 }
 
-export type Contract = { project: _Project; client: _Client }
+export interface Contract {
+  project: _Project
+  client: _Client
+}

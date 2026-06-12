@@ -153,15 +153,24 @@ const INTEGRATIONS_FILE = join(EXAMPLES_DIR, '3_integrations.deepnote')
 // Multi-format conversion fixtures (.ipynb/.py/.qmd) live at <repo-root>/test-fixtures/formats.
 // Anchored to the same module-relative REPO_ROOT so they share the CWD-independent base.
 const TEST_FIXTURES_FORMATS_DIR = join(REPO_ROOT, 'test-fixtures', 'formats')
+const JUPYTER_FILE = join(TEST_FIXTURES_FORMATS_DIR, 'jupyter', 'basic.ipynb')
+const PERCENT_FILE = join(TEST_FIXTURES_FORMATS_DIR, 'percent', 'basic-cells.percent.py')
+const QUARTO_FILE = join(TEST_FIXTURES_FORMATS_DIR, 'quarto', 'basic.qmd')
 
 // Fail loudly and precisely if a fixture is missing/relocated, instead of
 // letting the absence surface as an opaque FileResolutionError buried inside
 // an unrelated assertion. This runs at module load, before any test (and
 // before the describe-body resolveUpstreamTargetPair calls), so a bad
-// base dir is caught immediately with the offending absolute path.
+// base dir — or a single missing fixture file inside an intact dir — is
+// caught immediately with the offending absolute path.
 for (const fixtureDir of [EXAMPLES_DIR, TEST_FIXTURES_FORMATS_DIR]) {
   if (!fs.existsSync(fixtureDir)) {
     throw new Error(`Test fixture dir missing at ${fixtureDir} — check REPO_ROOT (resolved from import.meta.url)`)
+  }
+}
+for (const fixtureFile of [HELLO_WORLD_FILE, BLOCKS_FILE, INTEGRATIONS_FILE, JUPYTER_FILE, PERCENT_FILE, QUARTO_FILE]) {
+  if (!fs.existsSync(fixtureFile)) {
+    throw new Error(`Test fixture file missing at ${fixtureFile} — check REPO_ROOT (resolved from import.meta.url)`)
   }
 }
 
@@ -2832,12 +2841,10 @@ describe('run command', () => {
     let consoleErrorSpy: Mock
     let programErrorSpy: Mock
 
-    // Test fixtures for different formats — anchored to the module-relative
-    // TEST_FIXTURES_FORMATS_DIR (not process.cwd()) so they resolve regardless
-    // of the CWD vitest is launched from.
-    const JUPYTER_FILE = join(TEST_FIXTURES_FORMATS_DIR, 'jupyter', 'basic.ipynb')
-    const PERCENT_FILE = join(TEST_FIXTURES_FORMATS_DIR, 'percent', 'basic-cells.percent.py')
-    const QUARTO_FILE = join(TEST_FIXTURES_FORMATS_DIR, 'quarto', 'basic.qmd')
+    // Multi-format fixtures (JUPYTER_FILE / PERCENT_FILE / QUARTO_FILE) are
+    // defined at module scope (anchored to the module-relative
+    // TEST_FIXTURES_FORMATS_DIR, not process.cwd()) and validated by the
+    // module-load fixture-file guard above.
 
     beforeEach(() => {
       vi.clearAllMocks()

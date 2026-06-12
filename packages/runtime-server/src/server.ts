@@ -1,26 +1,34 @@
 /**
  * `@deepnote/runtime-server` Node host factory.
  *
- * **s1 scaffold stub.** This card (m3/s1 step 2) establishes the package boundary
- * and the {@link createServer} factory *shape* only — `listen`/`close` lifecycle
- * over a bare `node:http` server. The real HTTP router (`GET /api/project`,
- * `POST /…/run`, `POST /api/project/save`) and the `ws` `/api/stream` fan-out land
- * in steps 3 / 4A / 4B. Keep this module's imports to Node built-ins + the runtime
- * deps; it must never import a frontend toolchain.
+ * **s1 step 3.** Establishes the {@link createServer} factory and wires the first HTTP
+ * route, `GET /api/project`, served from an opened {@link Session} (KD-6 — no kernel).
+ * The `POST /…/run` execute routes and the `ws` `/api/stream` fan-out land in steps 4A /
+ * 4B. Keep this module's imports to Node built-ins + the runtime deps; it must never
+ * import a frontend toolchain.
  */
 
-import { createServer as createHttpServer, type Server } from 'node:http'
+import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import { createRouter } from './router'
+import type { Session } from './session'
 
 /** Options accepted by {@link createServer}. Expanded in later phases. */
 export interface CreateServerOptions {
   /**
+   * The opened-project session backing `GET /api/project`. Constructed and
+   * `loadProject()`-ed by the caller (the `serve` command, step 5) **before**
+   * `createServer` so opening stays async and kernel-free (KD-6); the factory itself is
+   * synchronous. Omitted in the scaffold lifecycle test, where every request 503s.
+   */
+  session?: Session
+  /**
    * Bounded run-queue depth before new runs are rejected (design doc R4). Wired
-   * in step 3; accepted here so the option surface is stable from the scaffold.
+   * in step 4A; accepted here so the option surface is stable from the scaffold.
    */
   runQueueDepth?: number
   /**
    * Per-block within-block back-pressure bound, in bytes (design doc S1, default
-   * 8 MiB). Wired in step 3.
+   * 8 MiB). Wired in step 4A.
    */
   wsHighWaterMark?: number
 }
@@ -42,18 +50,23 @@ export interface RuntimeServer {
 /**
  * Construct a {@link RuntimeServer}.
  *
- * **Stub.** Returns a lifecycle-clean handle over a bare `node:http` server that
- * 503s every request (no routes are wired yet). The factory exists so downstream
- * (`packages/cli`, tests) can compose against a stable surface from step 2; real
- * routing arrives in steps 3 / 4A / 4B.
+ * With a `session` (the normal path), requests route through {@link createRouter}, which
+ * serves `GET /api/project` from the opened project (KD-6 — no kernel) and `404`s unknown
+ * routes; the `POST /…/run` execute routes arrive in steps 4A / 4B. Without a session (the
+ * scaffold lifecycle test), every request 503s — the factory's `listen`/`close` surface is
+ * still exercisable without opening a project.
  */
-export function createServer(_options: CreateServerOptions = {}): RuntimeServer {
-  const http: Server = createHttpServer((_req, res) => {
-    // No routes wired in the scaffold; every request is "not implemented yet".
-    res.statusCode = 503
-    res.setHeader('content-type', 'application/json')
-    res.end(JSON.stringify({ error: 'not-implemented', phase: 'scaffold' }))
-  })
+export function createServer(options: CreateServerOptions = {}): RuntimeServer {
+  const requestListener = options.session
+    ? createRouter(options.session)
+    : (_req: IncomingMessage, res: ServerResponse): void => {
+        // No session bound (scaffold lifecycle test): nothing is open to serve.
+        res.statusCode = 503
+        res.setHeader('content-type', 'application/json')
+        res.end(JSON.stringify({ error: 'no-project-loaded' }))
+      }
+
+  const http: Server = createHttpServer(requestListener)
 
   return {
     listen(port: number): Promise<number> {

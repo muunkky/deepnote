@@ -7,9 +7,9 @@
  * `@deepnote/mcp`; `packages/cli` consumes the root entry, while the m3/s2 SPA
  * imports the Node-free contract from the `./types` subpath.
  *
- * **s1 scope:** this step (server-package scaffold) establishes the package
- * boundary, the canonical `api-types` contract module, and a `createServer` stub.
- * Real HTTP/WS routing lands in later phases.
+ * **s1 scope:** the package boundary, the canonical `api-types` contract module, the
+ * `createServer` factory, and (this step) the opened-project `Session` plus the
+ * `GET /api/project` route. Execute/stream routing lands in later phases.
  *
  * @packageDocumentation
  */
@@ -25,6 +25,11 @@ export type {
   WsClientMessage,
   WsServerEvent,
 } from './api-types'
+// The HTTP router; consumed by `createServer` and the execute routes (steps 4A / 4B).
+export { createRouter } from './router'
 export type { CreateServerOptions, RuntimeServer } from './server'
-// The Node host factory (real routing arrives in steps 3 / 4A / 4B).
+// The Node host factory (execute/stream routing arrives in steps 4A / 4B).
 export { createServer } from './server'
+export type { LoadProjectOptions } from './session'
+// The opened-project lifecycle (KD-6 `loadProject`/`startEngine` split).
+export { Session } from './session'

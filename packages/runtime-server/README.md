@@ -6,9 +6,10 @@ and streams ordered, run-id-tagged execution events over a WebSocket. It compose
 `runtime-core` exactly the way `packages/cli`'s `run` command does; the kernel port
 never reaches the browser.
 
-> **Status (m3/s1):** scaffold. This step establishes the package boundary, the
-> canonical API-contract module, and a `createServer` stub. The HTTP router and the
-> `ws` `/api/stream` fan-out land in later steps (3 / 4A / 4B).
+> **Status (m3/s1):** the package boundary, the canonical API-contract module, the
+> `createServer` factory, and the first HTTP route — `GET /api/project` — are in place.
+> The `POST /…/run` execute routes and the `ws` `/api/stream` fan-out land in later steps
+> (4A / 4B).
 
 ## Layout (ADR-007 §6)
 
@@ -33,6 +34,58 @@ Exported from `./types` (single source of truth for the s1 ↔ SPA wire shape):
 - **`WsServerEvent`** — the server → client WS event union. `run-done` is the
   **guaranteed** terminal event on every run that resolves; `run-failed` is terminal
   for kernel death only.
+
+## `GET /api/project` — open + read the project (no kernel)
+
+Opening a project is pure deserialization + resolution metadata (KD-6): a viewer renders
+the persisted notebook/block tree **with no kernel running**. The flow:
+
+```ts
+import { createServer, Session } from "@deepnote/runtime-server";
+
+const session = new Session();
+await session.loadProject("/abs/path/notebook.deepnote"); // reads bytes, hashes, deserializes — no kernel
+const server = createServer({ session });
+await server.listen(3000);
+```
+
+`loadProject` is the `loadProject()` / `startEngine()` split (KD-6): it never starts a
+kernel, so the endpoint works even when the kernel is mis-installed.
+
+**Request:** `GET /api/project`
+
+**`200` response (`ApiProject`):**
+
+```jsonc
+{
+  "path": "/abs/path/notebook.deepnote", // resolved absolute path of the opened file
+  "metadata": { "createdAt": "…" }, // === DeepnoteFile['metadata']
+  "project": {
+    "notebooks": [
+      /* … */
+    ],
+  }, // full tree, persisted outputs intact
+  "openHash": "<hex sha256 of the on-disk bytes>", // stable; echoed back on save
+  "capabilities": {
+    "kernelLanguage": "python", // 'python' | <kernel name> | null (mis-installed)
+    "reactivity": "disabled", // always 'disabled' in s1; 'python' activates in m3/s5
+  },
+}
+```
+
+The returned `metadata` + `project` deep-equal `deserializeDeepnoteFile(<same bytes>)` —
+the viewer sees exactly what the file contains. `openHash` is a hex SHA-256 of the on-disk
+bytes at open time, used for save-time external-change detection (KD-7).
+
+**Errors:**
+
+| Status          | When                                                                                  |
+| :-------------- | :------------------------------------------------------------------------------------ |
+| `400 { error }` | the project path is unreadable / unresolvable, or the file is not a valid `.deepnote` |
+| `404 { error }` | unknown route, or a non-`GET` method on `/api/project` (s1 is read-only)              |
+
+A **missing or mis-installed kernel is not an error** — it surfaces as
+`capabilities.kernelLanguage: null`, and the full tree is still returned (KD-6).
 
 ## Dependencies
 

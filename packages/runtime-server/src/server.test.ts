@@ -33,7 +33,7 @@ describe('createServer (scaffold stub)', () => {
     expect(() => createServer({ runQueueDepth: 8, wsHighWaterMark: 8 * 1024 * 1024 })).not.toThrow()
   })
 
-  it('listen(port, host) constrains the bind to that interface', async () => {
+  it('listen(port, "127.0.0.1") binds the server to loopback, never 0.0.0.0', async () => {
     const server = createServer()
 
     // Bind explicitly to loopback (the `deepnote serve` path). The OS picks the port.
@@ -42,24 +42,38 @@ describe('createServer (scaffold stub)', () => {
 
     // Reachable on loopback…
     expect(await canConnect(port)).toBe(true)
-    const address = await boundAddress(port)
-    // …and bound to loopback, not the unspecified address — the security guarantee
-    // the serve command relies on (never 0.0.0.0).
-    expect(address).toBe('127.0.0.1')
+    // …and the *server-side* bound interface is loopback, never the unspecified address.
+    // This reads `http.address().address` (the authoritative bind interface), not a client
+    // socket's `localAddress` — a loopback client connection always reports `127.0.0.1`
+    // regardless of the server's bind, so only the server-side address distinguishes a
+    // loopback-only bind from an all-interfaces (`0.0.0.0`) bind. This is the security
+    // guarantee the serve command relies on; mutating the impl to bind `0.0.0.0` makes the
+    // next assertion fail.
+    expect(server.boundAddress()).toBe('127.0.0.1')
+    expect(server.boundAddress()).not.toBe('0.0.0.0')
 
     await server.close()
     expect(await canConnect(port)).toBe(false)
+    // After close the listener has no bound address.
+    expect(server.boundAddress()).toBeNull()
+  })
+
+  it('listen(port) with no host binds the unspecified (all-interfaces) address', async () => {
+    // The omitted-host lifecycle path: Node binds the unspecified address (all interfaces).
+    // The negative leg of the loopback guarantee — if `serve`'s loopback bind ever silently
+    // regressed to all-interfaces, the server-side address would read as the unspecified
+    // address (this branch), and the loopback assertion above would fail.
+    const server = createServer()
+
+    const port = await server.listen(0)
+    expect(port).toBeGreaterThan(0)
+
+    const address = server.boundAddress()
+    // IPv4 `0.0.0.0` or IPv6 `::`, depending on the host's default protocol — either is the
+    // unspecified address, and crucially NOT the `127.0.0.1` the loopback bind reports.
+    expect(['0.0.0.0', '::']).toContain(address)
+    expect(address).not.toBe('127.0.0.1')
+
+    await server.close()
   })
 })
-
-/** Resolve the local address a connection to `port` lands on, or null if unreachable. */
-function boundAddress(port: number): Promise<string | null> {
-  return new Promise<string | null>(resolve => {
-    const socket = createConnection({ host: '127.0.0.1', port }, () => {
-      const addr = socket.localAddress ?? null
-      socket.destroy()
-      void resolve(addr)
-    })
-    socket.once('error', () => void resolve(null))
-  })
-}

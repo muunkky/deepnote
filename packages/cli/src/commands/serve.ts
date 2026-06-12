@@ -3,6 +3,7 @@ import {
   type CreateServerOptions,
   createServer as createRuntimeServer,
   type RuntimeServer,
+  type ServerSession,
   Session,
 } from '@deepnote/runtime-server'
 import type { Command } from 'commander'
@@ -56,22 +57,13 @@ export interface ServeDeps {
   /** Resolve a free **single** port to bind (see the port-selection note on {@link createServeAction}). */
   findPort: (startPort: number) => Promise<number>
   /** Construct the (already-loaded) session for an opened project path. */
-  createSession: (path: string, options: { python?: string; kernel?: string }) => Promise<SessionLike>
+  createSession: (path: string, options: { python?: string; kernel?: string }) => Promise<ServerSession>
   /** Construct the runtime server around a session. */
   createServer: (options: CreateServerOptions) => RuntimeServer
   /** Open the served URL in a browser (the `--open` / `ui` path). */
   openBrowser: (url: string) => Promise<void>
   /** Register a `SIGINT` handler. Defaults to `process.on('SIGINT', …)`; overridable in tests. */
   onSigint: (handler: () => void) => void
-}
-
-/**
- * The session surface `serve` drives: it is constructed + `loadProject`-ed by {@link ServeDeps.createSession},
- * passed to the server, and `close()`-d on shutdown (which stops the engine — `engine.stop()`). The
- * concrete `Session` from `@deepnote/runtime-server` satisfies this; tests pass a spy.
- */
-export interface SessionLike {
-  close(): Promise<void>
 }
 
 /** Production wiring for {@link ServeDeps}: the real server, real port finder, real browser opener. */

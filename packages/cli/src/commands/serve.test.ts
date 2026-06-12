@@ -1,9 +1,9 @@
 import { resolve } from 'node:path'
-import type { CreateServerOptions, RuntimeServer } from '@deepnote/runtime-server'
+import type { CreateServerOptions, RuntimeServer, ServerSession } from '@deepnote/runtime-server'
 import { Command } from 'commander'
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import { resetOutputConfig } from '../output'
-import { createServeAction, type ServeDeps, type ServeOptions, type SessionLike } from './serve'
+import { createServeAction, type ServeDeps, type ServeOptions } from './serve'
 
 /**
  * Suite 6 (mocked). These tests exercise the assembled `createServeAction` against fakes for the
@@ -48,7 +48,24 @@ function makeHarness(opts: { findPortResult: number; listenResult: number }): Ha
 
   let sigintHandler: (() => void) | undefined
 
-  const session: SessionLike = { close: sessionClose }
+  // `serve` only drives `session.close()` (via the server's close → engine.stop()); the rest of
+  // the `ServerSession` surface (apiProject/startEngine/runProject/save) is the server's concern,
+  // not the command's, so those are guard stubs that throw if the thin action ever touches them.
+  const session: ServerSession = {
+    close: sessionClose,
+    apiProject: () => {
+      throw new Error('serve must not call session.apiProject')
+    },
+    startEngine: () => {
+      throw new Error('serve must not call session.startEngine')
+    },
+    runProject: () => {
+      throw new Error('serve must not call session.runProject')
+    },
+    save: () => {
+      throw new Error('serve must not call session.save')
+    },
+  }
 
   const server: RuntimeServer = {
     listen: vi.fn((port: number, host?: string) => {
@@ -57,6 +74,7 @@ function makeHarness(opts: { findPortResult: number; listenResult: number }): Ha
       // (createServer's close() → session.close() → engine.stop()).
       return Promise.resolve(opts.listenResult)
     }),
+    boundAddress: vi.fn(() => '127.0.0.1'),
     close: vi.fn(async () => {
       await sessionClose()
       await serverClose()

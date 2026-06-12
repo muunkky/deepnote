@@ -12,6 +12,7 @@
  */
 
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import type { Duplex } from 'node:stream'
 import { WebSocket, WebSocketServer } from 'ws'
 import type { WsClientMessage, WsServerEvent } from './api-types'
@@ -61,6 +62,15 @@ export interface RuntimeServer {
    * any host on the network drive the user's kernel).
    */
   listen(port: number, host?: string): Promise<number>
+  /**
+   * The authoritative server-side bound address — the `AddressInfo.address` the OS reports for
+   * the live listener (e.g. `'127.0.0.1'` for the loopback `serve` bind, or `'0.0.0.0'` / `'::'`
+   * for the unspecified-address lifecycle path). `null` before {@link RuntimeServer.listen} has
+   * resolved or after {@link RuntimeServer.close}. This is the *server's* bound interface, not the
+   * client end of a connection — the only sound way to assert the loopback security boundary the
+   * `serve` command depends on (never `0.0.0.0`).
+   */
+  boundAddress(): string | null
   /** Stop listening, close the WS server + the session's engine, and release the port. */
   close(): Promise<void>
 }
@@ -144,6 +154,7 @@ export function createServer(options: CreateServerOptions = {}): RuntimeServer {
   const handle = httpHandle(http)
   return {
     listen: handle.listen,
+    boundAddress: handle.boundAddress,
     async close(): Promise<void> {
       // Stop accepting new sockets, drop the engine, then close the HTTP listener.
       await new Promise<void>(resolve => wss.close(() => resolve()))
@@ -203,9 +214,7 @@ function httpHandle(http: Server): RuntimeServer {
         }
         const onListening = (): void => {
           http.off('error', onError)
-          const address = http.address()
-          // `address` is an `AddressInfo` for a TCP listener (never a string here).
-          resolve(typeof address === 'object' && address !== null ? address.port : port)
+          resolve(addressInfo(http)?.port ?? port)
         }
         http.once('error', onError)
         http.once('listening', onListening)
@@ -218,10 +227,23 @@ function httpHandle(http: Server): RuntimeServer {
         }
       })
     },
+    boundAddress(): string | null {
+      return addressInfo(http)?.address ?? null
+    },
     close(): Promise<void> {
       return new Promise<void>((resolve, reject) => {
         http.close(err => (err ? reject(err) : resolve()))
       })
     },
   }
+}
+
+/**
+ * The TCP {@link AddressInfo} of a listening `node:http` server, or `null` when it is not
+ * listening. `Server.address()` returns a string only for a UNIX-socket/pipe listener; this
+ * host always binds a TCP port, so the string/`null` cases collapse to "not bound".
+ */
+function addressInfo(http: Server): AddressInfo | null {
+  const address = http.address()
+  return typeof address === 'object' && address !== null ? address : null
 }

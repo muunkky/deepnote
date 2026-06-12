@@ -5,6 +5,43 @@ All notable changes to `@deepnote/runtime-core` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0]
+
+A minor (additive) release adding non-Python kernel selection to the runtime. It adds
+new public exports and two optional `RuntimeConfig` fields, and widens
+`KernelClient.connect` with an optional parameter — no existing exported signature
+changes.
+
+### Added
+
+#### Alternative-language kernel selection (PRD-002 Phase 1)
+
+Powers the new `deepnote run --kernel <name>` CLI flag: a notebook can now run on any
+Jupyter kernel registered with the `deepnote-toolkit` server (e.g. `bash`, `ir`,
+`ijulia`), not just `python3`.
+
+- `selectKernelName({ explicit, declared })` (plus `SelectKernelNameOptions` and
+  `DEFAULT_KERNEL_NAME = 'python3'`) — a pure precedence resolver for the kernel name:
+  explicit `--kernel` flag > notebook-declared language (Phase 2, reserved) > the
+  `python3` default. Resolved on a channel independent of `DEEPNOTE_PYTHON` interpreter
+  selection.
+- `isNonPythonKernel(kernelName, language?)` — predicate used to gate Python-only
+  behaviour (value-add blocks, the reactivity AST analyzer) off on non-Python kernels.
+- `KernelClient.connect(serverUrl, kernelName?)` — now accepts an optional kernel name
+  (defaults to `python3`, so existing callers are unchanged), replacing the previously
+  hardcoded `python3`. Before connecting it pre-flights `GET /api/kernelspecs` and, when
+  the requested kernel is not registered, throws a typed `KernelNotRegisteredError`
+  listing the available kernels — instead of surfacing the server's opaque HTTP 500.
+- `KernelNotRegisteredError`, `KernelLaunchError`, `KernelDiedError` (plus the
+  `KernelFailureCategory` union and the `KernelspecSummary` type) — typed errors that let
+  callers distinguish missing-kernelspec, launch-failure, and mid-run kernel-death from
+  ordinary in-block errors.
+- `RuntimeConfig.kernelName?` and `RuntimeConfig.kernelStartupTimeoutMs?` — optional
+  fields that thread the selected kernel name and a configurable kernel startup/idle
+  timeout from configuration through `ExecutionEngine` into `KernelClient.connect`.
+
+Existing Python notebooks behave identically: every new surface defaults to `python3`.
+
 ## [0.5.0]
 
 A minor (additive) release that adds one new public export and changes no existing

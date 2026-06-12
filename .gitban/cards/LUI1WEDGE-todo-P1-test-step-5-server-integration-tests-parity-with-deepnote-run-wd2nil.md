@@ -1,0 +1,140 @@
+# step 5: server-integration-tests — parity with `deepnote run`
+
+> **Sprint**: LUI1WEDGE | **Step**: 5 | **Roadmap**: m3/s1/serve-api/server-integration-tests
+> **Depends on**: step 4A (execute-stream-ws, `hlai4c`) AND step 4B (save-api, `e6e3lt`). **Unblocks**: step 8 (contrib-diff-cut).
+
+## Test Overview
+
+**Test Type:** Integration (real-kernel)
+
+**Target Component:** `@deepnote/runtime-server` end-to-end — `GET /api/project`, run-all over WS, and the failure-category path — against a real toolkit venv.
+
+**Related Cards:** depends on `hlai4c` (execute-stream-ws) and `e6e3lt` (save-api); proves the documented launch criteria for the wedge.
+
+**Coverage Goal:** API↔`run` output parity for 100% of executable block types on a fixture, plus end-to-end failure-category legibility and a `serve` smoke.
+
+### Required Reading
+
+| Source | Section / lines | Why |
+| :--- | :--- | :--- |
+| `docs/designs/m3-s1-server-api-and-serve.md` | "Test strategy" suites 1 & 5; Phase 5 DoD; "Current State" test-infrastructure note | The parity suite, the integration failure-category test, and the vitest split. |
+| `vitest.integration.config.ts` | whole file | `*.integration.test.ts` collection, real venv, `test:integration`, `integration-kernels` CI job. |
+| `vitest.config.ts` | exclude glob | why mocked `pnpm test` never picks up integration tests. |
+| `packages/cli/src/commands/run.ts` | `runDeepnoteProject` (802+); `--output json` path | the `deepnote run` reference whose `IOutput`s the server must match. |
+| `packages/runtime-core/src/execution-engine.ts` | `runProject` (177); callbacks (72–74) | the engine path the server drives identically to `run`. |
+
+## Test Strategy
+
+### Test Pyramid Placement
+
+| Layer | Tests Planned | Rationale |
+|-------|---------------|-----------|
+| Unit | N/A | covered by step 4A/4B mocked suites |
+| Integration | 3 | real-kernel parity, failure-category legibility, serve smoke |
+| E2E | N/A | the serve smoke IS the e2e for s1 |
+| Performance | N/A | latency proven by the transport spike (ADR-005) |
+
+### Testing Approach
+- **Framework:** vitest via `vitest.integration.config.ts` (`test:integration`).
+- **Mocking Strategy:** none — real toolkit venv + real toolkit server; self-skips when no venv / `RUN_INTEGRATION_TESTS` unset.
+- **Isolation Level:** boot a server per test over a fixture; tear down (`engine.stop()`/`server.close()`).
+
+## Test Scenarios
+
+### Scenario 1: API ↔ `run` output parity
+- **Given:** a sample `.deepnote` fixture exercising 100% of executable block types, and a real toolkit venv.
+- **When:** boot the server, `GET /api/project`, run-all over WS, collect streamed `IOutput`s; separately run `deepnote run --output json` on the same file.
+- **Then:** the streamed `IOutput`s **deep-equal** `deepnote run`'s for the same file (R3 "identical outputs" — measured, not asserted), and events arrived in order.
+- **Priority:** Critical
+
+### Scenario 2: failure-category legibility end-to-end
+- **Given:** a deliberately-missing kernel name.
+- **When:** trigger a run through the server.
+- **Then:** the failure surfaces as `missing-kernel` end-to-end (the typed discriminant, not a stringified message), and the consumer gets a terminal event (does not hang).
+- **Priority:** Critical
+
+### Scenario 3: serve smoke (e2e)
+- **Given:** `deepnote serve fixture.deepnote --no-open` against a real venv.
+- **When:** the server boots and a client hits `GET /api/project`.
+- **Then:** the project tree is returned; the server shuts down cleanly.
+- **Priority:** High
+
+### Scenario 4: mid-run kernel death is terminal (real)
+- **Given:** a run that causes the kernel to die mid-execution.
+- **When:** the run is driven through the server.
+- **Then:** a terminal `run-failed { failureCategory:'kernel-died' }` is delivered and no further events arrive for that `runId`.
+- **Priority:** High
+
+## Test Data & Fixtures
+
+### Required Test Data
+| Data Type | Description | Source |
+|-----------|-------------|--------|
+| Sample project | fixture exercising 100% of executable block types | repo fixtures (extend if a type is uncovered) |
+| Missing-kernel project | a project resolving to a non-existent kernel name | constructed in-test |
+| Toolkit venv | `deepnote-toolkit[server]` (+ `bash_kernel` per existing integration setup) | CI `integration-kernels` job / local venv |
+
+### Edge Case Data
+- **Empty/Null:** N/A (parity over a real fixture)
+- **Maximum Values:** N/A
+- **Invalid Formats:** missing-kernel name (Scenario 2)
+- **Unicode/Special Chars:** whatever the fixture's block outputs contain
+
+### Fixture Setup
+```
+boot server over fixture → GET /api/project → open WS → POST /api/project/run
+→ collect WsServerEvent[] until terminal → compare IOutputs to `deepnote run --output json`
+```
+
+## Implementation Checklist
+
+### Setup Phase
+- [ ] Test file[s] created in correct location
+- [ ] Test fixtures/factories defined
+- [ ] Mocks and stubs configured
+- [ ] Test database/state initialized [if needed]
+
+### Test Implementation
+- [ ] Happy path tests written and passing
+- [ ] Edge case tests written and passing
+- [ ] Error handling tests written and passing
+- [ ] Negative/security tests written and passing
+- [ ] Performance assertions added [if applicable]
+
+### Quality Gates
+- [ ] All tests pass locally
+- [ ] All tests pass in CI
+- [ ] No flaky tests introduced
+- [ ] Test execution time acceptable
+- [ ] Code coverage meets target [if applicable]
+
+### Documentation
+- [ ] Test file has clear docstrings/comments
+- [ ] Complex test logic explained
+- [ ] Setup/teardown documented
+
+## Definition of Done
+
+### Intent
+
+The wedge's headline promise — "the server runs your project exactly the way `deepnote run` does" — is proven against a real kernel, not asserted. Anyone reviewing the contribution can run one CI job and see that the bytes streamed over the server match the CLI's output for every executable block type, that a misconfigured kernel produces a legible, categorized failure instead of an opaque hang, and that `deepnote serve` actually boots and serves a real project. If this breaks, the wedge would ship with a credibility gap: a maintainer couldn't trust that the API path and the CLI path produce the same results.
+
+### Observable outcomes
+
+- [ ] **Capstone:** the streamed `IOutput`s from a server-driven run-all **deep-equal** `deepnote run --output json`'s for the same fixture, covering 100% of executable block types — green in the `integration-kernels` job.
+- [ ] A deliberately-missing kernel yields `missing-kernel` end-to-end (typed discriminant) with a terminal event (no hang).
+- [ ] `deepnote serve fixture.deepnote --no-open` serves a `GET /api/project` returning the tree (integration smoke) and shuts down cleanly.
+- [ ] The suite runs only under `test:integration` / `integration-kernels` (never in mocked `pnpm test`).
+
+## Acceptance Criteria
+
+- [ ] All planned scenarios have corresponding tests
+- [ ] Tests are deterministic [no flakiness]
+- [ ] Tests run in isolation [no order dependency]
+- [ ] Tests are fast enough for CI [within the integration job's per-test budget]
+- [ ] Coverage target met: 100% of executable block types in the parity fixture
+- [ ] Tests follow project conventions
+
+## Notes
+
+Reuses the exact `vitest.integration.config.ts` split and the `integration-kernels` CI job; no new test infrastructure. If the parity fixture is missing a block type, extend the fixture rather than narrowing the claim.

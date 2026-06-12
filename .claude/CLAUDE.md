@@ -66,6 +66,21 @@ We work **in lockstep with gitban on the fork**, then slice clean PRs out for up
 process diff. If a maintainer asks for an ADR/PRD upstream, add _that specific doc_ to the clean PR —
 otherwise the contribution diff stays code-only.
 
+## Showcase thread (dry run on our own fork)
+
+We run the maintainer-facing showcase on our **OWN fork** (`muunkky/deepnote`) first — a dry run of the
+eventual upstream engagement. Nothing goes to `deepnote/deepnote` yet; once the dry run reads well and we
+have a diff we're proud of, this same thread/format becomes the template for the real upstream post.
+
+- **The thread:** one showcase thread on `muunkky/deepnote` (a GitHub Discussion, or an issue) — record
+  its number here once opened: `#<thread>`. The **first post is hand-written / approved by Cameron**
+  (prevents overzealousness).
+- **After each sprint/milestone closes:** post an announcement comment in the thread — what shipped, link
+  the process diff, label which part is upstream-ready vs fork-only showcase.
+- **Label every linked diff** "upstream-ready" or "fork-only showcase."
+- **No upstream posting or PRs yet:** nothing goes to `deepnote/deepnote` until we explicitly decide the
+  dry run is ready; feature offers then follow the #288 pattern (offer + link both diffs + wait).
+
 ## Local dev setup
 
 **Baseline — needed for any contribution.** TypeScript monorepo, pnpm workspace.

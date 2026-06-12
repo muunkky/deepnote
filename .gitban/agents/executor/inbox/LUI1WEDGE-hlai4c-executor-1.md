@@ -65,3 +65,34 @@ misses the cold-module-graph python-subprocess probe; not a logic issue).
 
 This card is in sprint **LUI1WEDGE** — do not push a feature branch or open a PR; the dispatcher owns
 sprint lifecycle.
+
+---
+
+## ROUTER UPDATE (review-1): APPROVAL — close out the card
+
+The code for card hlai4c has been **approved** as of commit `955c41d`. Use the gitban tools to update
+the card and complete the close-out:
+
+- Use gitban's checkbox tools to ensure all checkboxes for completed work are checked off if not already.
+- Do not mark any work as deferred. This card will be closed and archived and likely never seen again.
+- Use gitban's complete-card tool to submit and validate if not already completed.
+
+### Close-out items (no code changes)
+
+The reviewer confirmed the following checkboxes are **honestly left unchecked** because they are not
+executor deliverables for a wedge-internal package — **leave them unchecked, do not self-approve**:
+
+- `API contract is reviewed and approved by team/stakeholders` — team/stakeholder action.
+- `Performance validated against requirements` — real-kernel parity/perf is step 5's integration suite;
+  the card's own Performance row is N/A.
+- `Monitoring and alerts configured` / `API is deployed to production and verified working` /
+  `Client communication sent` — release-owned, not deliverables for this wedge-internal package.
+
+### Follow-ups are NOT yours to fix
+
+The reviewer flagged three non-blocking follow-up items (L1 `run-start.totalBlocks` contract lie,
+L2 dead-engine-not-reset lifecycle gap, L3 `wsLowWaterMark`/`drainPollMs` config-surface gap). These are
+being routed to the **planner** as separate sprint cards. **Do NOT** attempt to fix them under this card.
+
+Note: You are closing out this card only. The dispatcher owns sprint lifecycle — do not close, archive,
+or finalize the sprint itself.

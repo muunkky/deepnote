@@ -56,13 +56,13 @@
 | Phase / Task | Status / Link to Artifact or Card | Universal Check |
 | :--- | :--- | :---: |
 | **API Contract Design** | `WsClientMessage`/`WsServerEvent` in `api-types.ts` | - [x] OpenAPI/Swagger spec is complete and reviewed. |
-| **Contract Review** | reviewer | - [ ] API contract is reviewed and approved by team/stakeholders. |
+| **Contract Review** | reviewer | - [ ] API contract is reviewed and approved by team/stakeholders deferred to od8esg. |
 | **TDD Implementation** | `run-queue.ts`, `session.startEngine()`/`runProject()`, WS fan-out, adapter | - [x] TDD workflow followed (tests first, then implementation). |
 | **Integration Tests** | a real run streams ordered events matching `deepnote run` (full coverage in step 5) | - [x] Integration tests cover happy path and error cases. |
 | **Security Review** | kernel port never reaches the socket | - [x] Security requirements validated (auth, input validation, rate limiting). |
 | **API Documentation** | README WS contract (ADR-005 app-level contract verbatim) | - [x] API documentation is complete with examples and error codes. |
 | **Client SDK Updates** | N/A | - [x] Client SDKs updated [if applicable] or follow-up cards created. |
-| **Deployment** | N/A | - [ ] API is deployed and verified in production. |
+| **Deployment** | N/A | - [ ] API is deployed and verified in production deferred to od8esg. |
 
 ## Definition of Done
 
@@ -91,7 +91,7 @@ A concurrent UI can fire runs at a server that fronts exactly one sequential ker
 | **4. Run Passing Tests** | mocked suites green | - [x] All integration tests pass, API behavior verified. |
 | **5. Add Error Handling Tests** | failure-category mapping (each typed error → correct shape); 400 bad ids; 429 at depth | - [x] Error handling tests written and passing. |
 | **6. Security Tests** | kernel port never written to socket | - [x] Security tests validate auth, input sanitization, rate limiting. |
-| **7. Performance Tests** | N/A (latency is the spike's; covered by integration parity in step 5) | - [ ] Performance validated against requirements [if applicable]. |
+| **7. Performance Tests** | N/A (latency is the spike's; covered by integration parity in step 5) | - [ ] Performance validated against requirements [if applicable] deferred to wd2nil. |
 | **8. Regression Suite** | package + repo test green | - [x] Full regression suite passed, no existing APIs broken. |
 
 #### API Implementation Notes
@@ -137,17 +137,17 @@ A concurrent UI can fire runs at a server that fronts exactly one sequential ker
 ### Completion Checklist
 
 - [x] OpenAPI/Swagger specification is complete and merged.
-* [ ] API contract is reviewed and approved by team/stakeholders.
+* [ ] API contract is reviewed and approved by team/stakeholders deferred to od8esg.
 - [x] TDD workflow followed: tests written first, then implementation.
 - [x] All integration tests pass (happy path + error cases).
 - [x] Security requirements validated (authentication, authorization, input validation, rate limiting).
 - [x] API documentation is complete with request/response examples and error codes.
-* [ ] Performance validated against requirements [if applicable].
+* [ ] Performance validated against requirements [if applicable] deferred to wd2nil.
 - [x] Client SDKs updated or follow-up cards created.
 - [x] API changelog updated with new endpoints and changes.
-* [ ] Monitoring and alerts configured for the new API.
-* [ ] API is deployed to production and verified working.
-* [ ] Client communication sent (email, Slack, API portal announcement).
+* [ ] Monitoring and alerts configured for the new API deferred to od8esg.
+* [ ] API is deployed to production and verified working deferred to od8esg.
+* [ ] Client communication sent (email, Slack, API portal announcement) deferred to od8esg.
 
 
 ## Executor close-out (executor-1, step 4A)
@@ -183,3 +183,14 @@ Honest scope: the **real-kernel API↔`deepnote run` parity** (design-doc suite 
 - **P4 coalescing · P6 running-cancel · `runScope:'with-upstream'`** — settled m3/s5 deferrals (design-review B2/B3/S2); not implemented by directive.
 - **Real-kernel parity, performance metrics** — step 5 integration suite (`Performance validated` left unchecked; `N/A` per the card's own Performance row).
 - **"API contract reviewed/approved by team", production deploy, monitoring/alerts, client comms** — reviewer-/release-owned, not an executor deliverable for a wedge-internal package; left unchecked honestly rather than self-approved.
+
+
+
+
+## Review log (router-1)
+
+- **review-1 verdict: APPROVAL** (commit `955c41d`, 2026-06-12)
+- Review report: `.gitban/agents/reviewer/inbox/LUI1WEDGE-hlai4c-reviewer-1.md`
+- Gate 1 (completion claim): PASS — DoD exemplary, four genuine unfakeable capstones, M2 structural invariant verified with negative control.
+- Gate 2 (implementation quality): PASS — real TDD, both back-pressure regimes proven behaviorally, failure-category fidelity from typed instances, no lazy solves, no security issues. 45/45 tests pass; build + types-subpath + biome clean.
+- **Routing:** Executor → close out the card (`.gitban/agents/executor/inbox/LUI1WEDGE-hlai4c-executor-1.md`). Three non-blocking follow-ups (L1 `run-start.totalBlocks` contract lie, L2 dead-engine-not-reset lifecycle gap, L3 `wsLowWaterMark`/`drainPollMs` config-surface gap) routed to planner as separate sprint cards (`.gitban/agents/planner/inbox/LUI1WEDGE-hlai4c-planner-1.md`).

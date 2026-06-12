@@ -249,3 +249,13 @@ packages/runtime-server/src/router-save.test.ts.
 ### Spell-check note (environment, not content)
 
 `pnpm spell-check` (and per-file `cspell lint`) report `Files checked: 0` in this worktree — the same cspell worktree glob-resolution quirk executor-1 flagged, not a content issue. My additions use only standard/established project vocabulary already in the tree (`deepnoteFileSchema`, `openHash`, `sha256`, `utf-8`, `zod`, idempotent). Flagging for the PR/closeout agent to re-verify spell-check from the parent repo.
+
+
+## Review log — reviewer-2 (router-2)
+
+- **Verdict:** APPROVAL (Gate 1 PASS, Gate 2 PASS) at commit `31f9a87`.
+- **Review report:** `.gitban/agents/reviewer/inbox/LUI1WEDGE-e6e3lt-reviewer-2.md`
+- **Context:** review cycle 2 of the reopened save-endpoint hardening (L1/L2/L3). All three cycle-1 follow-ups resolved by `31f9a87`: L1 input-validation gap now returns 400 (not 500) via `deepnoteFileSchema.safeParse` before the write; L2 hash-encoding asymmetry removed by hashing the raw Buffer on both sides (byte-identical to `session.ts`); L3 409/200 wire bodies annotated `SaveConflictResponse`/`SaveProjectResponse`. Scope honored — only `router.ts`, `save.ts`, `router-save.test.ts` touched.
+- **Verification (reviewer-confirmed):** full runtime-server suite **59/59 PASS** (incl. new L1 400-no-write case), `biome check` clean, `tsc --noEmit` clean, ADR-007 runtime-import invariant green.
+- **Routing:** Executor → close out & complete this card (`.gitban/agents/executor/inbox/LUI1WEDGE-e6e3lt-executor-2.md`). No blockers; no non-blocking follow-ups; no close-out items beyond standard completion.
+- **Out of scope (unchanged):** backlog `ad6kmb` (open→save `ApiProject` reconstruction gap) remains correctly deferred and tracked.

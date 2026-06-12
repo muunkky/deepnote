@@ -66,3 +66,29 @@ A lint/spell failure is a completion failure. The package vitest suite is best r
 
 This card is in sprint **LUI1WEDGE** — do not push a feature branch or open a PR; the dispatcher owns
 sprint lifecycle.
+
+---
+
+## ✅ APPROVAL — close out this card (router-2, post-review)
+
+The rework above (L1/L2/L3) is **complete and APPROVED** as of commit `31f9a87`
+(Gate 1 PASS, Gate 2 PASS — review `.gitban/agents/reviewer/inbox/LUI1WEDGE-e6e3lt-reviewer-2.md`).
+The reviewer verified: full runtime-server suite **59/59 PASS** (incl. the new L1 400-no-write case),
+`biome check` clean, `tsc --noEmit` clean, ADR-007 runtime-import invariant still green. **No blockers,
+no follow-up items.** Proceed to close-out:
+
+## Card Close-out tasks
+- Use gitban's checkbox tools to ensure all checkboxes on the card are checked off for completed work
+  if not already (including the three L1/L2/L3 reopen checkboxes, which are now durably committed).
+- Do not mark any work as deferred. This card will be closed and archived and likely never seen again.
+- Use gitban's complete card tool to submit and validate if not already completed.
+- **Close-out items: None.** The three cycle-1 follow-ups (L1 input-validation 400, L2 hash-encoding
+  symmetric raw-Buffer fix, L3 wire-body contract types) are all resolved by `31f9a87` and verified
+  PASS. The pre-existing backlog item `ad6kmb` (open→save `ApiProject` reconstruction gap) remains
+  correctly OUT OF SCOPE and is already tracked in the backlog — do NOT pull it into this card.
+- If the worktree's cspell `Files checked: 0` glob quirk persists at closeout, re-verify spell-check
+  from the parent repo; the additions use only established project vocabulary
+  (`deepnoteFileSchema`, `openHash`, `sha256`, idempotent).
+
+Note: You are closing out **this card only**. The dispatcher owns sprint lifecycle — do not close,
+archive, or finalize the sprint itself.

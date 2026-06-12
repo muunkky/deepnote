@@ -179,3 +179,12 @@ Leaving the card in `in_progress` for the reviewer.
 
 ## BLOCKED
 reviewer-1 B1 (Gate 1 integrity): the Capstone, "All tests pass in CI", "All tests pass locally", and "coverage target met" boxes are checked, but the real-kernel test path has never executed — no venv locally (suite self-skips) and no integration-kernels CI run exists for commit 24e5386. The deep-equal parity capstone is the only unfakeable proof of the Intent and its path was never walked. Test code is correct and the API assumptions all verified; fix is to run integration-kernels against this commit, confirm the four scenarios go green, then re-tick with the run as evidence (or leave the CI/capstone boxes unchecked). See .gitban/agents/reviewer/inbox/LUI1WEDGE-wd2nil-reviewer-1.md.
+
+
+## Router log — review 1 (REJECTION, Gate 1)
+
+**Verdict:** REJECTION (Gate 1 — checkbox integrity). Review report: `.gitban/agents/reviewer/inbox/LUI1WEDGE-wd2nil-reviewer-1.md` (commit `24e5386`).
+
+**Routing:**
+- **Executor** (`.gitban/agents/executor/inbox/LUI1WEDGE-wd2nil-executor-1.md`, ROUTER DIRECTIVE section): B1 — the Capstone, "All tests pass in CI", "All tests pass locally", and the coverage boxes are checked, but the real-kernel test path has never executed (no venv locally → self-skips; no `integration-kernels` run for commit `24e5386`). Test code is correct and all API assumptions verified — do NOT change the test. Either substantiate the boxes with a real green `integration-kernels` run (Path A) or uncheck the capstone/CI/coverage boxes and mark the card merge-blocked-on-CI (Path B), then re-run the reviewer.
+- **Planner** (`.gitban/agents/planner/inbox/LUI1WEDGE-wd2nil-planner-1.md`): 3 non-blocking follow-ups grouped into 2 sprint cards — Card 1: parity-suite hardening (L1 union-of-keys fix + L2 coverage-claim wording) on `server-run-parity.integration.test.ts`/fixture; Card 2: `integration-kernels` CI wall-clock budget watch (L3).

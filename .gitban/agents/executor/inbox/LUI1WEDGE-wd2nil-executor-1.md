@@ -81,3 +81,72 @@ Run from the **repo root** (NOT a package dir — some cli tests resolve `exampl
 A lint/spell/format/typecheck failure is a completion failure, not a follow-up.
 
 This card is in sprint **LUI1WEDGE** — do not push a branch or open a PR; the dispatcher owns lifecycle.
+
+---
+
+# ROUTER DIRECTIVE — review 1 (REJECTION, Gate 1) — supersedes the build context above
+
+Use `.venv/Scripts/python.exe` to run Python commands.
+
+===CARD STRUCTURE FIX REQUIRED (Gate 1 failure)===
+This rejection is about the card's checkbox design, Definition of Done, or
+completion-claim integrity — not the code. Before re-submitting: edit the card
+to fix the issues per the blockers below, re-verify that every checked box is
+actually true and every observable is actually met, then re-run the reviewer.
+The reviewer did not evaluate your code changes. Do not rewrite working code
+unless the fixed card structure surfaces an actual gap.
+===END CARD STRUCTURE FIX REQUIRED===
+
+The code for gitban card `wd2nil` was reviewed (review 1, commit `24e5386`) and
+REJECTED on a single, narrow Gate 1 integrity blocker. The reviewer was explicit:
+the test code is correct, every API assumption was cross-checked against source and
+holds, the loopback guard correctly carries the `zq7q0g` requirement, and the vitest
+split is right. **Do not change the test.** The fix is to make the card's checked
+boxes truthful.
+
+Full review: `.gitban/agents/reviewer/inbox/LUI1WEDGE-wd2nil-reviewer-1.md`
+
+## BLOCKER (B1) — checked boxes assert a green real-kernel run that has never executed
+
+Every box on the card is ticked, including:
+- **Capstone** observable ("streamed `IOutput`s deep-equal `deepnote run --output json` … green in the `integration-kernels` job")
+- `[x] All tests pass in CI`
+- `[x] All tests pass locally`
+- `[x] Coverage target met: 100% of executable block types` (Quality Gates AND the Acceptance-Criteria line)
+
+But the real-kernel test path has demonstrably **never executed**:
+- **Locally:** impossible — no `deepnote-toolkit[server]` venv on this machine; the suite self-skips (4 tests skipped, verified). The closeout states this plainly.
+- **In CI:** commit `24e5386` lives only on `milestone/m3-local-ui`; no `integration-kernels` run exists for it. The job has not been triggered against this suite.
+
+A `[x]` capstone whose test path was never walked is lying about the check. Honesty
+in the closeout prose does not license ticking the box — the box must be either
+**substantiated** or **unticked**.
+
+### Required fix — pick the path the dispatch can actually deliver
+
+**Path A (preferred — substantiate the boxes):**
+1. Run the `integration-kernels` job against this commit — push the branch so CI runs
+   it, or provision a local `deepnote-toolkit[server]` + `python3` venv and run
+   `RUN_INTEGRATION_TESTS=true DEEPNOTE_INTEGRATION_VENV=<venv> pnpm run test:integration`.
+2. Confirm the four scenarios go **green** against the real kernel — in particular that
+   the per-block `IOutput` deep-equal actually holds. The `execute_result`
+   `execution_count` and the `display_data` MIME bundle are the most likely places a
+   real run could diverge from the CLI; these cannot be proven by inspection.
+3. Only then re-tick the capstone / "passes in CI" / "passes locally" / coverage boxes,
+   with the run as **evidence** — link the CI run or paste the green run summary into the
+   closeout.
+
+**Path B (if a real-kernel run is genuinely out of reach this dispatch):**
+- The card is then "merge-blocked-on-CI." **Uncheck** the capstone, `[x] All tests pass
+  in CI`, `[x] All tests pass locally`, and the coverage boxes (Quality Gates +
+  Acceptance Criteria), and edit the card so it explicitly states the real-kernel green
+  is pending the `integration-kernels` job on the integration branch. The boxes cannot
+  stand checked while no green run exists.
+- Whichever boxes legitimately ARE true (structure created, self-skip verified, mocked
+  config excludes it, tsc/biome/prettier/cspell clean) stay checked.
+
+Use gitban's checkbox/edit-card tools to make the boxes match reality — do **not** edit
+the card markdown file directly. After the card is truthful, re-run the reviewer.
+
+Note: You are closing out this card only. The dispatcher owns sprint lifecycle — do not
+close, archive, or finalize the sprint itself.

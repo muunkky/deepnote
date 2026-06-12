@@ -97,3 +97,35 @@ batch 1 (`87ifqe`). Keep `.gitban` board commits separate from code commits (the
 - Cleaned a stray `packages/convert/.gitban/` (hook-audit artifact from an agent's bad-CWD hook
   invocation — untracked noise, not board state).
 - **b1 DONE → 1/12. Next: b2 `x71bcm` (step 3, GET /api/project).**
+
+### Batch 2 — `x71bcm` (step 3, GET /api/project)
+
+**Push-blocker saga (resolved; durable fixes recorded):** card-87ifqe's code passed the executor's
+tests/typecheck/build but had **never been run through the project's biome / prettier / cspell gates**
+(nor by the reviewer), so the dispatcher pre-push (`pnpm lintAndFormat && typecheck && test &&
+spell-check`) kept failing. Fixed at the merge gate, one commit each: biome autofix (import order,
+formatting) + `type`→`interface`; `void`-marked `server.test.ts` `resolve()` calls (biome's
+type-unaware *per-file* pre-commit pass false-positives `noFloatingPromises`; project-wide `biome
+check .` already passes — `void` satisfies both without an unused-suppression); British
+`behavioural`/`behaviourally` → `docs-dictionary.txt`; prettier-format the README.
+- **DURABLE — flaky vitest timeout.** On this 6.3Gi/no-swap box the default vitest worker fan-out
+  thrashes (multi-minute transform/import) and the Python-subprocess tests (`reactivity` DAG, `cli`
+  stats) miss the 5s default timeout; `bail:1` then fails the whole push. Fix: `vitest.config.ts`
+  now reads `VITEST_MAX_WORKERS`/`VITEST_MIN_WORKERS`/`VITEST_TEST_TIMEOUT` (opt-in; unset = vitest
+  defaults, so CI/maintainers unaffected; fork-only — exclude from contrib slice). **Standing push
+  command for this sprint:** `npm_config_workspace_concurrency=1 VITEST_MAX_WORKERS=2
+  VITEST_MIN_WORKERS=1 VITEST_TEST_TIMEOUT=30000 git -C "$PARENT" push origin milestone/m3-local-ui`.
+- **Process fix:** amended the executor directive to require running `pnpm exec biome check --write`
+  + `pnpm spell-check` before finishing. **It worked** — the x71bcm executor ran the gates itself
+  (auto-fixed an import-order issue, added `unfakeable` to the dict).
+- Pre-push landed `a654fdc..aee1530` (full CI green, 2372 tests under 2-worker run).
+- Executor (executor-1, worktree `agent-a4a53574491e3cf59`) completed: 1 commit `e88fd33`, base check
+  passed on the override. Fast-forward merge `aee1530..e88fd33` (10 files, +584). Built `GET
+  /api/project`: `Session` (KD-6 `loadProject`/`startEngine` split, hex SHA-256 `openHash`,
+  kernel-free open), framework-free `node:http` router, fixture, 22/22 tests incl. the no-kernel
+  deep-equal capstone over real HTTP. Card left `in_progress` for reviewer.
+- Reviewer flags from executor: (1) `capabilities.reactivity` always `'disabled'` in s1 (reactive
+  exec is m3/s5 — emitting `'python'` would advertise a non-existent capability; matches the
+  api-types contract sample). (2) Root `tsconfig.json` now excludes `**/*.capstone.ts` from the
+  general typecheck glob — minimal fix for a pre-existing scaffold `TS2307` (capstones typecheck via
+  the dedicated `check:types-subpath`). Reviewer to scrutinize the shared-config change.

@@ -530,7 +530,7 @@ milestones:
                   run.'
                 sequence: 9
                 status: todo
-                notes: 'Open issue #323'
+                notes: '[NEXT — ready] · Open issue #323'
           runtime-core-package:
             id: runtime-core-package
             title: '@deepnote/runtime-core — execution engine'
@@ -974,6 +974,7 @@ milestones:
                 status: in_progress
                 notes: 'Ongoing; PRs #393, #387, #376, #368, #354, #350, #338, #333,
                   #332, #307, #295, #292'
+            notes: '[NEXT — ready]'
     metadata:
       maintained_by: Deepnote team + OSS contributors
       review_frequency: per-release
@@ -1016,6 +1017,7 @@ milestones:
             status: todo
             notes: 'Source: README.md roadmap. Depends on a mature runtime-core (m1/s5).'
             features: {}
+        notes: '[NEXT — PRD-first]'
       s2:
         id: s2
         title: Users edit notebooks with a local AI agent
@@ -1037,6 +1039,7 @@ milestones:
             status: todo
             notes: 'Source: README.md roadmap; issue #181. Builds on m1/s6 agentic-notebooks.'
             features: {}
+        notes: '[NEXT — PRD-first]'
       s3:
         id: s3
         title: Users bring their own keys for AI services
@@ -1056,6 +1059,7 @@ milestones:
             status: todo
             notes: 'Source: README.md roadmap.'
             features: {}
+        notes: '[NEXT — PRD-first]'
       s4:
         id: s4
         title: Users run their own compute
@@ -1075,6 +1079,7 @@ milestones:
             status: todo
             notes: 'Source: README.md roadmap.'
             features: {}
+        notes: '[NEXT — PRD-first]'
       s5:
         id: s5
         title: Deepnote is a first-class, multi-kernel notebook runtime
@@ -1093,7 +1098,7 @@ milestones:
             description: 'Stub: open epic to make Deepnote a first-class notebook
               runtime. Continues runtime-core (m1/s5) work.'
             status: todo
-            notes: 'Open epic: issue #162. Continues m1/s5 runtime-core-package.'
+            notes: '[NEXT — PRD-first] · Open epic: issue #162. Continues m1/s5 runtime-core-package.'
             features: {}
           alternative-kernels:
             id: alternative-kernels
@@ -1101,17 +1106,17 @@ milestones:
             description: 'Stub: support notebook kernels for languages beyond Python
               (feature-scope issue).'
             status: in_progress
-            notes: 'Phase 1 COMPLETE (sprint ALTKERN1, 2026-06-11): all 4 Phase-1
-              features done; shipped on fork PR muunkky/deepnote#4 and showcased on
-              issue #154 (comment 4686199361) with an explicit offer to open the upstream
-              PR. Project held in_progress pending maintainer signal on #154 before
-              Phase 2/3. DoD scope = Through C (showcase on #154). Stops at the maintainer-gated
-              upstream merge. Out of scope: PRD-002 Phase 2/3 (first-class language
-              format field, --list-kernels discovery, import language-preservation);
-              non-goals (polyglot, value-add blocks on non-Python kernels, auto-install,
-              WASM/remote kernels); proving a specific heavy kernel (Julia/R) in CI
-              (launch model is kernel-agnostic; CI uses pure-pip bash_kernel, Julia/R
-              as manual check).'
+            notes: '[OFFERED — gated on #154] · Phase 1 COMPLETE (sprint ALTKERN1,
+              2026-06-11): all 4 Phase-1 features done; shipped on fork PR muunkky/deepnote#4
+              and showcased on issue #154 (comment 4686199361) with an explicit offer
+              to open the upstream PR. Project held in_progress pending maintainer
+              signal on #154 before Phase 2/3. DoD scope = Through C (showcase on
+              #154). Stops at the maintainer-gated upstream merge. Out of scope: PRD-002
+              Phase 2/3 (first-class language format field, --list-kernels discovery,
+              import language-preservation); non-goals (polyglot, value-add blocks
+              on non-Python kernels, auto-install, WASM/remote kernels); proving a
+              specific heavy kernel (Julia/R) in CI (launch model is kernel-agnostic;
+              CI uses pure-pip bash_kernel, Julia/R as manual check).'
             features:
               non-python-launch-model:
                 id: non-python-launch-model
@@ -1180,6 +1185,49 @@ milestones:
                   ngjse2 (1B reactivity), qajbsg (1B failure-category), obcn7z (1C
                   integration/CI/docs), dn929q (closeout)'
                 actual_completion_date: '2026-06-11'
+              phase2-format-language-field:
+                id: phase2-format-language-field
+                title: Phase 2 — first-class `language` format field + import
+                  preservation
+                description: "Make `language` a first-class, validated field in the
+                  `.deepnote` format and preserve it on `.ipynb` import, so a notebook
+                  declares its own kernel and runs with no `--kernel` flag (Phase
+                  1's selection plumbing reads the declared language). TOUCHES THE
+                  FORMAT SCHEMA: adds a validated `language` declaration to the core
+                  `.deepnote` schema (deepnote-file-schema.ts), defaulting to Python
+                  and omitted-on-serialization for Python so existing notebooks round-trip
+                  byte-stable; reconciles the conversion layer (Quarto importer/exporter)
+                  and teaches the Jupyter importer (jupyter-to-deepnote.ts) to derive
+                  language from kernelspec.name / language_info.name (notebook-level
+                  kernelspec stamped onto N per-block declarations), and the Jupyter
+                  exporter (deepnote-to-jupyter.ts) to emit kernelspec/language_info
+                  from the declaration. Per PRD-002 Phase 2."
+                sequence: 6
+                status: todo
+                docs_ref: docs/prds/PRD-002-alternative-language-kernels.md
+                depends_on:
+                  - phase1-implementation
+                notes: '[NEXT — PRD-first] · ordered after Phase 3 by do-ability:
+                  Phase 2 touches the .deepnote format schema (co-design with maintainers),
+                  so Phase 3 (additive --list-kernels, no format dependency) is the
+                  readier next pick-up despite the lower phase number.'
+              phase3-kernel-discovery:
+                id: phase3-kernel-discovery
+                title: Phase 3 — `--list-kernels` discovery + install guidance
+                description: A `--list-kernels` CLI command that enumerates
+                  registered kernelspecs (name / display_name / language from
+                  GET /api/kernelspecs) before a run, plus actionable
+                  missing-kernel / kernel-launch-failure guidance that names the
+                  kernel, lists installed kernels, and points to the
+                  registration step. ADDITIVE CLI surface only — detection and
+                  reporting, no auto-install; does NOT touch the format schema.
+                  Per PRD-002 Phase 3.
+                sequence: 5
+                status: todo
+                docs_ref: docs/prds/PRD-002-alternative-language-kernels.md
+                depends_on:
+                  - phase1-implementation
+                notes: '[NEXT — ready]'
             docs_ref: docs/prds/PRD-002-alternative-language-kernels.md
             success_criteria:
               - A single-language non-Python notebook (code + markdown) runs

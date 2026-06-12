@@ -66,17 +66,30 @@ We work **in lockstep with gitban on the fork**, then slice clean PRs out for up
 process diff. If a maintainer asks for an ADR/PRD upstream, add _that specific doc_ to the clean PR —
 otherwise the contribution diff stays code-only.
 
-## Showcase thread (dry run on our own fork)
+## Showcase: a dry run on our own fork (Discussion + per-sprint Issues)
 
-We run the maintainer-facing showcase on our **OWN fork** (`muunkky/deepnote`) first — a dry run of the
-eventual upstream engagement. Nothing goes to `deepnote/deepnote` yet; once the dry run reads well and we
-have a diff we're proud of, this same thread/format becomes the template for the real upstream post.
+We rehearse the maintainer-facing showcase on our **OWN fork** (`muunkky/deepnote`) first — structurally
+identical to the eventual upstream play, so it de-risks the real thing. Nothing goes to `deepnote/deepnote`
+yet; once the dry run reads well and we have a diff we're proud of, this same format becomes the template
+for the real upstream engagement (the #162/#154 relationship thread + feature offers + the two diffs).
 
-- **The thread:** one showcase thread on `muunkky/deepnote` (a GitHub Discussion, or an issue) — record
-  its number here once opened: `#<thread>`. The **first post is hand-written / approved by Cameron**
-  (prevents overzealousness).
-- **After each sprint/milestone closes:** post an announcement comment in the thread — what shipped, link
-  the process diff, label which part is upstream-ready vs fork-only showcase.
+Two tiers, cross-linked:
+
+- **Discussion = the narrative** (one thread for the experiment). A blog/LinkedIn-style opening post — the
+  experiment, the fork model, what we're building, the rigor — then one reply per sprint/milestone telling
+  the *story* (the why, the de-risking, what the adversarial gates caught, the diff-size story). The
+  **opening post is hand-written / approved by Cameron** (prevents overzealousness); record its number
+  here: `#<discussion>`.
+- **Issues = the technical record, one per SPRINT** (not per node — the roadmap's features stay in gitban).
+  **Open** the issue *before* dispatch ("here's the design doc + ADRs + cards I'm about to build", with
+  links); **close** it *after* with the result (tests green, the diff, the closeout summary). Cameron
+  approves the first issue too.
+- **PRs = the diffs** — the process diff (`sprint-record/<TAG>`) and the clean contrib diff
+  (`contrib/<slug>`), per the two-diff model above.
+
+Mapping: **milestone → the Discussion opening · sprint (≈ story) → one Issue · feature/node → stays in
+gitban (linked, not mirrored).** Cross-link each layer (a sprint's Discussion reply → its Issue → its PR).
+
 - **Label every linked diff** "upstream-ready" or "fork-only showcase."
 - **No upstream posting or PRs yet:** nothing goes to `deepnote/deepnote` until we explicitly decide the
   dry run is ready; feature offers then follow the #288 pattern (offer + link both diffs + wait).

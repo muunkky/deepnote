@@ -36,7 +36,8 @@ import {
   selectKernelName,
   selectPythonSpec,
 } from '@deepnote/runtime-core'
-import type { ApiProject } from './api-types'
+import type { ApiProject, SaveProjectRequest } from './api-types'
+import { type SaveResult, saveProject } from './save'
 
 /** Options for opening a project into a {@link Session}. */
 export interface LoadProjectOptions {
@@ -173,6 +174,15 @@ export interface ServerSession {
   apiProject(): ApiProject
   startEngine(): Promise<void>
   runProject(request: RunProjectRequest, callbacks: RunProjectCallbacks): Promise<ExecutionSummary>
+  /**
+   * Persist a project back to the opened file atomically, guarding against external changes
+   * (4B — the save-safety gate). Returns a discriminated {@link SaveResult}: a committed write
+   * (the route maps to `200 { savedHash, bytesWritten }`) or a refused external-change conflict
+   * (mapped to `409 { error:'external-change', currentProject, currentHash }`, **no write**). On a
+   * committed write the session adopts `savedHash` as its new `openHash` so an immediate re-save
+   * by the same client is a no-op rather than a false conflict.
+   */
+  save(request: SaveProjectRequest): Promise<SaveResult>
   close(): Promise<void>
 }
 
@@ -276,6 +286,23 @@ export class Session implements ServerSession {
       onBlockDone: callbacks.onBlockDone,
       onOutput: callbacks.onOutput,
     })
+  }
+
+  /**
+   * Persist a project back to the opened file (4B). Delegates the atomic temp-then-rename write +
+   * external-change detection to {@link saveProject}, writing to the session's own loaded `path` and
+   * comparing the request's `openHash` against the current on-disk bytes. On a committed write the
+   * session **adopts `savedHash` as its new `openHash`** — so the same client can re-save its own
+   * just-saved canonical bytes without tripping the conflict guard against itself. On a conflict the
+   * `openHash` is left unchanged (no write happened). Throws if no project is loaded.
+   */
+  async save(request: SaveProjectRequest): Promise<SaveResult> {
+    const loaded = this.#requireLoaded()
+    const result = await saveProject(loaded.path, request.project, request.openHash)
+    if (!result.conflict) {
+      loaded.openHash = result.savedHash
+    }
+    return result
   }
 
   /** Stop the engine and release the kernel/server (the `serve` SIGINT path). Idempotent. */

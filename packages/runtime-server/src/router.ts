@@ -13,6 +13,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { SaveProjectRequest } from './api-types'
 import type { RunQueue } from './run-queue'
 import { type ServerSession, StartEngineError } from './session'
 
@@ -93,6 +94,61 @@ async function handleRun(
   sendJson(res, 202, { runId: result.runId })
 }
 
+/** Read the full request body as a UTF-8 string (the save body is small JSON). */
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    req.on('data', (chunk: Buffer) => chunks.push(chunk))
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    req.on('error', reject)
+  })
+}
+
+/**
+ * Handle `POST /api/project/save` (4B — the save-safety gate). Parse the
+ * {@link SaveProjectRequest} body, then delegate the atomic write + external-change detection to
+ * {@link ServerSession.save}:
+ *
+ * - committed write → `200 { savedHash, bytesWritten }`;
+ * - external change since open → `409 { error:'external-change', currentProject, currentHash }`
+ *   with **no write performed** (KD-7);
+ * - a malformed/missing body → `400 { error }` (the save never runs);
+ * - a no-loaded-project session or a genuine write failure → `500 { error }` (the temp file is
+ *   already cleaned up by `saveProject`; the original is untouched).
+ */
+async function handleSave(res: ServerResponse, session: ServerSession, req: IncomingMessage): Promise<void> {
+  let request: SaveProjectRequest
+  try {
+    const raw = await readBody(req)
+    const parsed = JSON.parse(raw) as Partial<SaveProjectRequest>
+    if (typeof parsed?.openHash !== 'string' || typeof parsed?.project !== 'object' || parsed.project === null) {
+      throw new Error('save body must be { project: DeepnoteFile, openHash: string }')
+    }
+    request = { project: parsed.project, openHash: parsed.openHash }
+  } catch (err) {
+    const error: ErrorBody = { error: err instanceof Error ? err.message : String(err) }
+    sendJson(res, 400, error)
+    return
+  }
+
+  try {
+    const result = await session.save(request)
+    if (result.conflict) {
+      // KD-7: external change detected — no write happened; hand back the current on-disk content.
+      sendJson(res, 409, {
+        error: 'external-change',
+        currentProject: result.currentProject,
+        currentHash: result.currentHash,
+      })
+      return
+    }
+    sendJson(res, 200, { savedHash: result.savedHash, bytesWritten: result.bytesWritten })
+  } catch (err) {
+    const error: ErrorBody = { error: err instanceof Error ? err.message : String(err) }
+    sendJson(res, 500, error)
+  }
+}
+
 /**
  * The s1 request router. Built once per server over the opened {@link Session} and the single
  * {@link RunQueue}; dispatches each request by method + path. Unknown routes return
@@ -113,6 +169,13 @@ export function createRouter(
 
     if (method === 'GET' && path === '/api/project') {
       handleGetProject(res, session)
+      return
+    }
+
+    if (method === 'POST' && path === '/api/project/save') {
+      // The save route is queue-independent (no kernel/engine involved) — it serves the
+      // GET+save lifecycle even before any run surface is wired.
+      void handleSave(res, session, req)
       return
     }
 

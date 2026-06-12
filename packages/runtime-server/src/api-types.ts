@@ -58,6 +58,49 @@ export interface ApiProject {
 }
 
 /**
+ * `POST /api/project/save` request body (step 4B — the save-safety gate).
+ *
+ * The client echoes the `openHash` it received from {@link ApiProject} at open time; the
+ * server compares it against a fresh SHA-256 of the on-disk bytes to detect an external
+ * change since open (KD-7). `project` is the full file to persist — the serializer
+ * re-canonicalizes it (sorting keys, field order) so fidelity is **semantic**, not
+ * byte-level (design doc "Save round-trip (R6)").
+ */
+export interface SaveProjectRequest {
+  /** The full project tree + metadata to write back, as a {@link DeepnoteFile}. */
+  project: DeepnoteFile
+  /** The `openHash` echoed from {@link ApiProject}; the optimistic-concurrency token. */
+  openHash: string
+}
+
+/**
+ * `POST /api/project/save` success response (`200`). The write was atomic
+ * (temp-then-rename in the same directory) and the persisted bytes are canonical.
+ */
+export interface SaveProjectResponse {
+  /** SHA-256 of the bytes actually written — the client adopts this as its next `openHash`. */
+  savedHash: string
+  /** Byte length of the persisted (canonical) YAML. */
+  bytesWritten: number
+}
+
+/**
+ * `POST /api/project/save` conflict response (`409`) — the **no-clobber** guard (KD-7).
+ *
+ * Returned with **no write performed** when the on-disk SHA-256 no longer equals the
+ * request's `openHash` (someone edited the file since it was opened). The current on-disk
+ * content is handed back so the client can reconcile rather than lose the other edit.
+ */
+export interface SaveConflictResponse {
+  /** Literal discriminant for the external-change conflict. */
+  error: 'external-change'
+  /** The current on-disk project (freshly deserialized) the save would have overwritten. */
+  currentProject: DeepnoteFile
+  /** SHA-256 of the current on-disk bytes — the client's new optimistic-concurrency token. */
+  currentHash: string
+}
+
+/**
  * Client → server WS message union.
  *
  * In s1 `runScope` is `'block'` only, and `cancel` cancels a **queued** task

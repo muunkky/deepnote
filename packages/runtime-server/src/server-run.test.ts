@@ -3,8 +3,14 @@ import type { ExecutionSummary } from '@deepnote/runtime-core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { WebSocket } from 'ws'
 import type { WsServerEvent } from './api-types'
+import type { SaveResult } from './save'
 import { createServer, type RuntimeServer } from './server'
 import { type RunProjectCallbacks, type RunProjectRequest, type ServerSession, StartEngineError } from './session'
+
+/** Shared save stub for the run-focused fake sessions — save behavior is covered in `save.test.ts`. */
+const unusedSave = async (): Promise<SaveResult> => {
+  throw new Error('save not used in these tests')
+}
 
 /**
  * Server-level wiring tests (step 4A): the HTTP `POST /…/run` routes, the `/api/stream` WS
@@ -45,6 +51,7 @@ class FakeSession implements ServerSession {
     })
     return { totalBlocks: 1, executedBlocks: 1, failedBlocks: 0, totalDurationMs: 1 }
   }
+  save = unusedSave
   async close(): Promise<void> {}
 }
 
@@ -122,6 +129,7 @@ describe('createServer — HTTP run routes + WS fan-out', () => {
       },
       startEngine: async () => {},
       runProject: () => new Promise<ExecutionSummary>(() => {}), // never resolves
+      save: unusedSave,
       close: async () => {},
     }
     server = createServer({ session: stuck, runQueueDepth: 1 })
@@ -158,6 +166,7 @@ describe('createServer — HTTP run routes + WS fan-out', () => {
       },
       startEngine: async () => {},
       runProject: () => firstRun,
+      save: unusedSave,
       close: async () => {},
     }
     server = createServer({ session })

@@ -1332,7 +1332,7 @@ milestones:
               round-trip safety gate (ships in P1, before any editing UI exists).'
             status: todo
             sequence: 1
-            docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+            docs_ref: docs/adr/ADR-007-server-spa-package-layout.md
             features:
               server-package-scaffold:
                 id: server-package-scaffold
@@ -1368,6 +1368,7 @@ milestones:
                 sequence: 3
                 depends_on:
                   - project-open-list-api
+                docs_ref: docs/adr/ADR-005-browser-kernel-transport-proxy.md
               save-api:
                 id: save-api
                 title: Save API (semantic round-trip + idempotence)
@@ -1521,7 +1522,7 @@ milestones:
               cleanly-sliceable backend package.
             status: todo
             sequence: 1
-            docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+            docs_ref: docs/adr/ADR-006-spa-framework-and-bundler.md
             features:
               framework-bundler-setup:
                 id: framework-bundler-setup
@@ -1658,7 +1659,7 @@ milestones:
               (proxy vs direct), so measured early, not asserted.
             status: todo
             sequence: 1
-            docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+            docs_ref: docs/adr/ADR-005-browser-kernel-transport-proxy.md
             features:
               run-controls:
                 id: run-controls

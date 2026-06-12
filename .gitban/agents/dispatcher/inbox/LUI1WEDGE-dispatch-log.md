@@ -234,3 +234,15 @@ authority for crash-recovery. A recovery dispatcher MUST run `zq7q0g` before `wd
   ancestor). Push is **deferred to post-merge-green** for this card only. No gate bypass — the red gate
   is being fixed, not skipped.
 - **➡️ Dispatching `zq7q0g` executor-2 (B1 test + B2 typecheck + L1).**
+
+### Batch 4 — `zq7q0g` (step 6 serve) COMPLETE → 5/12
+
+- executor-2 (`8ab721c`) fixed **B1** (server-side `boundAddress()` accessor; mutation-verified the
+  loopback test now fails on a 0.0.0.0 bind; negative leg also satisfies **L1**) + **B2** (typed
+  `createSession` as full `ServerSession`, dropped narrow `SessionLike`). reviewer-2 **APPROVAL**
+  (independently mutation-verified B1), no new follow-ups. close-out → **done** (`5081f35`).
+- **Deferred-push deviation RESOLVED:** post-merge full `pnpm typecheck` green (both halves); pushed
+  green branch `6bda08f..f131609`. The red gate was fixed by the executor, never bypassed.
+- L2 (real-socket never-0.0.0.0 guard) remains folded into `wd2nil` (step 5) per planner.
+- **➡️ Next: batch 5 — `wd2nil` (step 5 integration parity) — PHASE BARRIER. Needs real toolkit venv;
+  serve smoke (Scenario 3) now uses the real `deepnote serve` (just landed).**

@@ -93,3 +93,40 @@ Close out sprint LUI1WEDGE: archive done cards, generate the sprint summary, upd
 - [ ] Roadmap updated for any stories this sprint completed
 - [ ] `CHANGELOG.md` updated for any user-visible changes landed this sprint
 - [ ] All sprint cards archived via `archive_cards`
+
+
+## Sprint Retrospective
+
+### Item 1: Engine-construction-spy regression for the kernel-free guarantee (post-4A)
+
+Reviewer cycle 1 on x71bcm (GET /api/project, kernel-free) flagged a test-depth gap (L2). The
+"opens with NO kernel started" test currently asserts only the **positive** signal — a
+fully-populated `ApiProject` payload comes back. It cannot yet assert the **negative**: that no
+`ExecutionEngine` is ever constructed during `loadProject` / `GET /api/project`. The reason is
+structural — in step 3's phase there is no `ExecutionEngine` to spy on; the engine only becomes
+constructible once step 4A (`hlai4c`, execute-stream-ws) lands `startEngine`. The KD-6 kernel-free
+guarantee is currently enforced only by the positive assertion; a future refactor could silently
+start constructing an engine on open and the suite would stay green.
+
+**The follow-up:** once `hlai4c` has landed a constructible `ExecutionEngine`, add a regression test
+that spies on engine construction and asserts `loadProject` / `GET /api/project` never triggers it,
+so the kernel-free guarantee stays enforced after the engine becomes constructible. This is
+captured here (not filed as a sprint card now) because its prerequisite is the in-sprint card
+`hlai4c`, which is still `todo` — the closeout agent revisits this with full sprint context after
+4A is done and decides final disposition. If 4A has landed by closeout, this is almost certainly a
+`sprint` deferral (a small new card sequenced into this sprint, or folded into 4A's own suite). The
+exactly-one-true grid below is for the closeout agent to fill.
+
+| Deferral Type | Description | Applies (true/false) |
+|---------------|-------------|----------------------|
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
+| note-only | Captured for record; no action; current output is fine as-is. | |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+
+**Source:** x71bcm review 1
+**Files touched:** packages/runtime-server/src/session.test.ts (the kernel-free regression lives here; engine spy target arrives via hlai4c / step 4A)
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 1 classified (exactly one deferral type marked `true` above)
+- [ ] Item 1 actioned (action taken matches chosen type)

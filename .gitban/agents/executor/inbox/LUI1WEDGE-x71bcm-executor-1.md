@@ -52,3 +52,34 @@ pnpm spell-check                                         # cspell — add new te
 Fix anything biome can't auto-fix (e.g. prefer `interface` over `type X = {…}` for object types), and
 re-run until both are clean. Commit the fixes on your worktree branch. This is part of "tests pass before
 merge" — a lint/spell failure is a completion failure, not a follow-up.
+
+---
+
+## ROUTER CLOSE-OUT DIRECTIVE (reviewer-1: APPROVAL) — appended after review
+
+Use `.venv/Scripts/python.exe` to run Python commands.
+
+The code for the gitban card with id x71bcm has been **approved** as of commit `e88fd33`
+(reviewer report: `.gitban/agents/reviewer/inbox/LUI1WEDGE-x71bcm-reviewer-1.md`). The
+implementation work above is done — switch to close-out. Use the gitban tools to update the
+card and complete it.
+
+### Card Close-out tasks
+- Use gitban's checkbox tools to ensure every checkbox for completed work is checked off.
+  - **Specifically check the two reviewer-gate boxes** that were intentionally left unchecked:
+    "API contract is reviewed and approved by team/stakeholders" — it appears twice (the
+    "API Development Phases" table row, and the "Completion Checklist"). The reviewer has now
+    approved, so both are satisfied — check them both.
+- Do not mark any work as deferred. This card will be closed and archived and likely never seen again.
+- Use gitban's complete card tool to submit and validate if not already completed.
+- **Close-out items: none.** The reviewer flagged two non-blocking follow-ups (L1
+  capability-coupling-gap, L2 test-depth-gap). These are being routed to the **planner** — they
+  are NOT yours to implement. Do not touch `session.ts` capability logic or add the engine-spy
+  test here.
+- **CHANGELOG**: owned by the sprint closeout card (`od8esg`) per this card's own declaration —
+  do not edit it here.
+- This card is in sprint **LUI1WEDGE**, so do **not** push a feature branch or open a PR. The
+  dispatcher owns sprint lifecycle.
+
+You are closing out this card only. Do not close, archive, or finalize the sprint itself —
+that is the dispatcher's job.

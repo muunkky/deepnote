@@ -333,3 +333,16 @@ green and were not modified.
 
 **Out of scope (untouched, per directive):** L2 (engine-construction-spy regression) — waits on
 step 4A (`hlai4c`) and lives on closeout card `od8esg`. No capstone/router/fixture/README changes.
+
+
+## Review Log — cycle 2 (router: L1 reopen re-review)
+
+**Verdict: APPROVAL** (Gate 1 reopen-structure PASS, Gate 2 the-fix PASS). Commit `b10b73c`.
+
+- **Report:** `.gitban/agents/reviewer/inbox/LUI1WEDGE-x71bcm-reviewer-2.md`
+- **Scope:** re-review of the L1 reopen (capability-coupling-gap) only. `session.ts` +22/-7 in `resolveCapabilities`, `session.test.ts` +17 (one new regression). No scope drift; cycle-1 endpoint/session/router/fixture/README untouched.
+- **What was verified:** the early-return-for-non-Python-kernel fix restores kernel/interpreter-axis orthogonality (ADR-003 vs ADR-001); the new regression (`--kernel bash` + unresolvable Python → `kernelLanguage === 'bash'`) is a true red→green guard against the masked branch; docs updated to match control flow; `vitest run src/session.test.ts` 11/11 green (package 23/23).
+- **Routing (router-2):**
+  - Executor → close-out (check the two reviewer-gate "API contract approved by stakeholders" boxes; verify all boxes; complete card). Directive: `.gitban/agents/executor/inbox/LUI1WEDGE-x71bcm-executor-2-approval.md` (sibling `…-executor-2.md` was the reopen directive; this approval directive supersedes it).
+  - Planner → none. Reviewer flagged no new follow-up.
+- **Non-blocking / deferred:** L2 (engine-construction-spy regression) remains correctly deferred to sprint closeout card `od8esg` pending step 4A (`hlai4c`) — already captured there, not re-routed. No new tech debt exposed by this diff.

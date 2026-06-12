@@ -272,15 +272,64 @@ card's own capability-resolution logic.
 
 ### Fix checkboxes
 
-- [ ] Gate the Python interpreter probe on the kernel actually being Python (`!nonPython`) before
+- [x] Gate the Python interpreter probe on the kernel actually being Python (`!nonPython`) before
       it can null the capability flag — a non-Python kernel must not depend on Python interpreter
       resolution for its `kernelLanguage`.
-- [ ] Add a regression test: non-Python kernel (e.g. `bash`) with an **unresolvable** Python
+- [x] Add a regression test: non-Python kernel (e.g. `bash`) with an **unresolvable** Python
       interpreter asserts `kernelLanguage` is the kernel name (not `null`), and the open still
       returns the full tree. This walks the branch the existing bash test masks.
-- [ ] Existing capability tests (python3 default, mis-installed-python-nulls-python,
+- [x] Existing capability tests (python3 default, mis-installed-python-nulls-python,
       non-python-kernel) stay green; full package suite green.
 
 > **Note on the second reviewer follow-up (L2, engine-construction-spy regression):** NOT part of
 > this reopen. L2 depends on step 4A (`hlai4c`) landing a constructible `ExecutionEngine` to spy on
 > and is captured separately on the sprint closeout card (`od8esg`) for post-4A triage.
+
+
+## Executor Close-out — cycle 2 (L1 reopen: capability-coupling-gap)
+
+**Status:** L1 fix complete, tests green. Left in `in_progress` for the reviewer to
+re-verify the reopen (per executor-2 directive). Scope was L1 only — the already-approved
+endpoint/session/router/fixture/README and all prior tests were untouched.
+
+**Commit:** `b10b73c` on `worktree-agent-a493c08fb6e64d419` (merges back to `milestone/m3-local-ui`
+per the branch override). Completion tag re-pointed: `LUI1WEDGE-x71bcm-done` → `b10b73c`.
+
+### The bug (as diagnosed in the Reopen section)
+
+`resolveCapabilities` probed the Python interpreter *unconditionally*, then computed
+`interpreterAvailable ? (nonPython ? kernelName : 'python') : null`. For an explicit
+non-Python kernel (e.g. `--kernel bash`), a mis-installed *Python* interpreter still
+degraded `kernelLanguage` to `null` — even though bash availability is orthogonal to Python
+resolution (kernel axis ADR-003 vs interpreter axis ADR-001). The existing bash test masked
+this by passing a resolvable `python: 'python3'`, so the broken branch was never walked.
+
+### The fix (`packages/runtime-server/src/session.ts`)
+
+`resolveCapabilities` now early-returns for a non-Python kernel
+(`if (nonPython) return { kernelLanguage: kernelName, reactivity: 'disabled' }`) **before**
+any Python probe — a non-Python kernel reports its own name regardless of Python resolution.
+The Python interpreter probe now runs only on the Python path, where its result is the
+"kernel missing" signal (`'python'` vs `null`). Behaviour is identical for every previously-
+passing case; only the masked non-Python-with-unresolvable-Python branch changes (null → name).
+
+### Test (TDD — written failing first, `packages/runtime-server/src/session.test.ts`)
+
+New regression `a non-python kernel does NOT depend on Python interpreter resolution for its
+language (L1 regression)`: `--kernel bash` + `python: '/definitely/not/a/python/interpreter'`
+asserts `kernelLanguage === 'bash'` (was `null` pre-fix — confirmed red before the change) and
+that the full tree still returns (KD-6: never an open failure). The three existing capability
+tests (python3 default, mis-installed-python-nulls-python, non-python+resolvable-python) stay
+green and were not modified.
+
+### Gates (all clean on the worktree)
+
+- Vitest package suite: **23/23** (was 22; +1 regression), run with
+  `VITEST_MAX_WORKERS=2 VITEST_TEST_TIMEOUT=30000`.
+- `biome check --write packages/runtime-server` — 14 files, no fixes needed (already clean).
+- `tsc --noEmit -p tsconfig.json` (root) — clean.
+- `check:types-subpath` (capstone consumer vs built `dist/`) — clean.
+- `pnpm spell-check` (cspell) — clean (no new terms).
+
+**Out of scope (untouched, per directive):** L2 (engine-construction-spy regression) — waits on
+step 4A (`hlai4c`) and lives on closeout card `od8esg`. No capstone/router/fixture/README changes.

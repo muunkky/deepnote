@@ -11,6 +11,27 @@ Executor worktrees fork from `milestone/m3-local-ui`'s HEAD and merge back to it
 push pushes `origin milestone/m3-local-ui`. (A fresh dispatcher that ignores this will silently fork
 the sprint onto `sprint/LUI1WEDGE` and fragment the monolith.)
 
+## ⏸️ PAUSED for reboot (resume here) — as of HEAD `5f1f1e2`
+
+**Where we are:** b1 `87ifqe` DONE (closed out). b2 `x71bcm` — **executor done + merged** (ff to code
+commit `e88fd33`), board reconciled (`5f1f1e2`), post-merge typecheck + runtime-server tests (22/22)
+GREEN. **Reviewer NOT yet dispatched.** No agents/worktrees running; working tree clean.
+
+**➡️ RESUME AT: dispatch the reviewer for `x71bcm`** (review 1). The card's code is the single commit
+`e88fd33`; review it with `Commit: aee1530..e88fd33` (one commit, but pass the range form for parity).
+Then router → close-out, then **b3 `hlai4c` ‖ `e6e3lt`** (step 4A ‖ 4B, the P0 parallel batch).
+
+**Origin is 2 behind** (`e88fd33`, `5f1f1e2` committed locally, NOT pushed — deliberately, to skip the
+CI hook before reboot). The b3 pre-dispatch push will land them.
+
+**STANDING PUSH COMMAND this sprint** (the no-swap box OOMs/flakes otherwise — see Batch 2 history):
+`npm_config_workspace_concurrency=1 VITEST_MAX_WORKERS=2 VITEST_MIN_WORKERS=1 VITEST_TEST_TIMEOUT=30000 git -C "$PARENT" push origin milestone/m3-local-ui`
+
+**EXECUTOR DIRECTIVES carry the branch override** (substitute `milestone/m3-local-ui` for
+`sprint/LUI1WEDGE` in the base check) — write + **commit** the directive into HEAD *before* dispatching
+each executor, so its worktree fork includes it. Also instruct executors to run `pnpm exec biome check
+--write <pkg>` + `pnpm spell-check` before finishing (b1 missed these and blocked the push).
+
 ## ⚠️ Planning card `wzrodp` — do NOT complete at startup
 
 `wzrodp` (step 1, planning) carries the architect's **full 30-item sprint-lifecycle checklist**

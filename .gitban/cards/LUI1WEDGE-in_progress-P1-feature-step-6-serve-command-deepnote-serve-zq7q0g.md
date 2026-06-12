@@ -128,3 +128,35 @@ A user with a `.deepnote` file on their laptop runs one command and gets a runni
 * [ ] Stakeholders are notified of completion.
 * [ ] Follow-up actions are documented and tickets created.
 * [ ] Associated ticket/epic is closed.
+
+
+## Executor close-out (executor-1) — step 6 `deepnote serve`
+
+**Status:** complete. Code committed on the worktree branch (commit `9c9f07f`). Completion tag `LUI1WEDGE-zq7q0g-done` written. Left in `in_progress` for the reviewer.
+
+### What shipped
+- `packages/cli/src/commands/serve.ts` — `createServeAction`, thin per ADR-007 §2 / design-doc Phase 6. Flow: `resolvePathToDeepnoteFile` → `Session.loadProject` → `findConsecutiveAvailablePorts(startPort)` → `createServer({ session }).listen(port, '127.0.0.1')` → log ready URL → optional browser open → `SIGINT` → `server.close()` (→ `session.close()` → `engine.stop()`). All server logic stays in `@deepnote/runtime-server`. Collaborators (port finder, session/server factories, browser opener, SIGINT registrar) are injected via a `ServeDeps` interface so the action is unit-testable with no real socket/kernel; `defaultServeDeps()` wires the real implementations.
+- `packages/cli/src/cli.ts` — registered `serve` next to `open`/`run` with `--port`, `--no-open`, `--python`, `--kernel`, `--static-dir` and `--help` text (incl. the localhost-trust note).
+- `packages/cli/package.json` — added the single dep `@deepnote/runtime-server: workspace:*` (lockfile updated; symlink verified).
+- `packages/runtime-server/src/server.ts` — extended `RuntimeServer.listen` to `listen(port, host?)` so serve can constrain the bind interface. `host` omitted ⇒ prior all-interfaces behaviour (the existing `listen(0)` lifecycle test is unaffected); serve always passes `'127.0.0.1'`.
+- `packages/cli/README.md` — `deepnote serve` command reference with the localhost-trust note and the port-fallback behaviour.
+
+### Key decisions
+- **Port (M1):** reused the audited `findConsecutiveAvailablePorts`, binds the **first** of the returned pair and **intentionally leaves the adjacent port free** (documented in code + README) rather than adding a single-port helper. The reported URL uses the **actually-bound** port returned by `listen()`, so a fallback is always reported truthfully.
+- **localhost bind:** `BIND_HOST = '127.0.0.1'`, never `0.0.0.0`. Adding the `host` arg to the server's `listen` (rather than binding in the CLI) keeps the bind logic in runtime-server while letting the thin command choose loopback.
+- **`--static-dir`:** option exists, defaults UNSET, no bundled-UI path token. `git grep -iE 'apps/' -- packages/cli/src/commands/serve.ts` → **nothing** (DoD capstone PASS).
+- Invalid `--port` is a `FileResolutionError` (exit 2) — a clear usage error, not a silent fallback.
+
+### Tests (suite 6, mocked) — what they actually proved
+`packages/cli/src/commands/serve.test.ts` (11 tests) + `packages/runtime-server/src/server.test.ts` (+1 new): localhost-`127.0.0.1`-not-`0.0.0.0` bind, port fallback reports the bound URL, bound-port truthfulness when `listen()` resolves a different port, `--no-open` headless (no browser), `--open` launches the browser at the URL, SIGINT → `server.close()` → `session.close()` (engine.stop, no orphan), session passed into `createServer`, `--port`/`--python`/`--kernel` threading, invalid `--port` exit 2, unresolvable file exit 2. The runtime-server test asserts `listen(0, '127.0.0.1')` binds loopback via `socket.localAddress`.
+
+**Scope honesty:** these are MOCKED (fake server + fake session — no real socket bind, no real kernel). The real serve integration smoke (`deepnote serve fixture.deepnote --no-open` answering a live `GET /api/project`) is the **step-5 card (`wd2nil`)**, NOT verified here.
+
+### Gates
+- `pnpm exec vitest run` (cli + runtime-server): **1075 passed / 0 failed** (incl. the 14 new).
+- `pnpm typecheck`: PASS.
+- `biome check` (no-write) on all touched TS + package.json: clean. `prettier --check` README: clean.
+- `pnpm spell-check`: in this worktree cspell reports "0 files checked" because `cspell.json` ignores `.claude/**` and the whole worktree lives under `.claude/worktrees/` — a path artifact, not a real failure. Verified clean by piping each changed file through `cspell stdin --config cspell.json`: **0 issues** across `serve.ts`, `serve.test.ts`, `server.ts`, `server.test.ts`, and the README serve section. On the parent checkout (where the real pre-push runs) the glob is not ignored, so it runs normally.
+
+### Deferred / follow-ups
+None. No tech debt. `serve`/`ui` final naming remains a P6 PRD open question (not debt); the `ui` alias is step 7A.

@@ -79,7 +79,7 @@ Two tiers, cross-linked:
   experiment, the fork model, what we're building, the rigor — then one reply per sprint/milestone telling
   the *story* (the why, the de-risking, what the adversarial gates caught, the diff-size story). The
   **opening post is hand-written / approved by Cameron** (prevents overzealousness); record its number
-  here: `#<discussion>`.
+  here: the dry-run thread is **`muunkky/deepnote` Discussion #5** (*Show and tell*).
 - **Issues = the technical record, one per SPRINT** (not per node — the roadmap's features stay in gitban).
   **Open** the issue *before* dispatch ("here's the design doc + ADRs + cards I'm about to build", with
   links); **close** it *after* with the result (tests green, the diff, the closeout summary). Cameron

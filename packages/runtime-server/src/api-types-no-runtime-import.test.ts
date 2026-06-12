@@ -86,10 +86,28 @@ describe('api-types.ts is runtime-import-free (ADR-007 §6)', () => {
   it('emits no runtime import/require when transpiled (the erasure that makes it Node-free)', () => {
     // The behavioural proof: stripping types leaves no module reference at all, so
     // a consumer of the emitted `/types` JS pulls in nothing — no Node, no `ws`.
-    const { outputText } = ts.transpileModule(source, {
-      compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext },
-    })
-    expect(outputText).not.toMatch(/\bimport\b/)
-    expect(outputText).not.toMatch(/\brequire\(/)
+    // `removeComments` so JSDoc prose (which mentions `import type …`) can't trip
+    // the regexes; we assert on actual module-loading *statements*, both module
+    // formats, to catch a value import regardless of emit target.
+    const esm = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ESNext,
+        removeComments: true,
+      },
+    }).outputText
+    const cjs = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ESNext,
+        removeComments: true,
+      },
+    }).outputText
+
+    // ESM: no `import … from '…'` and no bare side-effect `import '…'`.
+    expect(esm).not.toMatch(/\bimport\b[^;]*\bfrom\b/)
+    expect(esm).not.toMatch(/\bimport\s+['"]/)
+    // CJS: no `require('…')` call.
+    expect(cjs).not.toMatch(/\brequire\s*\(/)
   })
 })

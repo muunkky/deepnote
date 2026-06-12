@@ -275,6 +275,25 @@ importers:
         specifier: ^8.5.13
         version: 8.18.1
 
+  packages/runtime-server:
+    dependencies:
+      '@deepnote/blocks':
+        specifier: workspace:*
+        version: link:../blocks
+      '@deepnote/reactivity':
+        specifier: workspace:*
+        version: link:../reactivity
+      '@deepnote/runtime-core':
+        specifier: workspace:*
+        version: link:../runtime-core
+      ws:
+        specifier: '>=8.20.1'
+        version: 8.21.0
+    devDependencies:
+      '@types/ws':
+        specifier: ^8.5.13
+        version: 8.18.1
+
 packages:
 
   '@ai-sdk/gateway@3.0.66':

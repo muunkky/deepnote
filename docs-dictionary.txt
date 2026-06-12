@@ -366,3 +366,21 @@ relitigate
 unsanitized
 footgun
 vegalite
+
+# Local Deepnote UI / m3 ADRs (ADR-005/006/007) + PRD-003 — frontend toolchain + planning terms
+architecting
+assertable
+Assertable
+bottlenecked
+contributable
+depcruise
+empt
+excludable
+greppable
+Greppable
+nbviewer
+nteract
+Pyodide
+Rsbuild
+Rspack
+Turborepo

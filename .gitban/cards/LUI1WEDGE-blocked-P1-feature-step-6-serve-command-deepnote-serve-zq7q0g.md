@@ -160,3 +160,29 @@ A user with a `.deepnote` file on their laptop runs one command and gets a runni
 
 ### Deferred / follow-ups
 None. No tech debt. `serve`/`ui` final naming remains a P6 PRD open question (not debt); the `ui` alias is step 7A.
+
+
+## BLOCKED
+Gate 2 (code-quality): B1 — the runtime-server `listen(port, host)` test is a false positive on the security-critical loopback assertion. `boundAddress` reads the client-side `socket.localAddress` over a loopback connection, which is always 127.0.0.1 regardless of the server's bind interface; verified the test still passes when the server is mutated to bind 0.0.0.0. The card's "binds localhost, never 0.0.0.0" observable has no real guard. Production code is correct; fix the test to assert on the server-side bound address and add a leg that fails on 0.0.0.0. See .gitban/agents/reviewer/inbox/LUI1WEDGE-zq7q0g-reviewer-1.md.
+
+
+## Router log (review 1)
+
+**Verdict:** REJECTION (Gate 2 — code-quality). Commit `9c9f07f`.
+**Review report:** `.gitban/agents/reviewer/inbox/LUI1WEDGE-zq7q0g-reviewer-1.md`.
+
+**Routing:**
+- **B1 (blocker, Gate 2 → executor):** the runtime-server `listen(port, host)` test
+  (`server.test.ts`) is a false positive on the loopback guarantee — `boundAddress` reads the
+  client-side `socket.localAddress` over a loopback connection (always `127.0.0.1` regardless of the
+  server's bind interface; passes even when the server is mutated to bind `0.0.0.0`). Fix: assert on the
+  server-side bound address and add a leg that fails on `0.0.0.0`. Instructions:
+  `.gitban/agents/executor/inbox/LUI1WEDGE-zq7q0g-executor-1-rework.md`.
+- **L1, L2 (non-blocking → planner):** L1 — pin the omitted-host `listen` lifecycle path to its bound
+  interface once B1's server-side-address accessor exists (same file as B1). L2 — confirm step-5
+  integration smoke (`wd2nil`) asserts real-socket loopback bind / off-host unreachability so the
+  security boundary has a real-socket guard. Instructions:
+  `.gitban/agents/planner/inbox/LUI1WEDGE-zq7q0g-planner-1.md` (2 cards, both in sprint LUI1WEDGE).
+
+Production code verified correct end-to-end by the reviewer; card structure passed Gate 1. No code
+rewrite required beyond the test fix and a server-side bound-address accessor.

@@ -1012,12 +1012,24 @@ milestones:
           local-ui:
             id: local-ui
             title: Local Deepnote UI
-            description: 'Stub: bring the Deepnote Cloud UI to a locally-runnable
-              surface. Design not yet started.'
-            status: todo
-            notes: 'Source: README.md roadmap. Depends on a mature runtime-core (m1/s5).'
+            description: "SUPERSEDED — promoted to milestone m3 'Local Deepnote UI'.
+              This stub re-leveled into its own milestone (peer to m1/m2) once PRD-003
+              was written; the local browser UI is large enough (backend wedge + fork-only
+              SPA, split by the #162 boundary) to be a milestone, not a project. See
+              m3 and docs/prds/PRD-003-local-deepnote-ui.md. Status set to done only
+              to retire the stub; the actual work lives under m3 (todo)."
+            status: done
+            notes: 'RETIRED / SUPERSEDED BY m3. Original stub source: README.md roadmap.
+              The full tree (5 stories, 9 projects, 28 features) now lives under milestone
+              m3. Do not plan work from this node — use m3.'
             features: {}
-        notes: '[NEXT — PRD-first]'
+            docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+        notes: "[PROMOTED TO m3] The local-UI work originally stubbed here (m2/s1/local-ui)
+          was promoted to its own milestone, m3 'Local Deepnote UI', once PRD-003
+          was written — it is large enough to be a milestone (backend wedge + fork-only
+          SPA, split by the #162 boundary), not a single project under this story.
+          This story's sole project is now the retired/superseded local-ui stub; all
+          active local-UI work lives under m3. See docs/prds/PRD-003-local-deepnote-ui.md."
       s2:
         id: s2
         title: Users edit notebooks with a local AI agent
@@ -1251,3 +1263,623 @@ milestones:
                 explicit offer to open the upstream PR: the clean contribution diff
                 (contrib/<slug>, code-only) and the process diff (sprint-record/<TAG>,
                 full lifecycle)'
+    notes: The local-UI thread of this milestone (story s1 'Users run the
+      familiar Deepnote Cloud UI locally') was promoted to its own milestone, m3
+      'Local Deepnote UI' (peer to m1/m2), once PRD-003 was written. The
+      m2/s1/local-ui stub is retired/superseded; see m3.
+  m3:
+    id: m3
+    title: Local Deepnote UI
+    description: 'A local browser-based notebook UI — open, view, edit, and reactively
+      run .deepnote projects on local compute, launched from the CLI. The runtime-over-HTTP/WS
+      backend + `deepnote serve` is the upstream-contributable wedge; the browser
+      SPA is a fork-only showcase (per #162, which assigns the interactive UI to deepnote/vscode-deepnote).
+      Re-leveled from the former m2/s1/local-ui stub into its own milestone, peer
+      to m1/m2.'
+    status: in_progress
+    docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+    notes: "Master PRD = PRD-003-local-deepnote-ui.md. The #162 boundary (interactive
+      UI assigned to deepnote/vscode-deepnote; CLI/runtime owned by deepnote/deepnote)
+      is the load-bearing scope decision: backend wedge is upstream-contributable,
+      browser SPA is fork-only showcase. See PRD §'The resolution this PRD commits
+      to'."
+    stories:
+      s1:
+        id: s1
+        title: Headless runtime server + one-command launch
+        description: "THE UPSTREAM WEDGE. Expose runtime-core's existing headless
+          execution over a stable, documented HTTP + WebSocket API (open project,
+          list notebooks/blocks, run block(s), stream onBlockStart/onBlockDone/onOutput,
+          save) with no UI required, plus a `deepnote serve`/`deepnote ui` CLI command
+          that boots it over a local .deepnote project. Reuses ExecutionEngine + server-starter.ts
+          + interpreter/kernel resolution exactly as run.ts composes them. This is
+          the part offered upstream on #162. Covers PRD Phases P0 (architecture ADRs),
+          P1 (headless server core), P6 (CLI integration), and P7 (decompose for upstream).
+          Dev setup: cli/runtime-core area — Python 3 + jinja2; a venv with deepnote-toolkit[server];
+          point pythonEnv/--python at it."
+        status: todo
+        sequence: 1
+        depends_on: []
+        docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+        success_criteria:
+          - "Headless API parity with `run`: a documented HTTP/WS client can open
+            a project, run all blocks, and receive the same IOutputs deepnote run
+            produces — 100% of run's executable block types stream identical IOutputs"
+          - '`deepnote serve project.deepnote --no-open` starts a server and serves
+            /api/project, returning the project tree over HTTP'
+          - 'Streaming fidelity: every onBlockStart/onBlockDone/onOutput event from
+            ExecutionEngine is delivered over the WS in order, with no dropped or
+            reordered events across a full-project run'
+          - 'Failure-category fidelity: API error payloads carry the same failureCategory
+            discriminants as run.ts — missing-kernel / kernel-launch / kernel-died
+            / in-block all distinguishable'
+          - 'Save round-trip fidelity: open → save → re-deserialize yields a project
+            deep-equal to the saved one; serialization is idempotent (a second no-op
+            save produces an empty git diff). Byte-equality with the original file
+            is explicitly NOT the bar'
+          - 'Offered upstream: the backend + serve command are sliced as a clean contrib/*
+            diff off upstream/main and the milestone update is posted to the fork
+            dry-run showcase thread'
+        projects:
+          serve-api:
+            id: serve-api
+            title: HTTP + WebSocket server over runtime-core
+            description: 'A new server package wrapping ExecutionEngine: open a project,
+              list notebooks/blocks, run block(s), stream onBlockStart/onBlockDone/onOutput
+              over WebSocket, and save — with no UI. Reuses server-starter.ts, interpreter/kernel
+              resolution, integrations wiring, and reactivity exactly as run.ts composes
+              them. The shareable wedge offered upstream on #162. Carries the save
+              round-trip safety gate (ships in P1, before any editing UI exists).'
+            status: todo
+            sequence: 1
+            docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+            features:
+              server-package-scaffold:
+                id: server-package-scaffold
+                title: Server package scaffold
+                description: New packages/* server package wrapping
+                  ExecutionEngine, located so it slices clean of the SPA (per
+                  the P0 package-layout ADR). HTTP for request/response +
+                  WebSocket for the execution event stream. No frontend
+                  dependency. Establishes the package boundary that keeps the
+                  backend upstream-sliceable.
+                status: todo
+                sequence: 1
+              project-open-list-api:
+                id: project-open-list-api
+                title: Open project + list notebooks/blocks API
+                description: HTTP endpoints to open a .deepnote project and
+                  return its metadata + notebook/block tree (GET /api/project),
+                  reusing deserializeDeepnoteFile and interpreter/kernel
+                  resolution as run.ts composes them.
+                status: todo
+                sequence: 2
+              execute-stream-ws:
+                id: execute-stream-ws
+                title: Execute block(s) + stream events over WS
+                description: Run block(s) via ExecutionEngine and deliver every
+                  onBlockStart/onBlockDone/onOutput event over the WebSocket in
+                  order, with no dropped or reordered events across a
+                  full-project run. POST /api/notebooks/{nb}/blocks/{id}/run +
+                  WS /api/stream. Preserves the run.ts failureCategory
+                  discriminants (missing-kernel / kernel-launch / kernel-died /
+                  in-block) in error payloads.
+                status: todo
+                sequence: 3
+                depends_on:
+                  - project-open-list-api
+              save-api:
+                id: save-api
+                title: Save API (semantic round-trip + idempotence)
+                description: 'POST /api/project/save writes the .deepnote file via
+                  serializeDeepnoteFile. The save-safety gate: deserialize(serialize(project))
+                  deep-equals project (no content loss) AND serialization is idempotent
+                  (a second no-op save produces an empty git diff). Ships in P1, before
+                  any editing UI exists. Byte-equality with the original file is explicitly
+                  NOT the bar.'
+                status: todo
+                sequence: 4
+                depends_on:
+                  - project-open-list-api
+              server-integration-tests:
+                id: server-integration-tests
+                title: Server integration tests
+                description: 'End-to-end API tests: open a sample project, run it,
+                  stream outputs identical to deepnote run, and save with semantic
+                  round-trip fidelity. Asserts streaming order/fidelity, failure-category
+                  fidelity, and save idempotence — the documented launch criteria
+                  for the wedge.'
+                status: todo
+                sequence: 5
+                depends_on:
+                  - execute-stream-ws
+                  - save-api
+          cli-serve:
+            id: cli-serve
+            title: '`deepnote serve` / `deepnote ui` command'
+            description: The CLI command that boots the serve-api server over a
+              local .deepnote project — a natural sibling of `deepnote run`.
+              Handles port selection via findConsecutiveAvailablePorts
+              (port-in-use falls back to next free port and reports the chosen
+              URL), and optionally opens the browser (--open/--no-open).
+              `deepnote serve` is the canonical headless wedge; `deepnote ui` is
+              a thin alias that defaults --open (final naming is a P6 call).
+              Includes SQL/integration parity with run via the integrations env
+              wiring.
+            status: todo
+            sequence: 2
+            docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+            features:
+              serve-command:
+                id: serve-command
+                title: '`deepnote serve` command'
+                description: 'The canonical `deepnote serve project.deepnote` command:
+                  boots the serve-api server over a local project, handles port selection
+                  via findConsecutiveAvailablePorts (port-in-use falls back to next
+                  free port and reports the chosen URL), with --port and --no-open
+                  flags. A natural sibling of `deepnote run`. Includes clean startup/ready/stop
+                  logging and a Ctrl-C shutdown that stops the toolkit server (engine.stop()).'
+                status: todo
+                sequence: 1
+                depends_on:
+                  - server-package-scaffold
+              browser-launch-alias:
+                id: browser-launch-alias
+                title: '`deepnote ui` browser-opening alias'
+                description: A thin `deepnote ui` alias that defaults --open,
+                  opening the browser to the served URL. `serve` carries
+                  headless-API connotations; `ui` opens a browser — final naming
+                  is a P6 call (Open Questions).
+                status: todo
+                sequence: 2
+                depends_on:
+                  - serve-command
+              sql-integration-parity:
+                id: sql-integration-parity
+                title: SQL / integration parity with `run`
+                description: Local SQL/integration support to the extent run.ts
+                  already supports it, reusing the integrations env wiring. Any
+                  opt-in network feature (e.g. API-backed integrations) must be
+                  off by default and visibly optional to preserve the
+                  local-first guarantee.
+                status: todo
+                sequence: 3
+                depends_on:
+                  - serve-command
+          wedge-slice-showcase:
+            id: wedge-slice-showcase
+            title: Slice the wedge as a contrib diff + showcase post
+            description: "The wedge's delivery (PRD Phase P7). Slice the serve-api
+              + cli-serve as a clean contrib/* diff off upstream/main (code only —
+              no .gitban/.claude) and post the milestone update to the fork dry-run
+              showcase thread on muunkky/deepnote. This is a dry run of the eventual
+              #162 engagement; nothing is pushed to deepnote/deepnote yet. The full
+              SPA monolith stays as the fork-only process diff."
+            status: todo
+            sequence: 3
+            docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+            features:
+              contrib-diff-cut:
+                id: contrib-diff-cut
+                title: Cut the clean contrib/* diff off upstream/main
+                description: Slice serve-api + cli-serve as a clean contrib/*
+                  branch cut from upstream/main — code only, no
+                  .gitban/.claude/docs. Must build clean off upstream/main. The
+                  SPA is explicitly NOT in this diff. This is the exact diff we
+                  would open against deepnote/deepnote once invited.
+                status: todo
+                sequence: 1
+                depends_on:
+                  - server-integration-tests
+              fork-showcase-post:
+                id: fork-showcase-post
+                title: Post the milestone update to the fork showcase thread
+                description: 'Post the milestone update to the fork dry-run showcase
+                  thread on muunkky/deepnote: what shipped, link the contrib diff
+                  and the process diff, label which part is upstream-ready vs fork-only
+                  showcase. A dry run of the eventual #162 engagement — nothing is
+                  pushed to deepnote/deepnote yet (follows the #288 pattern: showcase
+                  and ask before pushing).'
+                status: todo
+                sequence: 2
+                depends_on:
+                  - contrib-diff-cut
+      s2:
+        id: s2
+        title: Open & view a notebook locally
+        description: "The read-only viewer SPA (PRD Phase P2). Introduces the first-ever
+          UI framework + browser bundler to the pnpm monorepo, an app shell that loads
+          a project over the s1 API, and read-only DOM renderers for every block type
+          plus Jupyter IOutput — the browser counterpart to the terminal output-renderer.ts.
+          No execution, no editing yet: renders the project's persisted state in a
+          Cloud-like view. Fork-only showcase."
+        status: todo
+        sequence: 2
+        depends_on:
+          - s1
+        docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+        success_criteria:
+          - 'Per-block-type rendering: each block type renders correctly in the browser
+            — code, sql, markdown, text, visualization, input-*, button, big-number,
+            image, separator all render from a fixture project'
+          - Unknown / unsupported block types fall back safely (raw content +
+            type label) rather than crashing the notebook view
+          - 'Time-to-first-render: from `deepnote serve` to a rendered notebook in
+            the browser is < 10 s on the reference workload (~20-block notebook) with
+            a ready interpreter'
+          - DOM IOutput rendering covers stream, display_data, execute_result,
+            and error output types
+        projects:
+          spa-foundation:
+            id: spa-foundation
+            title: 'SPA foundation: framework, bundler, app shell'
+            description: Introduce a UI framework + browser bundler to the
+              monorepo for the first time (a load-bearing, one-way-ish decision
+              per the P0 toolchain ADR), build the app shell + routing, and load
+              a project over the s1 API into app state. The toolchain must be
+              isolated enough that it does not leak into — or risk — the
+              cleanly-sliceable backend package.
+            status: todo
+            sequence: 1
+            docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+            features:
+              framework-bundler-setup:
+                id: framework-bundler-setup
+                title: UI framework + bundler introduced to the monorepo
+                description: Add the first-ever UI framework and browser bundler
+                  to the pnpm workspace (the workspace has zero frontend tooling
+                  today — Biome/Prettier/vitest/tsc only). Touches CI, lockfile,
+                  lint/format config, and the spell-check dictionary. Per the P0
+                  toolchain ADR; the toolchain stays isolated so it does not
+                  leak into the cleanly-sliceable backend package.
+                status: todo
+                sequence: 1
+              app-shell-and-routing:
+                id: app-shell-and-routing
+                title: App shell + routing
+                description: 'The browser app shell: a left-hand notebook list and
+                  the active notebook rendered top-to-bottom, with routing between
+                  notebooks in a project.'
+                status: todo
+                sequence: 2
+                depends_on:
+                  - framework-bundler-setup
+              project-load-state:
+                id: project-load-state
+                title: Project load over the s1 API into app state
+                description: Fetch a project from the s1 server (GET
+                  /api/project) and load its notebook/block tree into the SPA's
+                  application state, ready to render. The data path the
+                  renderers consume.
+                status: todo
+                sequence: 3
+                depends_on:
+                  - app-shell-and-routing
+          block-renderers:
+            id: block-renderers
+            title: Read-only DOM block renderers
+            description: Read-only DOM renderers for all block types plus
+              Jupyter IOutput — the browser counterpart to the terminal
+              output-renderer.ts. Covers code, sql, markdown, text,
+              visualization, big-number, image, the eight input kinds, button,
+              separator, the IOutput MIME types
+              (stream/display_data/execute_result/error), and a safe fallback
+              for unknown types. Block-type coverage is the SPA's real surface
+              area; rich outputs (HTML tables, images, vega/plotly) are where
+              Cloud-likeness lives.
+            status: todo
+            sequence: 2
+            docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+            features:
+              code-markdown-text-renderers:
+                id: code-markdown-text-renderers
+                title: Code / markdown / text renderers
+                description: Read-only renderers for code blocks (syntax
+                  highlighting + last-saved outputs), markdown blocks (formatted
+                  prose), and text blocks.
+                status: todo
+                sequence: 1
+              sql-renderer:
+                id: sql-renderer
+                title: SQL renderer
+                description: 'Read-only renderer for SQL blocks: shows the query and
+                  its persisted result table.'
+                status: todo
+                sequence: 2
+              viz-bignumber-image-renderers:
+                id: viz-bignumber-image-renderers
+                title: Visualization / big-number / image renderers
+                description: Read-only renderers for visualization blocks
+                  (vega/plotly natively or fall back to the persisted image — a
+                  P2/P3 design-doc call), big-number tiles (showing their
+                  value), and image blocks. Rich visual outputs are where
+                  Cloud-likeness lives.
+                status: todo
+                sequence: 3
+              input-button-separator-renderers:
+                id: input-button-separator-renderers
+                title: Input / button / separator renderers
+                description: Read-only renderers for the eight input kinds
+                  (text/textarea/checkbox/select/slider/date/date-range/file)
+                  showing current values, button blocks, and separators.
+                status: todo
+                sequence: 4
+              ioutput-mime-renderer:
+                id: ioutput-mime-renderer
+                title: Jupyter IOutput MIME renderer
+                description: DOM rendering of Jupyter IOutputs (stream,
+                  display_data, execute_result, error) — the browser counterpart
+                  to the terminal output-renderer.ts. Handles the MIME types
+                  rich outputs use (HTML tables, images, etc.). Shared by all
+                  output-bearing block renderers.
+                status: todo
+                sequence: 5
+              unknown-type-fallback:
+                id: unknown-type-fallback
+                title: Unknown-type safe fallback
+                description: A safe fallback renderer for unsupported / unknown
+                  block types — raw content + type label rather than crashing
+                  the notebook view.
+                status: todo
+                sequence: 6
+      s3:
+        id: s3
+        title: Run blocks with live streamed output
+        description: The live execution UI (PRD Phase P3). Run-this-block /
+          run-all wired to the s1 WebSocket server; kernel outputs stream live
+          into the s2 renderers; execution state and counts tracked;
+          kernel-failure banners surfaced. Scenario 2 of the PRD works
+          end-to-end against a real kernel. Fork-only showcase.
+        status: todo
+        sequence: 3
+        depends_on:
+          - s1
+          - s2
+        docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+        success_criteria:
+          - 'Live execution loop: edit → run → see rich output with no reload; on
+            the reference workload output appears in-place < 2 s on a warm kernel'
+          - Outputs stream live into the rendered notebook in place (no page
+            reload); the execution count increments per run
+          - "Kernel-failure cases surface correctly: an actionable banner (e.g. 'deepnote-toolkit
+            not installed — pip install deepnote-toolkit[server]') rather than a blank
+            cell, distinguishing the run.ts failure categories"
+          - A block exception renders its traceback in place and marks the block
+            failed
+        projects:
+          live-execution:
+            id: live-execution
+            title: Live execution wired to the WS server
+            description: Run-this-block / run-all wired to the s1 WebSocket
+              server; outputs stream live into the s2 renderers; execution state
+              and counts tracked; kernel-failure banners surfaced to the UI (not
+              just the console). Measures the < 2 s in-place output bar against
+              the reference workload — load-bearing for the P0 transport ADR
+              (proxy vs direct), so measured early, not asserted.
+            status: todo
+            sequence: 1
+            docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+            features:
+              run-controls:
+                id: run-controls
+                title: Run-this-block / run-all controls
+                description: UI controls to run a single block (Run /
+                  Shift+Enter) or run-all, dispatching execution requests to the
+                  s1 server.
+                status: todo
+                sequence: 1
+              ws-output-streaming:
+                id: ws-output-streaming
+                title: WebSocket output streaming into renderers
+                description: Consume the s1 WS event stream (block-start /
+                  output / block-done) and stream outputs live into the s2
+                  renderers in place — no page reload. Targets < 2 s in-place
+                  output on a warm kernel on the reference workload (measured,
+                  load-bearing for the P0 transport ADR).
+                status: todo
+                sequence: 2
+                depends_on:
+                  - run-controls
+              execution-state-counts:
+                id: execution-state-counts
+                title: Execution state + counts
+                description: Per-block running/idle indicators and
+                  execution-count tracking that increments per run, mirroring
+                  Cloud's execution state.
+                status: todo
+                sequence: 3
+                depends_on:
+                  - ws-output-streaming
+              failure-banners:
+                id: failure-banners
+                title: Kernel-failure banners
+                description: Actionable kernel-failure banners surfaced to the
+                  UI (not just the console), driven by the run.ts failure
+                  categories — e.g. 'deepnote-toolkit not installed — pip
+                  install deepnote-toolkit[server]' for missing-kernel — rather
+                  than a blank cell. Block exceptions render their traceback in
+                  place and mark the block failed.
+                status: todo
+                sequence: 4
+                depends_on:
+                  - ws-output-streaming
+      s4:
+        id: s4
+        title: Edit blocks & save safely
+        description: Editing + persistence (PRD Phase P4). Per-block editors for
+          the editable types (code, sql, markdown/text source, input values)
+          plus add/delete/reorder of blocks, and safe save back to .deepnote via
+          serializeDeepnoteFile with atomic write (write-temp-then-rename) and
+          external-change detection. Save is the highest-stakes operation in the
+          product; faithful means semantic round-trip + idempotence, not
+          byte-equality. Fork-only showcase.
+        status: todo
+        sequence: 4
+        depends_on:
+          - s3
+        docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+        success_criteria:
+          - "Faithful persistence: edit N blocks, save, re-deserialize — saved project
+            deep-equals the in-UI project; only the user's edits (plus any first-pass
+            canonicalization) appear in the diff"
+          - 'A no-op save is a no-op (idempotent): a second save with no edits produces
+            an empty git diff'
+          - Save is atomic (write-temp-then-rename) — no partial/corrupt file on
+            interruption
+          - External-change conflict is detected and warned, not silently
+            clobbered, when the .deepnote file changed on disk since it was
+            opened
+          - Per-type editors exist for code, sql, markdown/text, and input
+            values; blocks can be added, deleted, and reordered
+        projects:
+          block-editors:
+            id: block-editors
+            title: Per-type block editors + structural edits
+            description: Per-type editors for the editable block types (code,
+              sql, markdown/text source, input config/values) plus
+              add/delete/reorder of blocks. The editable counterpart to the s2
+              read-only renderers.
+            status: todo
+            sequence: 1
+            docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+            features:
+              code-sql-editor:
+                id: code-sql-editor
+                title: Code / SQL editor
+                description: Per-type editors for code and SQL block source,
+                  with appropriate language editing affordances.
+                status: todo
+                sequence: 1
+              markdown-text-editor:
+                id: markdown-text-editor
+                title: Markdown / text editor
+                description: Per-type editors for markdown and text block
+                  source.
+                status: todo
+                sequence: 2
+              input-config-editor:
+                id: input-config-editor
+                title: Input config / value editor
+                description: Editors for the eight input-block kinds — editing
+                  both the input configuration and its current value.
+                status: todo
+                sequence: 3
+              block-add-delete-reorder:
+                id: block-add-delete-reorder
+                title: Add / delete / reorder blocks
+                description: 'Structural editing of the notebook: add a new block,
+                  delete a block, and reorder blocks within a notebook.'
+                status: todo
+                sequence: 4
+          persistence:
+            id: persistence
+            title: Safe save back to .deepnote
+            description: 'Safe save back to the .deepnote file via serializeDeepnoteFile:
+              atomic write (write-temp-then-rename) and external-change detection
+              so a file edited on disk since open is warned about, not clobbered.
+              Faithfulness is semantic round-trip (deserialize(serialize(project))
+              deep-equals project) plus serialization idempotence (serialize(deserialize(s))
+              === s for canonical s), NOT byte-equality — the serializer re-canonicalizes
+              YAML, so a first save may reformat untouched lines but is a true no-op
+              thereafter.'
+            status: todo
+            sequence: 2
+            docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+            features:
+              serialize-save-roundtrip:
+                id: serialize-save-roundtrip
+                title: Serialize + save round-trip
+                description: Save the in-UI project back to .deepnote via
+                  serializeDeepnoteFile so that re-deserializing yields a
+                  project deep-equal to the saved one (no content loss), and a
+                  no-op save is idempotent. Reuses the s1 save-api gate.
+                status: todo
+                sequence: 1
+              atomic-write-external-change-detection:
+                id: atomic-write-external-change-detection
+                title: Atomic write + external-change detection
+                description: Atomic save (write-temp-then-rename) so an
+                  interrupted save never leaves a partial/corrupt file, plus
+                  detection of external edits — if the .deepnote file changed on
+                  disk since it was opened, warn rather than silently clobber.
+                status: todo
+                sequence: 2
+                depends_on:
+                  - serialize-save-roundtrip
+      s5:
+        id: s5
+        title: Reactive re-execution
+        description: Reactivity (PRD Phase P5). Auto re-run of downstream blocks
+          on edit/input change via @deepnote/reactivity's
+          getDownstreamBlocksForBlocksIds, in dependency order, with the
+          Python-only degradation notice. Mirrors Cloud's signature reactive
+          mode against local compute. Input-driven re-runs fire on
+          commit/debounce (slider release / short settle), not continuously per
+          intermediate value. On a non-Python kernel the UI degrades to in-order
+          execution with a visible 'reactivity disabled' notice (mirroring
+          REACTIVITY_PYTHON_ONLY_NOTICE). Fork-only showcase.
+        status: todo
+        sequence: 5
+        depends_on:
+          - s4
+        docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+        success_criteria:
+          - 'Reactive re-run: changing an input re-runs its downstream blocks in dependency
+            order — the downstream chart updates without manual per-block runs'
+          - Re-runs fire on commit/debounce (input release or short settle), not
+            continuously per intermediate value
+          - On a non-Python kernel, reactivity degrades to in-order execution
+            with a visible 'reactivity disabled' notice rather than silently
+            mis-ordering
+          - Downstream re-runs are halted for a branch whose block raised an
+            exception (matching headless semantics)
+        projects:
+          reactive-rerun:
+            id: reactive-rerun
+            title: Reactive downstream re-execution
+            description: Auto re-run of downstream blocks via
+              getDownstreamBlocksForBlocksIds on edit/input change, in
+              dependency order, against a persistent kernel session — net-new
+              work (run.ts only does validation-only dependency analysis today).
+              Includes input-change commit/debounce policy and the Python-only
+              degradation notice on non-Python kernels.
+            status: todo
+            sequence: 1
+            docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+            features:
+              dag-downstream-rerun:
+                id: dag-downstream-rerun
+                title: DAG-driven downstream re-run in dependency order
+                description: On edit, compute downstream blocks via
+                  getDownstreamBlocksForBlocksIds and re-run them in dependency
+                  order against the persistent kernel session. Net-new wiring of
+                  the analysis primitive into a live, ordered re-run loop.
+                  Downstream re-runs are halted for a branch whose block raised
+                  an exception.
+                status: todo
+                sequence: 1
+              input-change-propagation-debounce:
+                id: input-change-propagation-debounce
+                title: Input-change propagation with commit/debounce
+                description: Re-run an input's downstream blocks when its value
+                  changes, firing on commit/debounce (slider release / short
+                  settle), NOT continuously per intermediate value — a long
+                  dependent chain re-running on every drag increment against a
+                  Python kernel is a footgun the design must avoid. Exact
+                  debounce/commit policy is a P5 design-doc detail.
+                status: todo
+                sequence: 2
+                depends_on:
+                  - dag-downstream-rerun
+              python-only-degradation:
+                id: python-only-degradation
+                title: Python-only degradation notice
+                description: "On a non-Python kernel (reactivity is Python-only today
+                  — the DAG analyzer is a Python AST analyzer), degrade exactly as
+                  run.ts does: run blocks in order, no dependency analysis, with a
+                  visible 'reactivity disabled' notice (mirroring REACTIVITY_PYTHON_ONLY_NOTICE)
+                  rather than silently mis-ordering."
+                status: todo
+                sequence: 3
+                depends_on:
+                  - dag-downstream-rerun

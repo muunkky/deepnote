@@ -390,3 +390,4 @@ Turborepo
 # Local Deepnote UI / m3-s1 serve backend (runtime-server, GET /api/project)
 unfakeable
 macrotask
+lossily

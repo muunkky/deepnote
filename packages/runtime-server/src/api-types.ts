@@ -70,13 +70,21 @@ export type WsClientMessage =
 /**
  * A streamed kernel output, attributed to a single block within a run. Mirrors
  * `ExecutionEngine`'s `onOutput(blockId, output)` callback one-to-one.
+ *
+ * Two shapes, discriminated by {@link OutputEvent.truncated}:
+ *
+ * - The normal payload carries a single `output: IOutput` (mirrors `onOutput`).
+ * - The **within-block back-pressure marker** (design doc S1, regime 2) carries
+ *   `truncated: true` and **no** `output`: once a single block's runaway `stream`
+ *   text exceeds the `wsHighWaterMark` bound (default 8 MiB), the remaining
+ *   `stream` text for that block is replaced by exactly one `{ truncated: true }`
+ *   marker. Lifecycle/result outputs (`execute_result`/`display_data`/`error`) are
+ *   never dropped — only a single block's runaway `stream` is bounded, never
+ *   silently.
  */
-export interface OutputEvent {
-  type: 'output'
-  runId: RunId
-  blockId: string
-  output: IOutput
-}
+export type OutputEvent =
+  | { type: 'output'; runId: RunId; blockId: string; output: IOutput; truncated?: false }
+  | { type: 'output'; runId: RunId; blockId: string; truncated: true }
 
 /**
  * Terminal event for the kernel-death catch (KD-5) — the **only** non-`run-done`

@@ -27,9 +27,23 @@ export type {
 } from './api-types'
 // The HTTP router; consumed by `createServer` and the execute routes (steps 4A / 4B).
 export { createRouter } from './router'
+// The run-serialization seam (R4): the single-concurrency FIFO + its sink/option types.
+export {
+  DEFAULT_RUN_QUEUE_DEPTH,
+  DEFAULT_WS_HIGH_WATER_MARK,
+  RunQueue,
+} from './run-queue'
+export type {
+  EnqueueResult,
+  EventSink,
+  RunCallbacks,
+  RunProjectTarget,
+  RunQueueOptions,
+  RunRequest,
+} from './run-queue'
 export type { CreateServerOptions, RuntimeServer } from './server'
-// The Node host factory (execute/stream routing arrives in steps 4A / 4B).
+// The Node host factory (step 4A wires the run routes + `/api/stream` WS fan-out).
 export { createServer } from './server'
-export type { LoadProjectOptions } from './session'
-// The opened-project lifecycle (KD-6 `loadProject`/`startEngine` split).
-export { Session } from './session'
+export type { LoadProjectOptions, RunProjectCallbacks, RunProjectRequest } from './session'
+// The opened-project lifecycle (KD-6 `loadProject`/`startEngine` split) + typed start failure.
+export { Session, StartEngineError } from './session'

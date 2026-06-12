@@ -19,10 +19,23 @@
 
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import { isAbsolute, resolve } from 'node:path'
-import type { DeepnoteFile } from '@deepnote/blocks'
+import { dirname, isAbsolute, resolve } from 'node:path'
+import type { DeepnoteBlock, DeepnoteFile } from '@deepnote/blocks'
 import { deserializeDeepnoteFile } from '@deepnote/blocks'
-import { isNonPythonKernel, resolvePythonExecutable, selectKernelName, selectPythonSpec } from '@deepnote/runtime-core'
+import {
+  type BlockExecutionResult,
+  ExecutionEngine,
+  type ExecutionSummary,
+  type IOutput,
+  type KernelFailureCategory,
+  KernelDiedError,
+  KernelLaunchError,
+  KernelNotRegisteredError,
+  isNonPythonKernel,
+  resolvePythonExecutable,
+  selectKernelName,
+  selectPythonSpec,
+} from '@deepnote/runtime-core'
 import type { ApiProject } from './api-types'
 
 /** Options for opening a project into a {@link Session}. */
@@ -107,14 +120,46 @@ function hashBytes(bytes: Buffer): string {
 }
 
 /**
- * A loaded project: the deserialized file, the bytes' hash, the absolute path, and the
- * resolved capability flags. Held in the {@link Session}; not re-read per request.
+ * A loaded project: the deserialized file, the bytes' hash, the absolute path, the resolved
+ * capability flags, and the load options (threaded into {@link Session.startEngine} to resolve
+ * the engine config). Held in the {@link Session}; not re-read per request.
  */
 interface LoadedProject {
   path: string
   file: DeepnoteFile
   openHash: string
   capabilities: Capabilities
+  options: LoadProjectOptions
+}
+
+/**
+ * A typed kernel-start failure carrying the design-doc {@link KernelFailureCategory} (R5). The
+ * `/…/run` route reads `.failureCategory` to build the HTTP error payload
+ * (`{ error, failureCategory }`) or the terminal WS `run-failed`, rather than re-deriving the
+ * class from a stringified message (KD-5). Raised by {@link Session.startEngine} when the
+ * underlying `engine.start()` throws a typed kernel-failure-family member.
+ */
+export class StartEngineError extends Error {
+  constructor(
+    readonly failureCategory: KernelFailureCategory,
+    message: string
+  ) {
+    super(message)
+    this.name = 'StartEngineError'
+  }
+}
+
+/** The subset of engine callbacks {@link Session.runProject} forwards. */
+export interface RunProjectCallbacks {
+  onBlockStart: (block: DeepnoteBlock, index: number, total: number) => void | Promise<void>
+  onBlockDone: (result: BlockExecutionResult) => void | Promise<void>
+  onOutput: (blockId: string, output: IOutput) => void
+}
+
+/** The per-run request {@link Session.runProject} executes (s1: single-block or run-all). */
+export interface RunProjectRequest {
+  blockId?: string
+  notebookName?: string
 }
 
 /**
@@ -126,6 +171,12 @@ interface LoadedProject {
  */
 export class Session {
   #loaded: LoadedProject | null = null
+  /**
+   * The lazily-started engine (KD-6 `startEngine` half). `null` until the first run triggers
+   * {@link Session.startEngine}; constructed/launched once, then reused across runs (KD-1 — one
+   * engine per serve process, not per request).
+   */
+  #engine: ExecutionEngine | null = null
 
   /**
    * Open a `.deepnote` file: read its bytes, hash them, deserialize, and resolve the
@@ -146,6 +197,78 @@ export class Session {
       file,
       openHash: hashBytes(bytes),
       capabilities,
+      options,
+    }
+  }
+
+  /**
+   * Lazily construct + launch the single {@link ExecutionEngine} (the `startEngine` half of the
+   * KD-6 split) and connect its kernel. Idempotent: the first call starts the engine; later calls
+   * reuse it. A missing / unlaunchable / dead-at-launch kernel surfaces here — **on run** — as a
+   * typed {@link StartEngineError} carrying the design-doc {@link KernelFailureCategory} (R5),
+   * never as an open failure (KD-6). The discriminant is read from the typed kernel-failure-family
+   * instance `engine.start()` throws (KD-5), exactly as `run.ts` preserves it.
+   */
+  async startEngine(): Promise<void> {
+    if (this.#engine) {
+      return
+    }
+    const loaded = this.#requireLoaded()
+    const engine = new ExecutionEngine({
+      // The interpreter that runs the toolkit server (ADR-001 precedence); resolved name-based at
+      // open time, resolved to a real path here. A mis-installed interpreter throws below.
+      pythonEnv: selectPythonSpec({ explicit: loaded.options.python }),
+      // Runs resolve relative paths against the project's own directory, mirroring `deepnote run`.
+      workingDirectory: dirname(loaded.path),
+      // The kernelspec the toolkit server launches (ADR-003); defaults to `python3`.
+      kernelName: selectKernelName({ explicit: loaded.options.kernel }),
+    })
+    try {
+      await engine.start()
+    } catch (error) {
+      // KD-5: preserve the typed discriminant. `engine.start()` rethrows the kernel-failure-family
+      // member (missing/launch/died); map it to the design-doc category for the route's payload.
+      const failureCategory: KernelFailureCategory =
+        error instanceof KernelNotRegisteredError
+          ? 'missing-kernel'
+          : error instanceof KernelLaunchError
+            ? 'kernel-launch'
+            : error instanceof KernelDiedError
+              ? 'kernel-died'
+              : 'kernel-launch'
+      throw new StartEngineError(failureCategory, error instanceof Error ? error.message : String(error))
+    }
+    this.#engine = engine
+  }
+
+  /**
+   * Run the opened project against the started engine, forwarding the engine callbacks. A thin
+   * pass-through to `engine.runProject` (design doc KD-1) — **called only by `run-queue.ts`'s
+   * `drain`** (the M2 invariant), never directly by a route, so no un-serialized run can exist.
+   * Resolves with the {@link ExecutionSummary} (incl. an in-block break, `failedBlocks > 0`, which
+   * resolves — B1); rejects with a {@link KernelDiedError} on mid-run kernel death (the only reject
+   * path, KD-5). Requires {@link Session.startEngine} to have run first.
+   */
+  async runProject(request: RunProjectRequest, callbacks: RunProjectCallbacks): Promise<ExecutionSummary> {
+    const engine = this.#engine
+    if (!engine) {
+      throw new Error('Engine not started; call startEngine() first.')
+    }
+    const loaded = this.#requireLoaded()
+    return engine.runProject(loaded.file, {
+      notebookName: request.notebookName,
+      blockId: request.blockId,
+      onBlockStart: callbacks.onBlockStart,
+      onBlockDone: callbacks.onBlockDone,
+      onOutput: callbacks.onOutput,
+    })
+  }
+
+  /** Stop the engine and release the kernel/server (the `serve` SIGINT path). Idempotent. */
+  async close(): Promise<void> {
+    if (this.#engine) {
+      await this.#engine.stop()
+      this.#engine = null
     }
   }
 

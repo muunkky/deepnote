@@ -1,0 +1,32 @@
+{
+  "card_id": "dn929q",
+  "sprint_tag": "ALTKERN1",
+  "date": "2026-06-11",
+  "verdict_acted_on": "PASS",
+  "invocations": [
+    {
+      "strict_external": true,
+      "verdict": "EXTERNAL_PROBE_ERROR",
+      "error": "strict-external probing requested but no probe is wired; supply --no-strict-external for offline cite-only checks or wire an ExternalStateProbe in-process",
+      "note": "The external-state probe is not wired in this gitban server build (not a fork-specific failure). The fork additionally has GitHub Actions disabled, so no remote CI run on sprint/ALTKERN1 exists to probe."
+    },
+    {
+      "strict_external": false,
+      "verdict_first": "FAIL",
+      "fail_reason": "3 missing_cite on structural Completion Checklist boxes (exactly-one-true / action-filled / per-item-checkboxes); auto-blocked dn929q",
+      "remediation": "Added commit: cites (96af4e0, b0cebce, eb95f5e) to the three structural boxes",
+      "verdict_final": "PASS",
+      "checked_boxes": 5,
+      "auto_unblock": "blocked -> in_progress"
+    }
+  ],
+  "soft_bypass_rationale": "Documented EXTERNAL_PROBE_ERROR path: external CI probing is unavailable (probe unwired + fork Actions disabled). The why-unavailable is recorded in the closeout body's Build & CI rows, which were rewritten to cite LOCAL verification evidence (runtime-core 278 + cli 1004 mocked unit tests; 3/3 real-kernel e2e bash->image/png via pnpm test:integration) rather than claiming a remote CI run. Retried strict_external=false (cite-only + stored-state) -> PASS. Stored-state clean: 0 in_progress cards, roadmap phase1 features flipped to done.",
+  "evidence_commits": {
+    "item3_comment": "96af4e0",
+    "item4_agent_hardfail_test": "b0cebce",
+    "item6_fixture_guard": "eb95f5e",
+    "changelog_0_6_0": "e4b8ea6",
+    "154_doc": "e77a8cf",
+    "integration_ci_job": "e27424a"
+  }
+}

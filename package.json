@@ -30,7 +30,7 @@
   },
   "lint-staged": {
     "**/*.{ts,tsx,html,json,jsonc}": [
-      "pnpm exec biome check --write"
+      "pnpm exec biome check --write --no-errors-on-unmatched"
     ],
     "**/*.{md,yml,yaml}": [
       "pnpm exec prettier --write"

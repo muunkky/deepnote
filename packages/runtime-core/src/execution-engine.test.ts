@@ -1521,6 +1521,45 @@ version: '1.0.0'
     expect(result.error.message).toContain('bash')
   })
 
+  it('aborts an agent block before the OPENAI_API_KEY check / executeAgentBlock on a non-Python kernel', async () => {
+    const engine = newBashEngine()
+    const onBlockDone = vi.fn()
+
+    // Deliberately leave OPENAI_API_KEY unstubbed: the guard must fire *before*
+    // the agent branch ever reads `process.env.OPENAI_API_KEY` or invokes
+    // `executeAgentBlock`. `agent` is a member of VALUE_ADD_BLOCK_TYPES, so the
+    // value-add guard must hard-fail it the same way it hard-fails sql — the
+    // security guarantee that value-add blocks never silently leak codegen to an
+    // alien kernel.
+    await engine.start()
+    try {
+      const file = buildFile([{ type: 'agent', content: 'Analyze the data' }])
+      await engine.runProject(file, { onBlockDone })
+    } finally {
+      await engine.stop()
+    }
+
+    // The agent block is reported as failed, carrying the typed guard error
+    // naming both the block type `agent` and the kernel `bash`.
+    expect(onBlockDone).toHaveBeenCalledTimes(1)
+    const result = onBlockDone.mock.calls[0][0]
+    expect(result.success).toBe(false)
+    expect(result.blockType).toBe('agent')
+    expect(result.error).toBeInstanceOf(UnsupportedBlockOnKernelError)
+    expect(result.error.blockType).toBe('agent')
+    expect(result.error.kernelName).toBe('bash')
+    expect(result.error.message).toContain('agent')
+    expect(result.error.message).toContain('bash')
+
+    // The load-bearing invariant: the guard fired BEFORE the agent branch — the
+    // agent-codegen path (`executeAgentBlock`) was never reached, so no
+    // API-key check ran and no agent code was generated/dispatched.
+    expect(mockExecuteAgentBlock).not.toHaveBeenCalled()
+    expect(mockKernelClient.execute).not.toHaveBeenCalled()
+    // The failure is the value-add guard, not the downstream OPENAI_API_KEY error.
+    expect(result.error.message).not.toContain('OPENAI_API_KEY')
+  })
+
   it('never dispatches a _dntk string to the kernel on the abort path', async () => {
     const engine = newBashEngine()
 

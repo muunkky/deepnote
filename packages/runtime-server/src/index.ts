@@ -44,9 +44,9 @@ export {
   DEFAULT_WS_HIGH_WATER_MARK,
   RunQueue,
 } from './run-queue'
+export type { SaveFs, SaveResult } from './save'
 // The atomic save primitive (4B — the save-safety gate): temp-then-rename + external-change detection.
 export { saveProject } from './save'
-export type { SaveFs, SaveResult } from './save'
 export type { CreateServerOptions, RuntimeServer } from './server'
 // The Node host factory (step 4A wires the run routes + `/api/stream` WS fan-out).
 export { createServer } from './server'

@@ -147,9 +147,9 @@ describe('Capstone 3 — atomicity (temp-then-rename, no leftover, original inta
       },
     }
 
-    await expect(
-      saveProject(target, deserializeDeepnoteFile(fixtureText), originalHash, fs)
-    ).rejects.toThrow('simulated crash')
+    await expect(saveProject(target, deserializeDeepnoteFile(fixtureText), originalHash, fs)).rejects.toThrow(
+      'simulated crash'
+    )
 
     // The temp was created, then cleaned up; nothing survives.
     expect(tempPath).toMatch(/\.tmp-/)

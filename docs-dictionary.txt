@@ -358,3 +358,11 @@ Summarise
 summarised
 centralised
 unstubbed
+
+# Local Deepnote UI / read-only viewer SPA (PRD-003 / m3/s2) + planning-doc terms
+rendermime
+ioutput
+relitigate
+unsanitized
+footgun
+vegalite

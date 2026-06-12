@@ -196,3 +196,18 @@ contract-typed wire bodies). reviewer-2 APPROVAL, no new follow-ups. done.
 cleanly on 4A's settled api-types/router/index/README surface. Full package suite 59/59.
 
 - **➡️ Next: batch 4 — `wd2nil` (step 5, server integration tests, parity with `deepnote run`) — PHASE BARRIER.**
+
+### ⚠️ RE-SEQUENCE: dispatch step 6 (`zq7q0g` serve) BEFORE step 5 (`wd2nil` integration)
+
+**Drift/dependency correction (recovery-authoritative).** `wd2nil` (step 5, integration parity)
+Scenario 3 + DoD outcome 3 require invoking `deepnote serve fixture --no-open` — but that CLI command
+is built by `zq7q0g` (step 6). The cards' own prose confirms the real edge: `zq7q0g` says
+*"Integration Testing | serve smoke lives in step 5"* and its own tests are mocked (suite 6), so it
+does NOT depend on `wd2nil`; its deps (2/3/4A/4B) are all done. The sprint plan numbered them 5→6 but
+the true dependency is **6 enables 5**.
+
+**Resolution:** dispatch order is `zq7q0g` (serve) → `wd2nil` (integration). Step numbers are left as-is
+(they map to design-doc Phase 5/6 that the card prose references); THIS log entry is the ordering
+authority for crash-recovery. A recovery dispatcher MUST run `zq7q0g` before `wd2nil`.
+
+- **➡️ Next: batch 4 — `zq7q0g` (step 6, `deepnote serve`).** Then batch 5 — `wd2nil` (step 5, integration).

@@ -198,7 +198,7 @@ this card already modified (`router.ts`, `save.ts`, `session.ts`, `router-save.t
 so it was reopened onto this card rather than spun out. Fix all three below, keep the
 existing 58/58 suite green, then re-run the package suite + `biome check` + `tsc --noEmit`.
 
-- [ ] **L1 (input-validation gap → 400, not 500).** `handleSave` in `router.ts:124`
+- [x] **L1 (input-validation gap → 400, not 500).** `handleSave` in `router.ts:124`
       validates the body only shallowly (`typeof parsed.project !== 'object' || parsed.project === null`).
       A body with a valid `openHash` but a structurally-invalid `project` (e.g.
       `{ project: {}, openHash: "<correct-on-disk-hash>" }`) passes that check, reaches
@@ -211,7 +211,7 @@ existing 58/58 suite green, then re-run the package suite + `biome check` + `tsc
       NOTE: this fixes the route's error *class* only — it is **not** the open→save contract gap
       tracked in backlog `ad6kmb` (that one adds `file: DeepnoteFile` to `ApiProject` on the open
       side; out of scope here).
-- [ ] **L2 (hash-encoding asymmetry — low-priority robustness).** `session.ts` computes
+- [x] **L2 (hash-encoding asymmetry — low-priority robustness).** `session.ts` computes
       `openHash = hashBytes(bytes)` over the raw on-disk Buffer, while `save.ts` re-hashes the
       current bytes as `sha256(current.toString('utf8'))`. These agree for all valid UTF-8 (and
       `.deepnote` files are always canonical UTF-8), so the loop is consistent in practice; the
@@ -219,7 +219,7 @@ existing 58/58 suite green, then re-run the package suite + `biome check` + `tsc
       decode yields a *false* 409 — which is fail-safe (refuse-to-write, never clobber). If
       addressed, hash both sides over the raw Buffer to remove the asymmetry. Acceptable to leave
       as-is with a code comment if the executor judges the Buffer-hash change not worth the churn.
-- [ ] **L3 (contract-type the wire bodies — cosmetic).** `handleSave` builds the 409 conflict
+- [x] **L3 (contract-type the wire bodies — cosmetic).** `handleSave` builds the 409 conflict
       response inline (`{ error: 'external-change', currentProject, currentHash }` at `router.ts:138`)
       and the 200 body inline (`router.ts:146`) instead of typing them as the `SaveConflictResponse`
       / `SaveProjectResponse` interfaces already defined in `api-types.ts` (lines 94 / 80) for exactly
@@ -228,3 +228,24 @@ existing 58/58 suite green, then re-run the package suite + `biome check` + `tsc
 
 **Source:** e6e3lt review 1. **Files:** packages/runtime-server/src/{router,save,session}.ts,
 packages/runtime-server/src/router-save.test.ts.
+
+
+## Executor close-out (executor-2, LUI1WEDGE — save-endpoint hardening reopen)
+
+**Status:** all three reopen items (L1/L2/L3) fixed, committed, tests green, lint/typecheck/capstone clean. Left `in_progress` for the reviewer. Scope honored: touched **only** `router.ts`, `save.ts`, `router-save.test.ts`. Did **not** touch `ApiProject` / the open side (backlog `ad6kmb` out of scope); the already-approved atomic-write/round-trip/idempotence/409 work at `d890e4d` was untouched.
+
+### What shipped (commit `31f9a87`)
+
+- **L1 (input-validation → 400, primary fix that unblocks step 5).** `handleSave` now validates `project` against the canonical `deepnoteFileSchema` (value-imported from `@deepnote/blocks`) via `safeParse` **before** the write. A body with a valid `openHash` but a structurally-invalid `project` (e.g. `{ project: {}, openHash: <correct-hash> }`) now returns **400** (malformed body) instead of reaching `serializeDeepnoteFile`, throwing a zod error, and leaking as **500**. The validated `validated.data` is forwarded to `session.save`. TDD: the failing `router-save.test.ts` case was written first (asserted 500→expected 400), then made to pass.
+- **L2 (hash-encoding asymmetry — robustness, took the symmetric fix, not the comment).** Chose the no-tech-debt path: `save.ts`'s `sha256` now hashes the **raw Buffer** (both the on-disk `current` Buffer for conflict detection and the written `Buffer.from(yaml,'utf8')` for `savedHash`), byte-for-byte identical to `session.ts`'s `hashBytes`. Removes the open-time-vs-save-time `toString('utf8')` divergence that could yield a false 409 on invalid-UTF-8 on-disk bytes. `savedHash` still equals the `openHash` a re-open would compute, so the same-client immediate-re-save no-op invariant holds.
+- **L3 (contract-type the wire bodies — cosmetic).** The inline 409 and 200 response objects in `handleSave` are now annotated `SaveConflictResponse` / `SaveProjectResponse` (already defined in `api-types.ts`), so a future contract drift is a compile error.
+
+### What the tests prove (honest scope)
+
+- **`router-save.test.ts`: 6/6 PASS** — the 5 pre-existing wire-shape tests plus the new **L1** case: a partially-constructed `DeepnoteFile` body (`{ project: {}, openHash: <correct-on-disk-hash> }`) → **400** with the on-disk bytes **unchanged** (no write). All run through a real `createServer`+`fetch` over the real `bash-image.deepnote` fixture.
+- **Full runtime-server suite: 59/59 PASS** (`VITEST_MAX_WORKERS=2 VITEST_TEST_TIMEOUT=30000`). The L2 raw-Buffer hash change keeps the existing `save.test.ts` (8) and the idempotence/409 HTTP tests green — for the canonical UTF-8 fixture, raw-Buffer and `update(text,'utf8')` digests are identical, so no existing assertion shifted.
+- **`biome check --write packages/runtime-server`: clean** (no fixes applied). **`tsc --noEmit`: clean.** **`check:types-subpath` (capstone, against built `dist/` after `pnpm run build`): PASS.**
+
+### Spell-check note (environment, not content)
+
+`pnpm spell-check` (and per-file `cspell lint`) report `Files checked: 0` in this worktree — the same cspell worktree glob-resolution quirk executor-1 flagged, not a content issue. My additions use only standard/established project vocabulary already in the tree (`deepnoteFileSchema`, `openHash`, `sha256`, `utf-8`, `zod`, idempotent). Flagging for the PR/closeout agent to re-verify spell-check from the parent repo.

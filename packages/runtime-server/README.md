@@ -12,9 +12,9 @@ never reaches the browser.
 
 ## Layout (ADR-007 §6)
 
-| Entry | Import | Contents |
-| :--- | :--- | :--- |
-| `.` | `@deepnote/runtime-server` | Node host: `createServer(opts) → { listen, close }`, plus a re-export of the contract types. Consumed by `@deepnote/cli`. |
+| Entry     | Import                           | Contents                                                                                                                                                               |
+| :-------- | :------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.`       | `@deepnote/runtime-server`       | Node host: `createServer(opts) → { listen, close }`, plus a re-export of the contract types. Consumed by `@deepnote/cli`.                                              |
 | `./types` | `@deepnote/runtime-server/types` | **Node-import-free** API contract — `type`/`interface` only, zero runtime import. Imported by the m3/s2 SPA so the browser's type graph never picks up Node/HTTP/`ws`. |
 
 The split is load-bearing: the SPA imports the wire shapes from `./types` and

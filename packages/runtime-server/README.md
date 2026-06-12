@@ -225,10 +225,31 @@ exists. Three guarantees:
 and `ws`. **No frontend dependency** — the package must never drag a browser
 toolchain into the backend (a slice-integrity grep enforces this).
 
+## Verified parity with `deepnote run`
+
+The server's headline promise — _it runs your project exactly the way `deepnote run` does_ — is
+**proven against a real kernel, not asserted**. The real-kernel integration suite
+(`test-integration/server-run-parity.integration.test.ts`) boots this server over a fixture, drives
+`GET /api/project` + run-all over `/api/stream`, collects the streamed `IOutput`s, and asserts they
+**deep-equal** the `IOutput`s `deepnote run --output json` produces for the same file (100% of the
+fixture's executable block types). The same suite proves three more end-to-end guarantees:
+
+- a deliberately-missing kernel surfaces the typed `missing-kernel` discriminant (never an opaque 500),
+- a mid-run kernel death is terminal — `run-failed { failureCategory: 'kernel-died' }` with no further
+  events for that run,
+- `serve`'s real socket is bound to loopback (`127.0.0.1`, never `0.0.0.0`) — the live-socket guard for
+  the localhost-trust security boundary.
+
+These are `*.integration.test.ts` files: the always-on mocked `pnpm test` **excludes** them (KD-9); they
+run only under `pnpm test:integration` in the `integration-kernels` CI job, which provisions a
+`deepnote-toolkit[server]` venv. Without that venv (or with `RUN_INTEGRATION_TESTS` unset) every test
+self-skips cleanly.
+
 ## Develop
 
 ```bash
 pnpm --filter @deepnote/runtime-server build   # tsdown → dist (index + api-types entries)
 pnpm --filter @deepnote/runtime-server test    # vitest (lifecycle + contract + no-runtime-import)
 pnpm --filter @deepnote/runtime-server exec tsc --noEmit
+pnpm test:integration                          # real-kernel parity (integration-kernels CI job; self-skips with no venv)
 ```

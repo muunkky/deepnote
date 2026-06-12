@@ -27,11 +27,11 @@ import {
   ExecutionEngine,
   type ExecutionSummary,
   type IOutput,
-  type KernelFailureCategory,
+  isNonPythonKernel,
   KernelDiedError,
+  type KernelFailureCategory,
   KernelLaunchError,
   KernelNotRegisteredError,
-  isNonPythonKernel,
   resolvePythonExecutable,
   selectKernelName,
   selectPythonSpec,
@@ -163,13 +163,27 @@ export interface RunProjectRequest {
 }
 
 /**
+ * The session surface the {@link createServer} host depends on — the route + queue collaborators
+ * (`apiProject`, `startEngine`, `runProject`, `close`). {@link Session} implements it. Declared
+ * as an interface (not the concrete class) so the server is decoupled from the engine wiring and
+ * the HTTP/WS layer is unit-testable with a fake session — no real kernel required. 4B's `save`
+ * surface extends this additively.
+ */
+export interface ServerSession {
+  apiProject(): ApiProject
+  startEngine(): Promise<void>
+  runProject(request: RunProjectRequest, callbacks: RunProjectCallbacks): Promise<ExecutionSummary>
+  close(): Promise<void>
+}
+
+/**
  * The opened-project lifecycle for one serve process.
  *
  * In s1 the session owns the loaded project (this card) and will own the lazily-started
  * `ExecutionEngine` (Phase 3). Construct it, `loadProject(path)` once, then serve
  * `GET /api/project` from the held state via {@link Session.apiProject}.
  */
-export class Session {
+export class Session implements ServerSession {
   #loaded: LoadedProject | null = null
   /**
    * The lazily-started engine (KD-6 `startEngine` half). `null` until the first run triggers

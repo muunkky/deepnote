@@ -30,10 +30,9 @@
  * never dropped.
  */
 
-import type { DeepnoteBlock, DeepnoteFile } from '@deepnote/blocks'
+import type { DeepnoteBlock } from '@deepnote/blocks'
+import type { BlockExecutionResult, ExecutionSummary, IOutput } from '@deepnote/runtime-core'
 import { KernelDiedError, type KernelFailureCategory } from '@deepnote/runtime-core'
-import type { BlockExecutionResult, ExecutionSummary } from '@deepnote/runtime-core'
-import type { IOutput } from '@deepnote/runtime-core'
 import type { RunId, WsServerEvent } from './api-types'
 
 /** Default bounded backlog before new runs are rejected (design doc R4, `maxDepth`). */

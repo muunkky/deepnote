@@ -31,7 +31,7 @@ import { describe, expect, it } from 'vitest'
 const srcDir = dirname(fileURLToPath(import.meta.url))
 
 /** The files permitted to reference `.runProject` (the queue caller + the session pass-through). */
-const ALLOWED_RUNPROJECT_FILES = new Set(['run-queue.ts', 'session.ts'])
+const ALLOWED_RUN_PROJECT_FILES = new Set(['run-queue.ts', 'session.ts'])
 
 /** Collect non-test `.ts` source files in the package `src/`. */
 function sourceFiles(): string[] {
@@ -66,7 +66,7 @@ describe('M2: engine.runProject is referenced only by the serialization queue', 
       if (fileName === 'run-queue.ts') {
         queueReferences = true
       }
-      if (!ALLOWED_RUNPROJECT_FILES.has(fileName)) {
+      if (!ALLOWED_RUN_PROJECT_FILES.has(fileName)) {
         offenders.push(fileName)
       }
     }

@@ -1,14 +1,14 @@
 import type { DeepnoteBlock } from '@deepnote/blocks'
-import { type BlockExecutionResult, type ExecutionSummary, type IOutput, KernelDiedError } from '@deepnote/runtime-core'
+import { type ExecutionSummary, type IOutput, KernelDiedError } from '@deepnote/runtime-core'
 import { describe, expect, it } from 'vitest'
 import type { WsServerEvent } from './api-types'
 import {
   type EventSink,
   type RunCallbacks,
   type RunProjectTarget,
+  RunQueue,
   type RunQueueOptions,
   type RunRequest,
-  RunQueue,
 } from './run-queue'
 
 /** A plain `runProject` function shape, for the mocks below. */
@@ -17,6 +17,19 @@ type RunProjectFn = RunProjectTarget['runProject']
 /** Build a queue from a bare `runProject` function — wraps it in the {@link RunProjectTarget}. */
 function q(runProject: RunProjectFn, sink: EventSink, options?: RunQueueOptions): RunQueue {
   return new RunQueue({ runProject }, sink, options)
+}
+
+/** A manually-settled promise, for the "run stays in flight until the test releases it" mocks. */
+interface Deferred<T> {
+  promise: Promise<T>
+  resolve: (value: T) => void
+}
+function deferred<T>(): Deferred<T> {
+  let resolve: (value: T) => void = () => {}
+  const promise = new Promise<T>(r => {
+    resolve = r
+  })
+  return { promise, resolve }
 }
 
 /**
@@ -55,8 +68,8 @@ const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0))
 describe('RunQueue — enqueue policy (R4: P1/P2/P3/P5)', () => {
   it('P1: an idle queue runs immediately, assigning runId 1 and emitting run-start (no run-queued)', async () => {
     const sink = new RecordingSink()
-    let resolveRun: (s: ExecutionSummary) => void = () => {}
-    const runProject: RunProjectFn = () => new Promise<ExecutionSummary>(r => (resolveRun = r))
+    const d_resolveRun = deferred<ExecutionSummary>()
+    const runProject: RunProjectFn = () => d_resolveRun.promise
     const queue = q(runProject, sink)
 
     const result = queue.enqueue({ blockId: 'b1' })
@@ -65,14 +78,14 @@ describe('RunQueue — enqueue policy (R4: P1/P2/P3/P5)', () => {
     expect(sink.events[0]).toEqual({ type: 'run-start', runId: 1, totalBlocks: 0 })
     expect(sink.events.some(e => e.type === 'run-queued')).toBe(false)
 
-    resolveRun(summary())
+    d_resolveRun.resolve(summary())
     await tick()
   })
 
   it('P2: a second run while one is in flight enqueues, emits run-queued {queueDepth}, returns 202-class accepted', async () => {
     const sink = new RecordingSink()
-    let resolveFirst: (s: ExecutionSummary) => void = () => {}
-    const runProject: RunProjectFn = () => new Promise<ExecutionSummary>(r => (resolveFirst = r))
+    const d_resolveFirst = deferred<ExecutionSummary>()
+    const runProject: RunProjectFn = () => d_resolveFirst.promise
     const queue = q(runProject, sink)
 
     queue.enqueue({ blockId: 'b1' }) // P1: runs, blocks on the pending promise
@@ -84,14 +97,14 @@ describe('RunQueue — enqueue policy (R4: P1/P2/P3/P5)', () => {
     expect(second.queueDepth).toBe(1)
     expect(sink.events).toContainEqual({ type: 'run-queued', runId: 2, queueDepth: 1 })
 
-    resolveFirst(summary())
+    d_resolveFirst.resolve(summary())
     await tick()
   })
 
   it('P3: at maxDepth a new run is REJECTED with no runId consumed and NO WS event', async () => {
     const sink = new RecordingSink()
-    let resolveFirst: (s: ExecutionSummary) => void = () => {}
-    const runProject: RunProjectFn = () => new Promise<ExecutionSummary>(r => (resolveFirst = r))
+    const d_resolveFirst = deferred<ExecutionSummary>()
+    const runProject: RunProjectFn = () => d_resolveFirst.promise
     const queue = q(runProject, sink, { maxDepth: 1 })
 
     queue.enqueue({ blockId: 'b1' }) // P1 (running)
@@ -105,7 +118,7 @@ describe('RunQueue — enqueue policy (R4: P1/P2/P3/P5)', () => {
     // No WS event for the rejected request, and no runId burned (next accept reuses it).
     expect(sink.events.length).toBe(before)
 
-    resolveFirst(summary())
+    d_resolveFirst.resolve(summary())
     await tick()
   })
 
@@ -113,10 +126,10 @@ describe('RunQueue — enqueue policy (R4: P1/P2/P3/P5)', () => {
     const sink = new RecordingSink()
     const started: RunId[] = []
     type RunId = number
-    let resolveFirst: (s: ExecutionSummary) => void = () => {}
+    const d_resolveFirst = deferred<ExecutionSummary>()
     const runProject: RunProjectFn = (req: RunRequest) => {
       started.push(Number(req.blockId?.replace('b', '')))
-      return new Promise<ExecutionSummary>(r => (resolveFirst = r))
+      return d_resolveFirst.promise
     }
     const queue = q(runProject, sink)
 
@@ -126,7 +139,7 @@ describe('RunQueue — enqueue policy (R4: P1/P2/P3/P5)', () => {
     expect(queue.cancel(second.runId)).toBe(true)
     expect(sink.events).toContainEqual({ type: 'run-cancelled', runId: second.runId })
 
-    resolveFirst(summary())
+    d_resolveFirst.resolve(summary())
     await tick()
     // b2 (runId 2) was cancelled before starting — only b1 ever ran.
     expect(started).toEqual([1])
@@ -135,8 +148,8 @@ describe('RunQueue — enqueue policy (R4: P1/P2/P3/P5)', () => {
 
   it('cancel of an unknown/running runId is a no-op (false), never faking a running-cancel (B2)', async () => {
     const sink = new RecordingSink()
-    let resolveRun: (s: ExecutionSummary) => void = () => {}
-    const runProject: RunProjectFn = () => new Promise<ExecutionSummary>(r => (resolveRun = r))
+    const d_resolveRun = deferred<ExecutionSummary>()
+    const runProject: RunProjectFn = () => d_resolveRun.promise
     const queue = q(runProject, sink)
 
     const first = queue.enqueue({ blockId: 'b1' }) // running
@@ -145,7 +158,7 @@ describe('RunQueue — enqueue policy (R4: P1/P2/P3/P5)', () => {
     expect(queue.cancel(999)).toBe(false)
     expect(sink.events.some(e => e.type === 'run-cancelled')).toBe(false)
 
-    resolveRun(summary())
+    d_resolveRun.resolve(summary())
     await tick()
   })
 })
@@ -250,7 +263,11 @@ describe('RunQueue — kernel-death terminal (KD-5)', () => {
     for (let i = 0; i < 5; i++) await tick()
 
     const terminal = sink.events[sink.events.length - 1]
-    expect(terminal).toMatchObject({ type: 'run-failed', failureCategory: 'kernel-died', message: 'kernel died mid-run' })
+    expect(terminal).toMatchObject({
+      type: 'run-failed',
+      failureCategory: 'kernel-died',
+      message: 'kernel died mid-run',
+    })
     // Read the discriminant from the typed instance, NOT a stringified message: a plain
     // Error with 'kernel-died' in its text must NOT be mapped to kernel-died.
     expect(sink.events.some(e => e.type === 'run-done')).toBe(false)
@@ -351,7 +368,12 @@ describe('RunQueue — back-pressure regime 2 (within-block: bounded stream + tr
         cb.onOutput(b.id, streamOutput('x'.repeat(512)))
       }
       // A NON-stream result output must NEVER be dropped, even past the bound.
-      cb.onOutput(b.id, { output_type: 'execute_result', data: { 'text/plain': '42' }, metadata: {}, execution_count: 1 })
+      cb.onOutput(b.id, {
+        output_type: 'execute_result',
+        data: { 'text/plain': '42' },
+        metadata: {},
+        execution_count: 1,
+      })
       cb.onOutput(b.id, { output_type: 'error', ename: 'X', evalue: 'y', traceback: [] })
       await cb.onBlockDone({
         blockId: b.id,
@@ -380,7 +402,9 @@ describe('RunQueue — back-pressure regime 2 (within-block: bounded stream + tr
     expect(afterMarkerStream.length).toBe(0)
 
     // Lifecycle + result/error outputs survive the flood.
-    const resultOutputs = outputs.filter(e => 'output' in e && (e.output.output_type === 'execute_result' || e.output.output_type === 'error'))
+    const resultOutputs = outputs.filter(
+      e => 'output' in e && (e.output.output_type === 'execute_result' || e.output.output_type === 'error')
+    )
     expect(resultOutputs.length).toBe(2)
     expect(sink.events.some(e => e.type === 'block-start')).toBe(true)
     expect(sink.events.some(e => e.type === 'block-done')).toBe(true)
@@ -394,7 +418,14 @@ describe('RunQueue — back-pressure regime 2 (within-block: bounded stream + tr
       await cb.onBlockStart(b, 0, 1)
       cb.onOutput(b.id, streamOutput('small'))
       cb.onOutput(b.id, streamOutput('output'))
-      await cb.onBlockDone({ blockId: b.id, blockType: 'code', success: true, outputs: [], executionCount: 1, durationMs: 1 })
+      await cb.onBlockDone({
+        blockId: b.id,
+        blockType: 'code',
+        success: true,
+        outputs: [],
+        executionCount: 1,
+        durationMs: 1,
+      })
       return summary()
     }
     const queue = q(runProject, sink, { wsHighWaterMark: 8 * 1024 * 1024 })

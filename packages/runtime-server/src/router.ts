@@ -13,8 +13,8 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { StartEngineError, type Session } from './session'
 import type { RunQueue } from './run-queue'
+import { type ServerSession, StartEngineError } from './session'
 
 /** A JSON error body, matching the design-doc `{ error }` shape. */
 interface ErrorBody {
@@ -44,7 +44,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
  * when the session was opened, or a not-yet-loaded session) maps to `400 { error }` rather
  * than a crash — a missing kernel does **not** fail open (it is a capability flag).
  */
-function handleGetProject(res: ServerResponse, session: Session): void {
+function handleGetProject(res: ServerResponse, session: ServerSession): void {
   try {
     sendJson(res, 200, session.apiProject())
   } catch (err) {
@@ -66,7 +66,7 @@ function handleGetProject(res: ServerResponse, session: Session): void {
  */
 async function handleRun(
   res: ServerResponse,
-  session: Session,
+  session: ServerSession,
   queue: RunQueue,
   request: { blockId?: string; notebookName?: string }
 ): Promise<void> {
@@ -103,7 +103,7 @@ async function handleRun(
  * works without an execution surface; a run route with no queue returns `404`.
  */
 export function createRouter(
-  session: Session,
+  session: ServerSession,
   queue?: RunQueue
 ): (req: IncomingMessage, res: ServerResponse) => void {
   return (req, res) => {

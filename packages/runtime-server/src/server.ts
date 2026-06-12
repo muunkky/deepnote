@@ -17,7 +17,7 @@ import { WebSocket, WebSocketServer } from 'ws'
 import type { WsClientMessage, WsServerEvent } from './api-types'
 import { createRouter } from './router'
 import { type EventSink, RunQueue } from './run-queue'
-import type { Session } from './session'
+import type { ServerSession } from './session'
 
 /** The WS path the event stream is served on (KD-4). */
 const STREAM_PATH = '/api/stream'
@@ -31,7 +31,7 @@ export interface CreateServerOptions {
    * started lazily by the queue on the first run. Omitted in the scaffold lifecycle test, where
    * every request 503s.
    */
-  session?: Session
+  session?: ServerSession
   /**
    * Bounded run-queue depth before new runs are rejected (design doc R4, P3). Default 8 via
    * {@link RunQueue}.
@@ -157,7 +157,7 @@ export function createServer(options: CreateServerOptions = {}): RuntimeServer {
  * surfaced as a terminal `run-failed` over the stream (the WS analogue of the HTTP error body).
  * A malformed message is ignored — the WS contract carries no error envelope in s1.
  */
-function handleClientMessage(session: Session, queue: RunQueue, data: WebSocket.RawData): void {
+function handleClientMessage(session: ServerSession, queue: RunQueue, data: WebSocket.RawData): void {
   let message: WsClientMessage
   try {
     message = JSON.parse(data.toString()) as WsClientMessage

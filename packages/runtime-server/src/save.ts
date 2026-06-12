@@ -28,9 +28,15 @@ import { dirname, join } from 'node:path'
 import type { DeepnoteFile } from '@deepnote/blocks'
 import { deserializeDeepnoteFile, serializeDeepnoteFile } from '@deepnote/blocks'
 
-/** Hex SHA-256 of a UTF-8 string — the same digest `session.ts` computes over the on-disk bytes. */
-function sha256(text: string): string {
-  return createHash('sha256').update(text, 'utf8').digest('hex')
+/**
+ * Hex SHA-256 of raw bytes — byte-for-byte identical to `session.ts`'s `hashBytes`, which hashes the
+ * on-disk Buffer directly. Hashing the raw Buffer (not a `toString('utf8')` decode) removes the
+ * encoding asymmetry that previously sat between open-time and save-time hashing: a file with
+ * invalid UTF-8 on disk would decode lossily and yield a *false* 409, whereas a raw-Buffer hash on
+ * both sides is always consistent. The optimistic-concurrency token compares like-for-like.
+ */
+function sha256(bytes: Buffer): string {
+  return createHash('sha256').update(bytes).digest('hex')
 }
 
 /**
@@ -87,7 +93,7 @@ export async function saveProject(
     current = null
   }
   if (current !== null) {
-    const currentHash = sha256(current.toString('utf8'))
+    const currentHash = sha256(current)
     if (currentHash !== openHash) {
       // Someone edited the file since we opened it. Refuse and hand back the on-disk content;
       // perform NO write so the concurrent edit is never clobbered.
@@ -116,7 +122,11 @@ export async function saveProject(
     throw err
   }
 
-  return { conflict: false, savedHash: sha256(yaml), bytesWritten: Buffer.byteLength(yaml, 'utf8') }
+  // `savedHash` hashes the exact bytes written (the utf-8 encoding of `yaml`), so it equals the
+  // `openHash` a subsequent re-open would compute via `session.ts`'s raw-Buffer `hashBytes` — the
+  // session adopts it as the next `openHash`, making the same client's immediate re-save a no-op.
+  const written = Buffer.from(yaml, 'utf8')
+  return { conflict: false, savedHash: sha256(written), bytesWritten: written.byteLength }
 }
 
 /** The final path segment — the temp file sits beside the target, sharing its basename prefix. */

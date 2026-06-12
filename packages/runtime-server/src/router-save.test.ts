@@ -138,4 +138,25 @@ describe('POST /api/project/save (HTTP integration)', () => {
     })
     expect(res.status).toBe(400)
   })
+
+  it('400 (NOT 500) when project is a structurally-invalid DeepnoteFile, with NO write', async () => {
+    // A body that passes the shallow `typeof project === 'object'` guard and carries the CORRECT
+    // on-disk openHash, but whose `project` is not a valid DeepnoteFile. Before L1 this reached the
+    // serializer, threw a zod error, and leaked as 500. It must be classified 400 (malformed body)
+    // — and must never write, because the schema failure is caught before the atomic write path.
+    const open = await openProject()
+    const before = readFileSync(target, 'utf8')
+    const res = await fetch(`${baseUrl}/api/project/save`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      // `{ project: {} }` is an object (passes the shallow guard) but missing the required
+      // `version`/`project`/… fields, so `deepnoteFileSchema.safeParse` fails.
+      body: JSON.stringify({ project: {}, openHash: open.openHash }),
+    })
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: string }
+    expect(typeof body.error).toBe('string')
+    // No write: a schema-invalid body never reaches the atomic write path.
+    expect(readFileSync(target, 'utf8')).toBe(before)
+  })
 })

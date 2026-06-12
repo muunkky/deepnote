@@ -13,7 +13,8 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { SaveProjectRequest } from './api-types'
+import { deepnoteFileSchema } from '@deepnote/blocks'
+import type { SaveConflictResponse, SaveProjectRequest, SaveProjectResponse } from './api-types'
 import type { RunQueue } from './run-queue'
 import { type ServerSession, StartEngineError } from './session'
 
@@ -124,7 +125,17 @@ async function handleSave(res: ServerResponse, session: ServerSession, req: Inco
     if (typeof parsed?.openHash !== 'string' || typeof parsed?.project !== 'object' || parsed.project === null) {
       throw new Error('save body must be { project: DeepnoteFile, openHash: string }')
     }
-    request = { project: parsed.project, openHash: parsed.openHash }
+    // Validate `project` against the canonical schema BEFORE the write. The shallow `typeof object`
+    // guard above only proves the field is present; a structurally-invalid `project` (e.g. missing
+    // the required `version`) would otherwise reach `serializeDeepnoteFile` and throw a zod error
+    // that the write-path try/catch maps to 500, leaking the internal serializer error. A malformed
+    // body is a 400 (client error), so parse-then-validate here and surface the schema failure as a
+    // 400 — never reaching the atomic write path (no write on a schema-invalid body).
+    const validated = deepnoteFileSchema.safeParse(parsed.project)
+    if (!validated.success) {
+      throw new Error(`save body project is not a valid DeepnoteFile: ${validated.error.message}`)
+    }
+    request = { project: validated.data, openHash: parsed.openHash }
   } catch (err) {
     const error: ErrorBody = { error: err instanceof Error ? err.message : String(err) }
     sendJson(res, 400, error)
@@ -135,14 +146,16 @@ async function handleSave(res: ServerResponse, session: ServerSession, req: Inco
     const result = await session.save(request)
     if (result.conflict) {
       // KD-7: external change detected — no write happened; hand back the current on-disk content.
-      sendJson(res, 409, {
+      const conflict: SaveConflictResponse = {
         error: 'external-change',
         currentProject: result.currentProject,
         currentHash: result.currentHash,
-      })
+      }
+      sendJson(res, 409, conflict)
       return
     }
-    sendJson(res, 200, { savedHash: result.savedHash, bytesWritten: result.bytesWritten })
+    const ok: SaveProjectResponse = { savedHash: result.savedHash, bytesWritten: result.bytesWritten }
+    sendJson(res, 200, ok)
   } catch (err) {
     const error: ErrorBody = { error: err instanceof Error ? err.message : String(err) }
     sendJson(res, 500, error)

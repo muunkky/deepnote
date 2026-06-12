@@ -171,6 +171,12 @@ export class KernelClient {
     let specs: KernelspecsResponse
     try {
       const base = serverUrl.replace(/\/$/, '')
+      // Raw `fetch` is deliberate for Phase 1's token-less LOCAL deepnote-toolkit
+      // server (matches the NOM-002 spike's direct REST probing). It does NOT
+      // carry the auth token / base-URL / custom headers that
+      // `ServerConnection.makeSettings` applies. If a future deployment (Phase 2+)
+      // puts the toolkit server behind auth or a non-trivial base path, route
+      // this pre-flight through `makeSettings` instead.
       const response = await fetch(`${base}/api/kernelspecs`)
       if (!response.ok) {
         return undefined // fall back to /api readiness, not a missing-kernel error

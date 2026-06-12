@@ -205,12 +205,12 @@ exists. Three guarantees:
 
 **Responses:**
 
-| Status                                                            | When                                                                                                      |
-| :---------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------- |
-| `200 { savedHash, bytesWritten }`                                 | written atomically; `savedHash` is the SHA-256 of the persisted bytes — adopt it as your next `openHash`   |
-| `409 { error:'external-change', currentProject, currentHash }`    | the on-disk hash ≠ `openHash` (an external edit since open); **no write performed** — reconcile and retry  |
-| `400 { error }`                                                   | malformed body (not JSON, or missing `project`/`openHash`); the save never runs                           |
-| `500 { error }`                                                   | a genuine write/rename failure (temp already cleaned up; original untouched)                               |
+| Status                                                         | When                                                                                                      |
+| :------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------- |
+| `200 { savedHash, bytesWritten }`                              | written atomically; `savedHash` is the SHA-256 of the persisted bytes — adopt it as your next `openHash`  |
+| `409 { error:'external-change', currentProject, currentHash }` | the on-disk hash ≠ `openHash` (an external edit since open); **no write performed** — reconcile and retry |
+| `400 { error }`                                                | malformed body (not JSON, or missing `project`/`openHash`); the save never runs                           |
+| `500 { error }`                                                | a genuine write/rename failure (temp already cleaned up; original untouched)                              |
 
 > **Open→save loop (s1 caveat).** The save body is a **full `DeepnoteFile`**, but the
 > `GET /api/project` `ApiProject` envelope currently exposes only `metadata` + `project` (not the

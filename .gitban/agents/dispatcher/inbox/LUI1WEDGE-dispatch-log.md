@@ -62,4 +62,27 @@ batch 1 (`87ifqe`). Keep `.gitban` board commits separate from code commits (the
 
 ## Dispatch history
 
-_(no batches dispatched yet — pre-dispatch)_
+### Resume (fresh session after /clear)
+
+- Phase 0 re-verified idempotent: orphan sweep clean; working tree clean; `WorktreeCreate` hook ok;
+  `health_check` healthy, `pending_migrations: []`; closeout card `od8esg` present; all 12 cards `todo`.
+- **Push-hook OOM resolved (standing pattern).** The pre-push hook runs `pnpm lintAndFormat && pnpm
+  typecheck && pnpm test && pnpm spell-check`; `typecheck`'s `pnpm -r exec tsc --noEmit` fans out
+  concurrent `tsc` and SIGKILL-OOMs on this 6.3Gi/no-swap box (verified: `packages/convert` typechecks
+  clean in isolation). Fixed cleanly — **prefix every dispatcher push with
+  `npm_config_workspace_concurrency=1`** to serialize the recursive exec. No `--no-verify`; full CI
+  still runs (2365 tests green). Reuse for all pushes this sprint.
+- Branch override conveyed to executors via the inbox directive (their first-read channel): substitute
+  `milestone/m3-local-ui` for `sprint/LUI1WEDGE` in the worktree branch-base check, else they abort on
+  the non-existent ref.
+
+### Batch 1 — `87ifqe` (step 2, server-package-scaffold)
+
+- Executor (executor-1, worktree `agent-aaab985ee2536fba4`) completed: 2 code commits, base check passed
+  on the override. Fast-forward merge `a654fdc..20970b6` into `milestone/m3-local-ui` (12 files, +621).
+  Worktree/branch/`-done` tag cleaned up. Card left `in_progress` for reviewer.
+- Reviewer relays from executor: (1) `madge`/`dependency-cruiser` not installed → implemented the
+  ADR-007 §6 no-runtime-import invariant via the TS compiler API (AST + transpile-erasure) in the
+  always-on `pnpm test` — intentional, stronger than madge, not debt. (2) The literal AC grep
+  `git grep -iE 'react|vite|apps/'` false-positives on `@deepnote/reactivity`/`vitest` (zero real
+  frontend coupling); recommend the P7 slice-integrity card tighten it to import-form/word-boundary.

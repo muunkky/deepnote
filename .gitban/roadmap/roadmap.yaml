@@ -1300,7 +1300,7 @@ milestones:
         status: todo
         sequence: 1
         depends_on: []
-        docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+        docs_ref: docs/designs/m3-s1-server-api-and-serve.md
         success_criteria:
           - "Headless API parity with `run`: a documented HTTP/WS client can open
             a project, run all blocks, and receive the same IOutputs deepnote run
@@ -1498,7 +1498,7 @@ milestones:
         sequence: 2
         depends_on:
           - s1
-        docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
+        docs_ref: docs/designs/m3-s2-viewer.md
         success_criteria:
           - 'Per-block-type rendering: each block type renders correctly in the browser
             — code, sql, markdown, text, visualization, input-*, button, big-number,

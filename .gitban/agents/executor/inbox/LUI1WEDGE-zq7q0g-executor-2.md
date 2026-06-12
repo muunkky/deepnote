@@ -39,8 +39,38 @@ reviewer proved this by mutation.
   Verify by temporarily mutating the impl to bind `0.0.0.0` and confirming the test fails, then revert.
 
 **Do NOT** rewrite the production `serve.ts` bind logic — the reviewer verified it is correct end-to-end.
-Touch only `server.ts` (return-shape / accessor to expose the server-side bound address) and the test
-(`server.test.ts`). The serve command's loopback behaviour itself is right; only its *test* is unsound.
+For B1, touch only `server.ts` (return-shape / accessor to expose the server-side bound address) and the
+test (`server.test.ts`). The serve command's loopback behaviour itself is right; only its *test* is unsound.
+
+## ⚠️ B2 — a real typecheck failure in the merged code you MUST also fix
+
+The merged `zq7q0g` code does **not** pass the full pre-push typecheck (`tsc -p tsconfig.json &&
+pnpm -r exec tsc --noEmit`). The root source-alias typecheck passes, but the per-package dist-resolution
+typecheck (`pnpm -r exec tsc`) fails:
+
+```
+packages/cli/src/commands/serve.ts(136,38): error TS2739:
+  Type 'SessionLike' is missing the following properties from type 'ServerSession':
+  apiProject, startEngine, runProject, save
+```
+
+Cause: `serve.ts`'s `SessionLike` interface is `{ close(): Promise<void> }` — too narrow. `createSession`
+returns `Promise<SessionLike>`, and `deps.createServer({ session })` passes it where
+`CreateServerOptions.session` requires the full `ServerSession` (which, per
+`packages/runtime-server/src/session.ts:173-187`, is `apiProject` / `startEngine` / `runProject` / `save`
+/ `close`). A `{ close() }` value is not assignable to `ServerSession`.
+
+`ServerSession` **already includes `close(): Promise<void>`**, so the narrow `SessionLike` is redundant.
+**Fix it soundly** — the clean fix is to type `ServeDeps.createSession` as returning the real
+`ServerSession` (import the type from `@deepnote/runtime-server`) and remove/realias `SessionLike`, so the
+production `new Session()` (which implements `ServerSession`) types correctly and `createServer({ session })`
+typechecks. Update `serve.test.ts`'s fake session(s) to satisfy `ServerSession` (a small typed fake/spy
+exposing the methods serve doesn't call is fine — or cast a minimal stub through a typed helper). Do not
+weaken `CreateServerOptions.session` in runtime-server to paper over this — fix it on the `serve.ts` side.
+
+**This is mandatory:** verify with `pnpm typecheck` from the repo root (BOTH halves:
+`tsc -p tsconfig.json` and `pnpm -r exec tsc --noEmit`) — a green per-package typecheck is a completion
+requirement, not a follow-up. The dispatcher could not push the branch because of this error.
 
 ## Before you finish — gates
 

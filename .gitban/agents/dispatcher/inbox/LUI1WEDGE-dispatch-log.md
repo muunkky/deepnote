@@ -211,3 +211,26 @@ the true dependency is **6 enables 5**.
 authority for crash-recovery. A recovery dispatcher MUST run `zq7q0g` before `wd2nil`.
 
 - **➡️ Next: batch 4 — `zq7q0g` (step 6, `deepnote serve`).** Then batch 5 — `wd2nil` (step 5, integration).
+
+### Batch 4 — `zq7q0g` (step 6 serve): REJECTION cycle + merge-gate typecheck bug
+
+- executor-1 (`9c9f07f`, 14 new tests): thin `createServeAction`, loopback bind, M1 single-port,
+  no-`apps/`-token. **reviewer-1 REJECTION (Gate 2, B1):** the `server.test.ts` loopback test was a
+  false positive — read client-side `socket.localAddress` (always 127.0.0.1 over loopback), passed even
+  when the server bound 0.0.0.0 (reviewer proved by mutation). Card → blocked.
+- planner: **L1** folded into `zq7q0g` as an AC checkbox (same file/accessor as B1's server-side fix);
+  **L2** amended into `wd2nil` (step-5 real-socket smoke gets a server-side never-0.0.0.0 assertion).
+  No new cards.
+- **Merge-gate typecheck bug (B2):** pushing the dispatch commit failed pre-push `tsc` —
+  `serve.ts:136` `SessionLike` (`{ close() }`) too narrow to satisfy `ServerSession` at
+  `createServer({ session })` (the root source-alias `tsc` passed but `pnpm -r exec tsc` dist-resolution
+  caught it; executor-1 + reviewer-1 both missed the per-package half). **Folded B2 into the executor-2
+  directive** rather than hand-patch the test design at the gate (substantive, touches serve.ts +
+  serve.test.ts — executor's job).
+- **Deferred-push deviation (documented):** the branch is typecheck-RED and cannot be pushed (the red IS
+  the bug executor-2 fixes). The `WorktreeCreate` hook forks executors from **local HEAD** (verified:
+  `worktree-create.sh:67 BASE_REF=rev-parse HEAD`), so executor-2 sees all committed directives + the
+  broken serve code WITHOUT a push; its startup `git merge origin/...` is a no-op (origin is an
+  ancestor). Push is **deferred to post-merge-green** for this card only. No gate bypass — the red gate
+  is being fixed, not skipped.
+- **➡️ Dispatching `zq7q0g` executor-2 (B1 test + B2 typecheck + L1).**

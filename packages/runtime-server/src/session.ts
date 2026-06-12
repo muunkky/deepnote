@@ -67,8 +67,20 @@ async function resolveCapabilities(options: LoadProjectOptions): Promise<Capabil
   const kernelName = selectKernelName({ explicit: options.kernel })
   const nonPython = isNonPythonKernel(kernelName)
 
-  // Probe the interpreter without executing it: `resolvePythonExecutable` throws when the
-  // path does not exist / holds no python — that is the s1 "mis-installed kernel" signal.
+  if (nonPython) {
+    // A non-Python kernel reports its own name as the language (s1 is name-based; the
+    // kernelspec `language` refinement is Phase 3+). The kernel axis (ADR-003) and the
+    // interpreter axis (ADR-001) are orthogonal — bash availability has nothing to do with
+    // the Python interpreter — so we do NOT probe Python here. Probing it would let a
+    // mis-installed Python wrongly null this flag (the L1 capability-coupling bug).
+    return { kernelLanguage: kernelName, reactivity: 'disabled' }
+  }
+
+  // Python path only: probe the interpreter without executing it. `resolvePythonExecutable`
+  // throws when the path does not exist / holds no python — that is the s1 "mis-installed
+  // kernel" signal. A Python kernel with no resolvable interpreter is the "kernel missing"
+  // state: render the tree, but flag it (`kernelLanguage: null`). A resolvable interpreter
+  // reports `'python'`.
   let interpreterAvailable = true
   try {
     await resolvePythonExecutable(selectPythonSpec({ explicit: options.python }))
@@ -76,11 +88,7 @@ async function resolveCapabilities(options: LoadProjectOptions): Promise<Capabil
     interpreterAvailable = false
   }
 
-  // A Python kernel with no resolvable interpreter is the "kernel missing" state: render
-  // the tree, but flag it (`kernelLanguage: null`). A non-Python kernel reports its own
-  // name as the language (s1 is name-based; the kernelspec `language` refinement is Phase
-  // 3+). A resolvable Python interpreter reports `'python'`.
-  const kernelLanguage = interpreterAvailable ? (nonPython ? kernelName : 'python') : null
+  const kernelLanguage = interpreterAvailable ? 'python' : null
 
   // Reactive execution is an m3/s5 deliverable (design-doc B3): always off in s1.
   const reactivity: Capabilities['reactivity'] = 'disabled'

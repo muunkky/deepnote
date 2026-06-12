@@ -118,4 +118,21 @@ describe('Session capabilities (KD-6 flags, kernel-free)', () => {
       reactivity: 'disabled',
     })
   })
+
+  it('a non-python kernel does NOT depend on Python interpreter resolution for its language (L1 regression)', async () => {
+    // The kernel axis (ADR-003) and the interpreter axis (ADR-001) are orthogonal: an
+    // explicit non-Python kernel reports its own language regardless of whether a Python
+    // interpreter resolves. The previous code probed Python unconditionally, so a
+    // mis-installed Python wrongly nulled `kernelLanguage` even for `--kernel bash`. This
+    // walks the branch the resolvable-`python3` non-python test above masks.
+    const session = new Session()
+    await session.loadProject(fixturePath, {
+      kernel: 'bash',
+      python: '/definitely/not/a/python/interpreter',
+    })
+    const { capabilities, project } = session.apiProject()
+    expect(capabilities).toEqual({ kernelLanguage: 'bash', reactivity: 'disabled' })
+    // And the open still returns the full tree (KD-6: never a failure).
+    expect(project.notebooks.length).toBeGreaterThan(0)
+  })
 })

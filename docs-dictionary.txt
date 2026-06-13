@@ -309,3 +309,26 @@ Homa
 foodpanda
 Shippit
 Webflow
+
+# m3/s1 runtime-server wedge — code/test terms (slice self-containment)
+autorestarting
+behavioural
+behaviourally
+centralises
+codegen
+ijulia
+kernelspecs
+lossily
+lumino
+macrotask
+parameterises
+summarise
+summarised
+typechecks
+unfakeable
+unlaunchable
+unstubbed
+xeus
+hlai
+ifqe
+qajbsg

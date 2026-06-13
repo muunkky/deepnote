@@ -159,3 +159,19 @@
 * [ ] Production deployment successful with monitoring.
 * [ ] Code quality metrics improved (complexity, coverage, maintainability).
 * [ ] Rollback plan documented and tested (if high-risk refactor).
+
+
+## Code-review (m3/s1 PR #7, /code-review high) — residual non-blocking findings
+
+A high-effort `/code-review` of the merged slice surfaced these. The genuine correctness bugs were FIXED before merge (kernel death-status now latches `terminating`; `Session.startEngine` got an in-flight lock against concurrent first-runs leaking a kernel/toolkit-server + breaking FIFO + double-injecting env; `sink.send` now per-socket try/catch so one bad socket can't drop a terminal event; `readBody` got a size cap). The following are deferred:
+
+**run↔serve parity gaps (server should match `deepnote run`):**
+- `serve` discards the integration-file parse `issues` that `Session.resolveIntegrationEnvForRun` returns — a malformed `.deepnote.env.yaml` silently drops env vars with no warning, whereas `run.ts` prints them. Surface them (log/diagnostic).
+- `serve` has no required-integration validation gate (run.ts `validateRequirements` exits 2 on a missing required integration); the server only fails when the SQL block runs. Add an equivalent fail-fast.
+- `startEngine`'s catch maps any non-typed `engine.start()` error (e.g. toolkit-server-start / missing `deepnote-toolkit`) to `failureCategory:'kernel-launch'` — a lie; `run.ts` surfaces it as an uncategorized server-start error. Add a `server-start` category or read the typed discriminant.
+
+**DRY / single-source (the category taxonomy):** three independent copies of "map a kernel error → failureCategory" exist (`run.ts`, `session.ts` instanceof ladder, `run-queue.ts` `categoryOf` duck-typing). Every member of the kernel-error family already carries a literal `.category`; collapse all three onto a shared `kernelFailureCategoryOf(error)` reading `.category`. `run-queue.ts categoryOf` is also effectively dead (the only reject path is `KernelDiedError`). Also: two byte-identical SHA-256 helpers (`save.ts sha256` / `session.ts hashBytes`) that MUST agree for optimistic-concurrency — single-source them; and a hand-rolled `basename` in `save.ts` (use `node:path`).
+
+**Test coverage for the merge-gate fixes:** add regression tests for the `startEngine` concurrency lock (concurrent calls → one engine), the `sink.send` one-bad-socket resilience, and the `readBody` size cap. (The death-status `terminating` fix already has a unit test.)
+
+**Lower-priority robustness:** `save.ts` external-change path deserializes on-disk bytes inline → a concurrent writer leaving invalid YAML yields 500 instead of a clean 409; `bufferedAmount` getter is O(sockets) on a 5ms drain poll; `resolveCapabilities` runs a synchronous `execSync` python probe on the kernel-free open path; the `disconnect()` `unhandledRejection` guard mutates a process-global listener set (overlaps od8esg Item 7).

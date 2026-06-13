@@ -650,4 +650,93 @@ describe('KernelClient', () => {
       await client.disconnect()
     })
   })
+
+  // Determinism guard for the Scenario-4 teardown leak (card wd2nil, reviewer-2 B1).
+  //
+  // When a kernel auto-restarts mid-run and is then disposed, `@jupyterlab/services`
+  // leaks an unhandled `Error('Kernel connection disconnected')` from a fire-and-forget
+  // internal reconnect microtask we cannot reach. `disconnect()` must swallow exactly that
+  // benign rejection so the integration suite exits 0 deterministically — while still
+  // letting any *other* unhandled rejection escape. These tests use REAL timers because
+  // the guard drains the macrotask queue with a real `setTimeout(0)`.
+  describe('disconnect — dead-kernel rejection guard', () => {
+    beforeEach(() => {
+      vi.useRealTimers()
+    })
+
+    /**
+     * Collect any `unhandledRejection` that escapes the process while `run()` executes,
+     * isolating it from vitest's own global handler. Returns the captured reasons. Mirrors
+     * the library's leak: disposing schedules a fire-and-forget rejecting microtask with no
+     * `.catch`, exactly like `DefaultKernel`'s auto-restart `void Promise.resolve().then(…)`.
+     */
+    async function captureUnhandledRejections(run: () => Promise<void>): Promise<unknown[]> {
+      const escaped: unknown[] = []
+      const priorListeners = process.listeners('unhandledRejection')
+      const sink = (reason: unknown) => {
+        escaped.push(reason)
+      }
+      process.removeAllListeners('unhandledRejection')
+      process.on('unhandledRejection', sink)
+      try {
+        await run()
+        // Give any rejection the guard *failed* to swallow a real tick to surface.
+        await new Promise<void>(resolve => setTimeout(resolve, 0))
+      } finally {
+        process.removeListener('unhandledRejection', sink)
+        for (const listener of priorListeners) {
+          process.on('unhandledRejection', listener as (reason: unknown, promise: Promise<unknown>) => void)
+        }
+      }
+      return escaped
+    }
+
+    /** Make `session.dispose()` leak the library's benign teardown rejection. */
+    function leakOnDispose(message: string) {
+      mockSession.dispose.mockImplementationOnce(() => {
+        // Fire-and-forget rejecting promise with no `.catch`, exactly like the library's
+        // internal `void Promise.resolve().then(async () => { await this.reconnect() })`.
+        void Promise.resolve().then(async () => {
+          throw new Error(message)
+        })
+      })
+    }
+
+    it('swallows the benign "Kernel connection disconnected" leak from dispose', async () => {
+      const escaped = await captureUnhandledRejections(async () => {
+        await client.connect('http://localhost:8888')
+        leakOnDispose('Kernel connection disconnected')
+        await client.disconnect()
+      })
+
+      expect(escaped).toEqual([])
+      expect(mockSession.dispose).toHaveBeenCalled()
+    })
+
+    it('does NOT swallow an unrelated unhandled rejection during teardown', async () => {
+      const escaped = await captureUnhandledRejections(async () => {
+        await client.connect('http://localhost:8888')
+        leakOnDispose('some unrelated catastrophic failure')
+        await client.disconnect()
+      })
+
+      expect(escaped).toHaveLength(1)
+      expect((escaped[0] as Error).message).toBe('some unrelated catastrophic failure')
+    })
+
+    it('restores the prior unhandledRejection listeners after disconnect', async () => {
+      const sentinel = (() => {}) as (reason: unknown, promise: Promise<unknown>) => void
+      process.on('unhandledRejection', sentinel)
+      try {
+        const before = process.listeners('unhandledRejection')
+        await client.connect('http://localhost:8888')
+        await client.disconnect()
+        const after = process.listeners('unhandledRejection')
+        expect(after).toEqual(before)
+        expect(after).toContain(sentinel)
+      } finally {
+        process.removeListener('unhandledRejection', sentinel)
+      }
+    })
+  })
 })

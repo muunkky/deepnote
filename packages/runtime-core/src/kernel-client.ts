@@ -53,6 +53,28 @@ export interface ExecutionCallbacks {
   onDone?: (result: ExecutionResult) => void
 }
 
+// Real-timer references captured at module load, before any test can install fake timers.
+// `disconnect()` drains the macrotask queue to catch Node's asynchronously-emitted
+// `unhandledRejection` for the benign dead-kernel teardown leak (see `disconnect`). Node
+// emits that event on a macrotask, not a microtask, so the drain MUST use a real timer —
+// but `disconnect()` is also reached from `connect()`'s failure path, which tests exercise
+// under `vi.useFakeTimers()`. Binding the real `setImmediate`/`setTimeout` here keeps the
+// drain working (and non-hanging) regardless of whether a caller has faked timers.
+const realSetImmediate: typeof setImmediate | undefined =
+  typeof setImmediate === 'function' ? setImmediate.bind(globalThis) : undefined
+const realSetTimeout: typeof setTimeout = setTimeout.bind(globalThis)
+
+/** Yield to a real macrotask so Node can emit any pending `unhandledRejection`. */
+function nextRealMacrotask(): Promise<void> {
+  return new Promise<void>(resolve => {
+    if (realSetImmediate) {
+      realSetImmediate(() => resolve())
+    } else {
+      realSetTimeout(() => resolve(), 0)
+    }
+  })
+}
+
 // Jupyter kernel WebSocket protocol to exclude from negotiation.
 // The v1 binary protocol uses DataView with getBigUint64 for message
 // deserialization, which fails in Bun's runtime with "Out of bounds access".
@@ -316,45 +338,125 @@ export class KernelClient {
   /**
    * Disconnect from the kernel and clean up resources.
    *
-   * Disposing an already-dead kernel (the Scenario-4 / `os._exit(1)` path) makes
-   * `@jupyterlab/services` synchronously fire `connectionStatusChanged → 'disconnected'`,
-   * which rejects its internal reconnect `PromiseDelegate` with `Error('Kernel connection
-   * disconnected')` (`default.js` `reconnect()`). That delegate is library-internal — we
-   * never receive it — so the rejection lands unhandled and a strict consumer (vitest) flags
-   * it as a potential false-positive. It is benign: we are tearing the kernel down on purpose.
-   * Pre-attaching a sink to the kernel's `info` promise (which rejects on the same signal)
-   * and guarding the dispose calls keeps the predictable teardown rejection from leaking,
-   * without swallowing real errors. (card wd2nil — surfaced once Scenario 4 kills a real kernel.)
+   * Disposing a kernel that auto-restarted mid-run (the Scenario-4 / `os._exit(1)` path)
+   * leaks an unhandled promise rejection from deep inside `@jupyterlab/services`, and the
+   * rejecting promise is genuinely unreachable from our code. The chain:
+   *
+   * 1. A crashed kernel is auto-restarted by the Jupyter server, which emits a `restarting`
+   *    status. `DefaultKernel._handleMessage` reacts by scheduling a *fire-and-forget*
+   *    microtask — `void Promise.resolve().then(async () => { … await this.reconnect() })`
+   *    (`default.js` ~L1406) — with no `.catch`. `reconnect()` returns a fresh
+   *    `PromiseDelegate` whose `connectionStatusChanged` listener rejects with
+   *    `Error('Kernel connection disconnected')` the instant the status goes `disconnected`.
+   * 2. When we then `session.dispose()` (→ `kernel.dispose()` →
+   *    `_updateConnectionStatus('disconnected')`, `default.js` L450) that pending reconnect
+   *    delegate rejects. Because the awaiting microtask was never given a `.catch`, the
+   *    rejection escapes as an *unhandled* rejection — which a strict consumer (vitest)
+   *    surfaces as a non-zero process exit, reding the `integration-kernels` CI job even
+   *    though every assertion passed.
+   *
+   * The earlier `this.kernel?.info?.catch(() => {})` fix sank the wrong promise: the leak is
+   * the reconnect delegate inside that internal microtask, not `kernel.info`. There is no
+   * handle on the rejecting promise to attach a sink to, so we install a *scoped*
+   * `process.on('unhandledRejection')` guard that swallows ONLY this exact benign teardown
+   * rejection and re-delegates everything else to the pre-existing listeners (real errors are
+   * never masked). The guard is armed only around the dispose path and torn down after the
+   * microtask/macrotask queues drain, so it cannot hide rejections from unrelated work.
+   *
+   * Fixing this in `disconnect()` (not the integration harness) makes the teardown clean
+   * everywhere: the same dead-kernel `disconnect()` runs at the end of every run, so any
+   * future test or caller that kills a kernel inherits the fix. (card wd2nil.)
    */
   async disconnect(): Promise<void> {
-    // Sink the kernel `info` promise's disconnect-rejection (shares the signal that leaks).
-    this.kernel?.info?.catch(() => {})
-
-    if (this.session) {
-      try {
-        await this.session.shutdown()
-      } catch {
-        // Ignore shutdown errors (a dead kernel cannot be shut down cleanly).
+    await this.#withDeadKernelRejectionGuard(async () => {
+      if (this.session) {
+        try {
+          await this.session.shutdown()
+        } catch {
+          // Ignore shutdown errors (a dead kernel cannot be shut down cleanly).
+        }
+        try {
+          this.session.dispose()
+        } catch {
+          // Ignore dispose errors on an already-dead kernel.
+        }
+        this.session = null
       }
-      try {
-        this.session.dispose()
-      } catch {
-        // Ignore dispose errors on an already-dead kernel.
+
+      if (this.sessionManager) {
+        this.sessionManager.dispose()
+        this.sessionManager = null
       }
-      this.session = null
+
+      if (this.kernelManager) {
+        this.kernelManager.dispose()
+        this.kernelManager = null
+      }
+
+      this.kernel = null
+    })
+  }
+
+  /**
+   * Run `teardown`, then drain the microtask + timer queues, while a scoped
+   * `unhandledRejection` guard swallows the single benign `Error('Kernel connection
+   * disconnected')` that `@jupyterlab/services` leaks from its internal auto-restart
+   * reconnect delegate (see {@link disconnect}). Any *other* unhandled rejection is
+   * re-delivered to the listeners that were registered before we armed the guard, so we
+   * never mask a real error — and the guard is removed before this method resolves.
+   */
+  async #withDeadKernelRejectionGuard(teardown: () => Promise<void>): Promise<void> {
+    // Snapshot the listeners present before we arm our guard so we can both restore them
+    // and re-deliver any non-benign rejection to them.
+    const priorListeners = process.listeners('unhandledRejection')
+
+    const guard = (reason: unknown, promise: Promise<unknown>): void => {
+      if (reason instanceof Error && reason.message === 'Kernel connection disconnected') {
+        // The expected, benign teardown rejection from the library-internal reconnect
+        // delegate. Swallow it — we are disposing the kernel on purpose.
+        return
+      }
+      // Not ours: re-deliver to whatever was listening before we intervened (Node's
+      // default handler if there were none) so real errors are not masked.
+      if (priorListeners.length > 0) {
+        for (const listener of priorListeners) {
+          listener(reason, promise)
+        }
+      } else {
+        // No prior listener: restore default behaviour by re-throwing on a fresh tick so
+        // Node treats it as an unhandled rejection again.
+        process.nextTick(() => {
+          throw reason
+        })
+      }
     }
 
-    if (this.sessionManager) {
-      this.sessionManager.dispose()
-      this.sessionManager = null
-    }
+    // Temporarily make our guard the sole handler so we see the rejection first; the prior
+    // listeners are captured above and invoked explicitly for anything that isn't ours.
+    process.removeAllListeners('unhandledRejection')
+    process.on('unhandledRejection', guard)
 
-    if (this.kernelManager) {
-      this.kernelManager.dispose()
-      this.kernelManager = null
+    try {
+      await teardown()
+      // The reconnect delegate rejects when `dispose()` emits the `disconnected` status,
+      // but Node emits the `unhandledRejection` event on a *macrotask* (after the microtask
+      // queue drains), and the library wraps the reject in an extra `async` layer
+      // (`void Promise.resolve().then(async () => { await this.reconnect() })`). Flush
+      // microtasks, then yield to a real macrotask, twice — while the guard is still armed —
+      // so the event is delivered to us rather than leaking after teardown.
+      for (let pass = 0; pass < 2; pass++) {
+        for (let i = 0; i < 5; i++) {
+          await Promise.resolve()
+        }
+        await nextRealMacrotask()
+      }
+    } finally {
+      process.removeListener('unhandledRejection', guard)
+      // Restore the exact pre-existing listener set (removeAllListeners cleared them).
+      for (const listener of priorListeners) {
+        process.on('unhandledRejection', listener as (reason: unknown, promise: Promise<unknown>) => void)
+      }
     }
-
-    this.kernel = null
   }
 
   /**

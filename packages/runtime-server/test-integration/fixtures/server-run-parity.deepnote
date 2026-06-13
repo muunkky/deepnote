@@ -1,0 +1,59 @@
+metadata:
+  createdAt: 2026-06-12T00:00:00.000Z
+  modifiedAt: 2026-06-12T00:00:00.000Z
+project:
+  name: server-run-parity
+  id: 00000000-0000-0000-0000-0000000000c1
+  notebooks:
+    - id: 00000000-0000-0000-0000-0000000000c2
+      name: Parity
+      blocks:
+        - blockGroup: "0"
+          id: 00000000-0000-0000-0000-0000000000c3
+          sortingKey: "0"
+          type: markdown
+          content: "# API vs run parity\n\nA non-executable markdown block: both the server run-all and `deepnote run` must skip it identically (it produces no `IOutput`s)."
+        - blockGroup: "1"
+          id: 00000000-0000-0000-0000-0000000000c4
+          sortingKey: "1"
+          type: code
+          content: |
+            # stream stdout — the most common IOutput shape (output_type: 'stream', name: 'stdout')
+            print("Hello, World!")
+        - blockGroup: "2"
+          id: 00000000-0000-0000-0000-0000000000c5
+          sortingKey: "2"
+          type: code
+          content: |
+            # stream stderr — a distinct stream name; both paths must preserve the channel
+            import sys
+            print("a diagnostic line", file=sys.stderr)
+        - blockGroup: "3"
+          id: 00000000-0000-0000-0000-0000000000c6
+          sortingKey: "3"
+          type: code
+          content: |
+            # execute_result — a bare trailing expression yields an execute_result IOutput
+            # with a deterministic text/plain repr and a stable execution_count.
+            x = 1
+            y = 2
+            x + y
+        - blockGroup: "4"
+          id: 00000000-0000-0000-0000-0000000000c7
+          sortingKey: "4"
+          type: code
+          content: |
+            # display_data — a rich MIME bundle via IPython.display (ships with ipykernel).
+            # A deterministic text/markdown payload keeps the streamed bytes byte-identical
+            # across both paths (no timestamps / addresses in the bundle).
+            from IPython.display import Markdown, display
+            display(Markdown("**bold parity**"))
+        - blockGroup: "5"
+          id: 00000000-0000-0000-0000-0000000000c8
+          sortingKey: "5"
+          type: code
+          content: |
+            # multiple stream writes in one block — ordering within a block must match
+            for i in range(3):
+                print(i)
+version: 1.0.0

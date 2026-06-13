@@ -1,0 +1,36 @@
+metadata:
+  createdAt: 2026-06-12T00:00:00.000Z
+  modifiedAt: 2026-06-12T00:00:00.000Z
+project:
+  name: server-kernel-death
+  id: 00000000-0000-0000-0000-0000000000d1
+  notebooks:
+    - id: 00000000-0000-0000-0000-0000000000d2
+      name: KernelDeath
+      blocks:
+        - blockGroup: "0"
+          id: 00000000-0000-0000-0000-0000000000d3
+          sortingKey: "0"
+          type: code
+          content: |
+            # First block runs cleanly so the run is genuinely mid-flight when the kernel dies.
+            print("alive")
+        - blockGroup: "1"
+          id: 00000000-0000-0000-0000-0000000000d4
+          sortingKey: "1"
+          type: code
+          content: |
+            # Hard-kill the kernel process itself (not a catchable exception): os._exit bypasses
+            # Python's normal shutdown so the kernel vanishes mid-run. The server must surface this
+            # as a terminal run-failed { failureCategory: 'kernel-died' }, never an opaque hang.
+            import os
+            os._exit(1)
+        - blockGroup: "2"
+          id: 00000000-0000-0000-0000-0000000000d5
+          sortingKey: "2"
+          type: code
+          content: |
+            # Should never run — the kernel is already dead. Its presence proves the run was
+            # terminated early (no further events for this runId after the terminal).
+            print("should-never-print")
+version: 1.0.0

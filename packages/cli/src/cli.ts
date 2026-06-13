@@ -16,6 +16,7 @@ import { createIntegrationsEditAction } from './commands/integrations/edit-integ
 import { createLintAction } from './commands/lint'
 import { createOpenAction } from './commands/open'
 import { createRunAction } from './commands/run'
+import { createServeAction } from './commands/serve'
 import { createStatsAction } from './commands/stats'
 import { createValidateAction } from './commands/validate'
 import { generateCompletionScript } from './completions'
@@ -272,6 +273,7 @@ ${c.bold('Examples:')}
     .description('Run a notebook file (.deepnote, .ipynb, .py, .qmd)')
     .argument('[path]', 'Path to a notebook file (.deepnote, .ipynb, .py, .qmd)')
     .option('--python <path>', 'Path to Python (executable, bin directory, or venv root)')
+    .option('--kernel <name>', 'Jupyter kernel to run the notebook against (default: python3)')
     .option('--cwd <path>', 'Working directory for execution (defaults to file directory)')
     .option('--notebook <name>', 'Run only the specified notebook')
     .option('--block <id>', 'Run only the specified block')
@@ -397,6 +399,111 @@ ${c.bold('Exit Codes:')}
 `
     })
     .action(createOpenAction(program))
+
+  // Serve command - boot a local Node host over a .deepnote project
+  program
+    .command('serve')
+    .description('Serve a .deepnote project from a local server (browser/API at http://localhost)')
+    .argument('[path]', 'Path to a .deepnote file or directory (defaults to the first .deepnote in the cwd)')
+    .option('--port <port>', 'Port to start probing from (falls back to the next free port if taken)')
+    // Register BOTH --open and --no-open so commander leaves `open` undefined unless the user opts in;
+    // the action then resolves it to serve's headless default. A lone --no-open would make commander
+    // default `open` to true, opening a browser by default — the wrong posture for serve.
+    .option('--open', 'Open a browser at the served URL (serve defaults to headless)')
+    .option('--no-open', 'Do not open a browser at the served URL (serve defaults to headless)')
+    .option('--python <path>', 'Path to Python (executable, bin directory, or venv root)')
+    .option('--kernel <name>', 'Jupyter kernel to run the notebook against (default: python3)')
+    .option(
+      '--static-dir <path>',
+      'Directory of a built static UI to serve alongside the API (advanced; defaults unset)'
+    )
+    .addHelpText('after', () => {
+      const c = getChalk()
+      return `
+${c.bold('Description:')}
+  Boots a local server over a .deepnote project and serves it at a localhost URL.
+  The server answers ${c.dim('GET /api/project')} with the project tree and streams run
+  events over a WebSocket. It binds ${c.bold('localhost only')} (never 0.0.0.0): the
+  server fronts a live kernel, so it is reachable from your machine alone — treat the
+  URL as trusted-local.
+
+${c.bold('Shutdown:')}
+  Press ${c.dim('Ctrl-C')} to stop the server and the kernel cleanly (no orphaned process).
+
+${c.bold('Examples:')}
+  ${c.dim('# Serve the first .deepnote file in the current directory, headless')}
+  $ deepnote serve
+
+  ${c.dim('# Serve a specific file')}
+  $ deepnote serve my-project.deepnote
+
+  ${c.dim('# Serve and open a browser at the URL')}
+  $ deepnote serve my-project.deepnote --open
+
+  ${c.dim('# Start probing from a specific port (falls back if taken)')}
+  $ deepnote serve my-project.deepnote --port 3000
+
+${c.bold('Exit Codes:')}
+  ${c.dim('0')}  Stopped cleanly (Ctrl-C)
+  ${c.dim('1')}  Runtime error (server failed to start)
+  ${c.dim('2')}  Invalid usage (file not found, not a .deepnote file, bad --port)
+`
+    })
+    .action(createServeAction(program, undefined, { defaultOpen: false }))
+
+  // UI command — thin alias for `serve` that defaults to opening a browser at the LOCAL served URL.
+  // It reuses `createServeAction` (no duplicated serve logic) and only flips `defaultOpen` to true,
+  // so `deepnote ui` pops a browser tab at http://localhost:PORT while `deepnote serve` stays headless.
+  // The browser-open targets the loopback URL only — `ui` never reaches the cloud-upload path
+  // (`openDeepnoteFileInCloud`), preserving the local-first guarantee (ADR-005 §3).
+  // NOTE: the final `serve`/`ui` naming is a P6 PRD open question; both are registered for now.
+  program
+    .command('ui')
+    .description('Open a .deepnote project in your browser via a local server (alias of serve --open)')
+    .argument('[path]', 'Path to a .deepnote file or directory (defaults to the first .deepnote in the cwd)')
+    .option('--port <port>', 'Port to start probing from (falls back to the next free port if taken)')
+    // Same dual-flag registration as serve, but the action resolves to `ui`'s open-by-default posture.
+    .option('--open', 'Open a browser at the served URL (ui defaults to opening one)')
+    .option('--no-open', 'Do not open a browser; serve headless (ui defaults to opening one)')
+    .option('--python <path>', 'Path to Python (executable, bin directory, or venv root)')
+    .option('--kernel <name>', 'Jupyter kernel to run the notebook against (default: python3)')
+    .option(
+      '--static-dir <path>',
+      'Directory of a built static UI to serve alongside the API (advanced; defaults unset)'
+    )
+    .addHelpText('after', () => {
+      const c = getChalk()
+      return `
+${c.bold('Description:')}
+  ${c.bold('Thin alias for')} ${c.dim('deepnote serve')} ${c.bold('that opens a browser by default.')}
+  Boots the same local server over a .deepnote project, then opens your browser straight to the
+  served ${c.bold('localhost')} URL (never 0.0.0.0, never an upload to Deepnote Cloud — the project
+  stays local). Pass ${c.dim('--no-open')} to stay headless, exactly like ${c.dim('deepnote serve')}.
+
+${c.bold('Naming:')}
+  The final ${c.dim('serve')}/${c.dim('ui')} naming is an open product question (PRD P6); both
+  commands are available today and share one implementation.
+
+${c.bold('Shutdown:')}
+  Press ${c.dim('Ctrl-C')} to stop the server and the kernel cleanly (no orphaned process).
+
+${c.bold('Examples:')}
+  ${c.dim('# Open the first .deepnote file in the current directory in your browser')}
+  $ deepnote ui
+
+  ${c.dim('# Open a specific file')}
+  $ deepnote ui my-project.deepnote
+
+  ${c.dim('# Boot the server but stay headless (no browser)')}
+  $ deepnote ui my-project.deepnote --no-open
+
+${c.bold('Exit Codes:')}
+  ${c.dim('0')}  Stopped cleanly (Ctrl-C)
+  ${c.dim('1')}  Runtime error (server failed to start)
+  ${c.dim('2')}  Invalid usage (file not found, not a .deepnote file, bad --port)
+`
+    })
+    .action(createServeAction(program, undefined, { defaultOpen: true }))
 
   // Convert command - convert between notebook formats
   program

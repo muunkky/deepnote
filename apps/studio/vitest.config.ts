@@ -15,11 +15,21 @@ import { defineProject } from 'vitest/config'
 // it never pulls the runtime-server runtime entry or any `node:` builtin into the SPA.
 const apiTypesEntry = fileURLToPath(new URL('../../packages/runtime-server/src/api-types.ts', import.meta.url))
 
+// `@deepnote/blocks` is a RUNTIME (not type-only) dependency of the text renderer: it
+// reuses `createMarkdownForTextBlock` to derive markdown for the seven text-cell kinds
+// (design Phase 4 / card zy7tn8). The package's published `exports` point at `./dist`,
+// which a worktree never builds, so — exactly as the tsconfig `@deepnote/*` paths glob
+// does for the typechecker — resolve it from package SOURCE here so the DOM-env suite
+// runs without a backend build. `@deepnote/blocks` is pure TypeScript with no `node:`
+// builtin (verified), so this stays inside the ADR-006/007 browser-safe boundary.
+const blocksEntry = fileURLToPath(new URL('../../packages/blocks/src/index.ts', import.meta.url))
+
 export default defineProject({
   plugins: [react()],
   resolve: {
     alias: {
       '@deepnote/runtime-server/types': apiTypesEntry,
+      '@deepnote/blocks': blocksEntry,
     },
   },
   test: {

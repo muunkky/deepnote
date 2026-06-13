@@ -13,6 +13,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@deepnote/blocks": "workspace:*",
+    "dompurify": "^3.2.7",
+    "highlight.js": "^11.11.1",
+    "marked": "^15.0.12",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },

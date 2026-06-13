@@ -246,3 +246,34 @@ authority for crash-recovery. A recovery dispatcher MUST run `zq7q0g` before `wd
 - L2 (real-socket never-0.0.0.0 guard) remains folded into `wd2nil` (step 5) per planner.
 - **➡️ Next: batch 5 — `wd2nil` (step 5 integration parity) — PHASE BARRIER. Needs real toolkit venv;
   serve smoke (Scenario 3) now uses the real `deepnote serve` (just landed).**
+
+### Batch 5 — `wd2nil` (step 5 integration parity): RESUME / crash-recovery re-dispatch
+
+**Session reboot — recovery classification.** A prior session dispatched `wd2nil` executor-2
+(`0884a22`, "REAL failures found + venv provisioned") then died. Recovery state at resume:
+- No `LUI1WEDGE-wd2nil-done` tag, no executor-2 commits on HEAD, no `-ERROR.md` file.
+- One **empty** orphan worktree `agent-ad2582d088c42fb85` (branch tip == HEAD `5de047c`, `HEAD..branch`
+  empty → zero recoverable work). Removed (`worktree remove --force` + `branch -D` + prune).
+- ⟹ Classification: **not-started → re-dispatch from scratch** against the existing executor-2 directive
+  (`.gitban/agents/executor/inbox/LUI1WEDGE-wd2nil-executor-2.md`, which already carries the 3 real
+  failures, the branch-override to `milestone/m3-local-ui`, and the one-scenario-at-a-time protocol).
+
+**Stale pause marker noted.** `bb31153` ("resume = dispatch x71bcm reviewer") is obsolete — `x71bcm`
+and `zq7q0g` both reached `done` after it was written. Authoritative resume point is THIS entry: re-run
+`wd2nil` executor-2.
+
+**Deferred-push deviation CONTINUES (documented, recovery-authoritative).** The branch is integration-RED
+(the 3 real `wd2nil` failures are exactly what executor-2 fixes; pre-push runs `pnpm test`, so a push
+fails until green) AND the box is memory-constrained (6.3 GiB, **no swap**) so `pnpm typecheck` in the
+pre-push hook OOM-kills (`pnpm -r exec tsc` on runtime-core → SIGKILL) under any concurrent load. The
+`WorktreeCreate` hook forks executors from **local HEAD** (`worktree-create.sh:67 BASE_REF=rev-parse HEAD`),
+so executor-2 sees all committed work WITHOUT a push. Push is **deferred to post-merge-green at close-out**,
+to be run when the suite is green and the box is idle. No gate bypass — the RED gate is being fixed, not
+skipped; `--no-verify` is never used.
+
+**Unrelated commits riding the branch:** `8b954c6` + `5de047c` (m3/s4+s5 design-doc stubs + a cspell
+dictionary entry) are docs-only, committed during a prior task; harmless to the runtime-server work and
+will ride to the deferred close-out push.
+
+- **➡️ Dispatching `wd2nil` executor-2 (re-dispatch): fix the 3 real failures (Scenario 4 kernel-death
+  terminal event is the load-bearing one), scenarios run one-at-a-time per the constrained-box protocol.**

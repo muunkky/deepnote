@@ -94,6 +94,37 @@ gitban (linked, not mirrored).** Cross-link each layer (a sprint's Discussion re
 - **No upstream posting or PRs yet:** nothing goes to `deepnote/deepnote` until we explicitly decide the
   dry run is ready; feature offers then follow the #288 pattern (offer + link both diffs + wait).
 
+### Drafting a per-sprint Discussion reply (the showcase post spec)
+
+This is the standing spec for **how** to write the per-sprint Discussion reply — colocated here with the
+posting process above so it is never re-improvised in a throwaway card directive. (Fork posts to
+`muunkky/deepnote` are pre-authorized; only `deepnote/deepnote` posts need Cameron's explicit sign-off.)
+
+- **Voice & audience.** Write as a **reporter sharing what was built and why** — measured, specific,
+  credible, no hype and no process/harness navel-gazing. The audience is the **maintaining engineering
+  team** (the people who own the codebase). The goal is to show we do a great job building *their*
+  product, in a way that is believable and technically compelling.
+- **Center the architecture, not a changelog.** Lead with **what was built and why**, the **architectural
+  decisions** (cite the governing ADRs / key decisions), and **how they came out in the implementation**.
+  Show respect for their architecture: package boundaries, the dependency arrows, and any
+  "no-behaviour-change" / additive invariants the slice preserves. If the work found and fixed a latent
+  bug in *their existing* code, that is the credibility centrepiece — say so plainly and name where the
+  fix landed. Avoid feature-dump bullet lists and "look how autonomous we are" framing — the engineering
+  is the showcase.
+- **Required checkpoint header** (a short status block at the very top, before the prose — use a bold
+  blockquote, not YAML frontmatter, so it renders in a Discussion comment):
+  - line 1 — `Sprint <TAG> · <milestone> — <one-line scope>`
+  - line 2 — `Status` ✅/🚧 · N cards (note review rigor) · verification (e.g. real-kernel) · the
+    upstream slice cut · backlog follow-up count
+  - line 3 — `Shipped` — the headline capabilities in one line
+- **Structure.** Header → a short lede (the brief + the governing constraint) → one section per
+  architectural decision (each: what / why / how implemented) → a "verified against real X — and what
+  that turned up" section → a closing "how it's packaged for review" (the clean slice, the boundary
+  gates, "reads as exactly the PR we'd open").
+- **Draft → review → post.** An agent drafts to this spec into `docs/showcase/<TAG>-showcase-post.md`
+  (fork-only; never rides the contrib slice); Cameron reads/edits; then post (or edit-in-place via the
+  `gh` GraphQL `addDiscussionComment` / `updateDiscussionComment` mutations on the dry-run Discussion).
+
 ## Local dev setup
 
 **Baseline — needed for any contribution.** TypeScript monorepo, pnpm workspace.

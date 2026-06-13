@@ -7,6 +7,12 @@
 
 ---
 
+> **Sprint `LUI1WEDGE` · m3/s1 — Headless runtime server + one-command local launch**
+> **Status** ✅ Complete · **13 cards**, every one adversarially reviewed (executor → review → router → close-out) and merged · verified against a real kernel · upstream-ready slice cut as `contrib/m3-serve` · 9 follow-ups filed to backlog
+> **Shipped** `@deepnote/runtime-server` (kernel-free open · serialized run-over-WS · atomic save) · `deepnote serve` / `deepnote ui` · SQL/integration env parity with `deepnote run`
+
+---
+
 ## m3/s1 — a headless runtime server and a one-command local launch
 
 This sprint landed the first slice of running a Deepnote project locally: a standalone runtime server plus `deepnote serve` / `deepnote ui`. The brief was deliberately narrow — make a `.deepnote` project openable, runnable, and saveable over a local HTTP/WebSocket surface — and the governing constraint was that it had to land as a clean _addition_ to the codebase, not a change to it. Here's what was built, the decisions behind it, and how they came out in the implementation.

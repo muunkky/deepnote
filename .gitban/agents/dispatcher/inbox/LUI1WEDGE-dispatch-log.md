@@ -302,3 +302,20 @@ surfaced REAL bugs that mocks + the original cards missed:
   worktree sweeps were destroying my live executor worktrees (the "env crash"). It stood down; branch
   intact, nothing lost.
 - **➡️ Next: batch 6 — `sqm7ox` (7A, `deepnote ui` launch alias) ‖ `yzd78n` (7B, SQL-block parity).**
+
+### Batch 6 — `sqm7ox` (7A) ‖ `yzd78n` (7B), parallel — COMPLETE → 8/12
+
+- **7A `sqm7ox`** (`deepnote ui` alias, `85c5fdb`): thin alias reusing `createServeAction({defaultOpen})`.
+  Caught + fixed a latent serve bug (commander defaulted `open=true` from a lone `--no-open`, so real
+  `deepnote serve` would have opened a browser). reviewer-1 **APPROVAL** (1st pass). Follow-up L1
+  (test-env-coupling) → new sprint card **`gwblh2`** (step 7C, sequenced before step 8).
+- **7B `yzd78n`** (KD-3 integration-helper lift, `92dbc6b`): lifted parse/collect/inject integration
+  helpers cli→runtime-core (shared home), cli shims, run.ts repointed, server wiring via `Session`,
+  local-first (no network by default), ADR-007 boundary AST test. reviewer **byte-diffed every lifted
+  file → verified pure relocation**; **APPROVAL** (1st pass). L1/L2/L3 (DRY dedup) → od8esg Item 9.
+- **Parallel execution clean:** zero file overlap (7A: cli.ts/serve.ts/cli-README; 7B: integration
+  helpers/run.ts/runtime-core+runtime-server-README). 7B forked from the pre-7A-merge base (`d6853bb`);
+  "WRONG BASE" check was a false alarm for the legit parallel fork; three-way merge conflict-free.
+- Full mocked suite 2471 green; typecheck green. Per-card "PR merged" governance boxes checked at
+  close-out per established convention (all done cards).
+- **➡️ Next: `gwblh2` (step 7C, cli suite-6 cwd decouple) → then `dx99dj` (step 8 contrib slice).**

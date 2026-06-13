@@ -1,0 +1,22 @@
+{
+  "sprint_id": "20260609-231157-sprint-superseded",
+  "sprint_name": "Superseded",
+  "sprint_folder": "20260609-231157-sprint-superseded",
+  "created_at": "2026-06-09T23:11:57.471198",
+  "start_date": null,
+  "end_date": "2026-06-09",
+  "archived_at": "2026-06-09T23:11:57.471198",
+  "card_ids": ["ca0ios"],
+  "metrics": {
+    "total_cards": 1,
+    "by_priority": {
+      "P2": 1
+    },
+    "by_type": {
+      "chore": 1
+    },
+    "by_handle": {
+      "CAMERON": 1
+    }
+  }
+}

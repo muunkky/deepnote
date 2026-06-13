@@ -47,6 +47,7 @@
     "@deepnote/database-integrations": "workspace:*",
     "@deepnote/reactivity": "workspace:*",
     "@deepnote/runtime-core": "workspace:*",
+    "@deepnote/runtime-server": "workspace:*",
     "@inquirer/prompts": "^8.2.1",
     "@shikijs/cli": "^4.0.0",
     "@toon-format/toon": "^2.1.0",

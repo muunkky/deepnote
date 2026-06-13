@@ -149,10 +149,23 @@ export async function executeAgentBlock(block: AgentBlock, context: AgentBlockCo
     baseURL: process.env.OPENAI_BASE_URL,
   })
 
+  // Model-resolution precedence (confirmed intentional, not a PoC placeholder):
+  // 1. `block.metadata.deepnote_agent_model` when explicitly set (not 'auto') —
+  //    a per-block override always wins.
+  // 2. `OPENAI_MODEL` env — the operator/deployment-level default.
+  // 3. `'gpt-5'` literal — the final fallback when neither is set.
+  // The chain is documented in PRD-001 ("AI Agent Notebook Authoring", Phase 2,
+  // Defaults reconciled) and introduced in the agentic-block PoC (#341); this
+  // reconciliation confirms the order and the `'gpt-5'` fallback as the intended
+  // default rather than carrying it forward as an unexamined PoC value.
   const modelName =
     block.metadata.deepnote_agent_model !== 'auto'
       ? block.metadata.deepnote_agent_model
       : (process.env.OPENAI_MODEL ?? 'gpt-5')
+  // Tool-loop turn cap (confirmed intentional per PRD-001 Phase 2): the agent may
+  // take at most 10 reasoning/tool steps before the loop stops, via
+  // `stepCountIs(maxTurns)` on the ToolLoopAgent below. This bounds runaway
+  // tool-calling on a single agent block; 10 is the intended cap, not a placeholder.
   const maxTurns = 10
 
   // Use the Responses API for direct OpenAI access (supports reasoning

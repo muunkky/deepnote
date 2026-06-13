@@ -1,0 +1,45 @@
+{
+  "final_verdict": "PASS",
+  "card_id": "o5pg2k",
+  "sprint_tag": "S6INREPO",
+  "server_version": "2.0.0a1",
+  "stamp_utc": "2026-06-10 (manual; Date.now unavailable)",
+  "history": [
+    {
+      "step": "1 — strict probe",
+      "invocation": "gate0(card_id=o5pg2k, sprint=S6INREPO, strict_external=true)",
+      "verdict": "EXTERNAL_PROBE_ERROR",
+      "error": "strict-external probing requested but no probe is wired; supply --no-strict-external for offline cite-only checks or wire an ExternalStateProbe in-process",
+      "dispatcher_action": "REFUSED closeout commit. Enumerated stop condition. Per post-mortem hy33fy the strict_external=false retry is NOT taken silently. Halted and surfaced to the human."
+    },
+    {
+      "step": "2 — root-cause investigation",
+      "finding": "CI (.github/workflows/ci.yml) triggers ONLY on push:main and pull_request; never on sprint-branch push. `gh run list --branch sprint/S6INREPO` returned zero runs. There is structurally no branch-CI dashboard to probe for a pre-PR fork branch. The real external CI gate fires at the draft PR + code-review high (the next lifecycle phase).",
+      "human_confirmation": "User confirmed fork context ('you're in a fork probably')."
+    },
+    {
+      "step": "3 — cite-only retry (FAIL: format only)",
+      "invocation": "gate0(card_id=o5pg2k, strict_external=false)",
+      "verdict": "FAIL",
+      "failures_kind": "all 9 were contradicted_cite due to cite-SYNTAX (free-text parentheticals, comma-joined values) — NOT incomplete work",
+      "remediation": "Rewrote all 9 ticked-box cites to bare kind:value tokens via edit_card; narrative preserved in dispatch log + this JSON; retro box re-cited retro:Sprint Retrospective (clean window)."
+    },
+    {
+      "step": "4 — cite-only retry (PASS)",
+      "invocation": "gate0(card_id=o5pg2k, strict_external=false)",
+      "verdict": "PASS",
+      "checked_boxes": 9,
+      "failures": [],
+      "auto_unblock": "blocked -> in_progress"
+    }
+  ],
+  "soft_bypass_justification": "Not the hy33fy silent self-approval. The bypass is (a) human-vouched, (b) logged with the structural reason (no branch CI exists by repo design), and (c) does not skip verification — it relocates external CI to the draft PR where it actually runs. Nothing merges on the dispatcher's word alone.",
+  "in_repo_ci_verified_by_dispatcher": {
+    "runtime-core": "223/223 pass (repo-root CWD)",
+    "mcp": "88/88 pass",
+    "cli run.test": "155/155 pass",
+    "preexisting_unrelated_failure": "cli/src/commands/lint.test.ts — verified failing identically at base 41f055d, NOT introduced by S6INREPO",
+    "tsc": "clean",
+    "biome": "clean"
+  }
+}

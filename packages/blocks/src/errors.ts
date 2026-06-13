@@ -53,6 +53,25 @@ export class ProhibitedYamlFeatureError extends ParseError {
 export class UnsupportedBlockTypeError extends DeepnoteError {}
 
 /**
+ * Thrown when a Deepnote value-add block (SQL, visualization, input, agent,
+ * etc.) is encountered on a non-Python kernel, where its `_dntk`-prefixed
+ * Python codegen cannot run (ADR-004 Decision point 1). The runtime raises
+ * this at the dispatch seam — **before** any codegen — so no `_dntk` string is
+ * ever generated, let alone dispatched to an alien kernel. The message names
+ * both the offending `blockType` and the active `kernelName` so the failure is
+ * self-explanatory.
+ */
+export class UnsupportedBlockOnKernelError extends DeepnoteError {
+  constructor(
+    readonly blockType: string,
+    readonly kernelName: string,
+    options?: ErrorOptions
+  ) {
+    super(`${blockType} blocks require the Python kernel; this notebook is running on '${kernelName}'.`, options)
+  }
+}
+
+/**
  * Thrown when a value is invalid (e.g., slider value, date interval).
  */
 export class InvalidValueError extends DeepnoteError {

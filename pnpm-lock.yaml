@@ -111,6 +111,9 @@ importers:
       '@deepnote/runtime-core':
         specifier: workspace:*
         version: link:../runtime-core
+      '@deepnote/runtime-server':
+        specifier: workspace:*
+        version: link:../runtime-server
       '@inquirer/prompts':
         specifier: ^8.2.1
         version: 8.2.1(@types/node@22.18.12)
@@ -249,6 +252,9 @@ importers:
       '@deepnote/blocks':
         specifier: workspace:*
         version: link:../blocks
+      '@deepnote/database-integrations':
+        specifier: workspace:*
+        version: link:../database-integrations
       '@jupyterlab/nbformat':
         specifier: ^4.3.2
         version: 4.5.2
@@ -271,6 +277,25 @@ importers:
       '@types/tcp-port-used':
         specifier: ^1.0.4
         version: 1.0.4
+      '@types/ws':
+        specifier: ^8.5.13
+        version: 8.18.1
+
+  packages/runtime-server:
+    dependencies:
+      '@deepnote/blocks':
+        specifier: workspace:*
+        version: link:../blocks
+      '@deepnote/reactivity':
+        specifier: workspace:*
+        version: link:../reactivity
+      '@deepnote/runtime-core':
+        specifier: workspace:*
+        version: link:../runtime-core
+      ws:
+        specifier: '>=8.20.1'
+        version: 8.21.0
+    devDependencies:
       '@types/ws':
         specifier: ^8.5.13
         version: 8.18.1
@@ -1369,6 +1394,7 @@ packages:
 
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
+    deprecated: Potential CWE-502 - Update to 1.3.1 or higher
 
   '@vercel/oidc@3.1.0':
     resolution: {integrity: sha512-Fw28YZpRnA3cAHHDlkt7xQHiJ0fcL+NRcIqsocZQUSmbzeIKRpwttJjik5ZGanXP+vlA4SbTg+AbA3bP363l+w==}

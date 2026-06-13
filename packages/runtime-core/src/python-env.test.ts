@@ -2,8 +2,14 @@ import { execSync } from 'node:child_process'
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildPythonEnv, detectDefaultPython, resolvePythonExecutable } from './python-env'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  buildPythonEnv,
+  detectDefaultPython,
+  resolvePythonExecutable,
+  selectPythonSpec,
+  selectPythonSpecWithHint,
+} from './python-env'
 
 vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
@@ -209,6 +215,244 @@ describe('detectDefaultPython', () => {
     // Should only call once for 'python' since it succeeds
     expect(mockExecSync).toHaveBeenCalledTimes(1)
     expect(mockExecSync).toHaveBeenCalledWith('python --version', { stdio: 'ignore' })
+  })
+})
+
+describe('selectPythonSpec', () => {
+  const mockExecSync = vi.mocked(execSync)
+  let savedDeepnotePython: string | undefined
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    savedDeepnotePython = process.env.DEEPNOTE_PYTHON
+    delete process.env.DEEPNOTE_PYTHON
+  })
+
+  afterEach(() => {
+    if (savedDeepnotePython === undefined) {
+      delete process.env.DEEPNOTE_PYTHON
+    } else {
+      process.env.DEEPNOTE_PYTHON = savedDeepnotePython
+    }
+  })
+
+  it('returns the explicit arg when provided, even if DEEPNOTE_PYTHON is set', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpec({ explicit: '/explicit/venv/bin/python' })
+
+    expect(result).toBe('/explicit/venv/bin/python')
+    // Precedence short-circuits before env or the autodetect fallback is ever consulted.
+    expect(mockExecSync).not.toHaveBeenCalled()
+  })
+
+  it('returns the explicit arg when provided and DEEPNOTE_PYTHON is unset', () => {
+    const result = selectPythonSpec({ explicit: '/explicit/venv/bin/python' })
+
+    expect(result).toBe('/explicit/venv/bin/python')
+    expect(mockExecSync).not.toHaveBeenCalled()
+  })
+
+  it('returns process.env.DEEPNOTE_PYTHON when no explicit arg is given', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpec({})
+
+    expect(result).toBe('/env/venv/bin/python')
+    // Env tier wins before the autodetect fallback is consulted.
+    expect(mockExecSync).not.toHaveBeenCalled()
+  })
+
+  it('reads DEEPNOTE_PYTHON when called with no argument object', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpec()
+
+    expect(result).toBe('/env/venv/bin/python')
+  })
+
+  it('treats an undefined explicit as absent and falls through to DEEPNOTE_PYTHON', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpec({ explicit: undefined })
+
+    expect(result).toBe('/env/venv/bin/python')
+  })
+
+  it('falls back to detectDefaultPython() when neither explicit arg nor DEEPNOTE_PYTHON is set', () => {
+    mockExecSync.mockImplementation(() => Buffer.from('Python 3.11.0'))
+
+    const result = selectPythonSpec({})
+
+    expect(result).toBe('python')
+    expect(mockExecSync).toHaveBeenCalledWith('python --version', { stdio: 'ignore' })
+  })
+
+  it('falls back through detectDefaultPython() to python3 when python is unavailable', () => {
+    mockExecSync.mockImplementation((command: string) => {
+      if (command === 'python --version') {
+        throw new Error('command not found: python')
+      }
+      return Buffer.from('Python 3.11.0')
+    })
+
+    const result = selectPythonSpec({})
+
+    expect(result).toBe('python3')
+  })
+
+  it('treats an empty explicit arg as absent and falls through to DEEPNOTE_PYTHON', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpec({ explicit: '' })
+
+    expect(result).toBe('/env/venv/bin/python')
+    // An empty explicit must not short-circuit to ''; it falls through the chain.
+    expect(mockExecSync).not.toHaveBeenCalled()
+  })
+
+  it('treats a whitespace-only explicit arg as absent and falls through to DEEPNOTE_PYTHON', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpec({ explicit: '   ' })
+
+    expect(result).toBe('/env/venv/bin/python')
+  })
+
+  it('treats a blank DEEPNOTE_PYTHON as absent and falls through to autodetect', () => {
+    mockExecSync.mockImplementation(() => Buffer.from('Python 3.11.0'))
+    process.env.DEEPNOTE_PYTHON = ''
+
+    const result = selectPythonSpec({})
+
+    // before fix: returns '' ; after fix: returns the autodetected spec
+    expect(result).toBe('python')
+    expect(mockExecSync).toHaveBeenCalledWith('python --version', { stdio: 'ignore' })
+  })
+
+  it('treats a whitespace-only DEEPNOTE_PYTHON as absent and falls through to autodetect', () => {
+    mockExecSync.mockImplementation(() => Buffer.from('Python 3.11.0'))
+    process.env.DEEPNOTE_PYTHON = '   '
+
+    const result = selectPythonSpec({})
+
+    expect(result).toBe('python')
+  })
+
+  it('falls through an empty explicit AND a blank DEEPNOTE_PYTHON to autodetect', () => {
+    mockExecSync.mockImplementation(() => Buffer.from('Python 3.11.0'))
+    process.env.DEEPNOTE_PYTHON = ''
+
+    const result = selectPythonSpec({ explicit: '' })
+
+    expect(result).toBe('python')
+  })
+})
+
+describe('selectPythonSpecWithHint', () => {
+  // The single source of truth for the ADR-001 bare-system-python warning shared by the
+  // CLI (`--python`) and MCP (`pythonPath`) consumers. The hint fires ONLY when the
+  // resolved spec is bare AND no *real* (non-blank) override was supplied — a blank value
+  // is not an override and must NOT suppress it.
+  const mockExecSync = vi.mocked(execSync)
+  let savedDeepnotePython: string | undefined
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    savedDeepnotePython = process.env.DEEPNOTE_PYTHON
+    delete process.env.DEEPNOTE_PYTHON
+    // Default to a bare autodetect so the hint gate can fire unless a test overrides it.
+    mockExecSync.mockImplementation(() => Buffer.from('Python 3.11.0'))
+  })
+
+  afterEach(() => {
+    if (savedDeepnotePython === undefined) {
+      delete process.env.DEEPNOTE_PYTHON
+    } else {
+      process.env.DEEPNOTE_PYTHON = savedDeepnotePython
+    }
+  })
+
+  it('attaches the hint when resolution lands on bare system python with no override', () => {
+    const result = selectPythonSpecWithHint({ argLabel: '--python' })
+
+    expect(result.spec).toBe('python')
+    expect(result.hint).toBeDefined()
+    expect(result.hint).toContain('system interpreter')
+    expect(result.hint).toContain('DEEPNOTE_PYTHON')
+    expect(result.hint).toContain('deepnote-toolkit')
+  })
+
+  it('embeds the caller-surface argLabel in the hint', () => {
+    const cli = selectPythonSpecWithHint({ argLabel: '--python' })
+    const mcp = selectPythonSpecWithHint({ argLabel: 'pythonPath' })
+
+    expect(cli.hint).toContain('--python')
+    expect(mcp.hint).toContain('pythonPath')
+    expect(mcp.hint).not.toContain('--python')
+  })
+
+  it('does NOT attach a hint when an explicit (real) override is provided', () => {
+    const result = selectPythonSpecWithHint({ explicit: '/explicit/venv/bin/python', argLabel: '--python' })
+
+    expect(result.spec).toBe('/explicit/venv/bin/python')
+    expect(result.hint).toBeUndefined()
+  })
+
+  it('does NOT attach a hint when DEEPNOTE_PYTHON is a real override', () => {
+    process.env.DEEPNOTE_PYTHON = '/env/venv/bin/python'
+
+    const result = selectPythonSpecWithHint({ argLabel: 'pythonPath' })
+
+    expect(result.spec).toBe('/env/venv/bin/python')
+    expect(result.hint).toBeUndefined()
+  })
+
+  it('does NOT attach a hint when the resolved spec is a non-bare interpreter', () => {
+    // A path override resolves to a non-bare spec, so the bare-python gate never opens.
+    const result = selectPythonSpecWithHint({ explicit: '/path/to/venv', argLabel: '--python' })
+
+    expect(result.spec).toBe('/path/to/venv')
+    expect(result.hint).toBeUndefined()
+  })
+
+  it('FIRES the hint when explicit is blank (blank is not an override)', () => {
+    // A blank explicit falls through to bare autodetect; the warning must still surface.
+    const result = selectPythonSpecWithHint({ explicit: '', argLabel: '--python' })
+
+    expect(result.spec).toBe('python')
+    expect(result.hint).toBeDefined()
+    expect(result.hint).toContain('system interpreter')
+  })
+
+  it('FIRES the hint when DEEPNOTE_PYTHON is blank (blank is not an override)', () => {
+    process.env.DEEPNOTE_PYTHON = ''
+
+    const result = selectPythonSpecWithHint({ argLabel: 'pythonPath' })
+
+    expect(result.spec).toBe('python')
+    expect(result.hint).toBeDefined()
+    expect(result.hint).toContain('system interpreter')
+  })
+
+  it('FIRES the hint when both explicit and DEEPNOTE_PYTHON are blank', () => {
+    process.env.DEEPNOTE_PYTHON = ''
+
+    const result = selectPythonSpecWithHint({ explicit: '   ', argLabel: '--python' })
+
+    expect(result.spec).toBe('python')
+    expect(result.hint).toBeDefined()
+  })
+
+  it('does NOT attach a hint when DEEPNOTE_PYTHON is an explicit bare override', () => {
+    // The user explicitly chose a bare interpreter via env — that is a real override,
+    // so even though the spec is bare, no hint fires.
+    process.env.DEEPNOTE_PYTHON = 'python'
+
+    const result = selectPythonSpecWithHint({ argLabel: 'pythonPath' })
+
+    expect(result.spec).toBe('python')
+    expect(result.hint).toBeUndefined()
   })
 })
 

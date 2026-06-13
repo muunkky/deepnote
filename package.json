@@ -25,11 +25,12 @@
     "spell-check:fix": "cspell \"**/*.{md,txt,json,js,ts,tsx,jsx,py,yml,yaml}\" --no-exit-code --show-suggestions",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run -c vitest.integration.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r exec tsc --noEmit"
   },
   "lint-staged": {
     "**/*.{ts,tsx,html,json,jsonc}": [
-      "pnpm exec biome check --write"
+      "pnpm exec biome check --write --no-errors-on-unmatched"
     ],
     "**/*.{md,yml,yaml}": [
       "pnpm exec prettier --write"

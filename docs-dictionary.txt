@@ -269,6 +269,8 @@ obrazovky
 
 # British English
 behaviour
+behavioural
+behaviourally
 strikethrough
 
 # Terms from docs
@@ -309,3 +311,89 @@ Homa
 foodpanda
 Shippit
 Webflow
+
+# Alternative-language kernels (PRD-002 / ALTKERN1) + planning-doc terms
+ALTKERN
+autodetection
+autorestart
+autorestarting
+catchable
+codegen
+direnv
+embedders
+envrc
+fixtured
+gitban
+Gitban
+headlessly
+ijavascript
+ijsinstall
+installspec
+invokable
+ipykernel
+jupyterlab
+kernelspecs
+Kernelspecs
+launchable
+muunkky
+overclaim
+prds
+prereq
+prereqs
+pyenv
+Pythonish
+reimplementability
+reimplementable
+reopenable
+researchable
+revisitable
+scriptable
+solutioning
+unadopted
+unbuilt
+unkeyed
+unlaunchable
+unrunnable
+vxiipn
+LSPORT
+parameterises
+centralises
+qajbsg
+Summarise
+summarised
+centralised
+unstubbed
+
+# Local Deepnote UI / read-only viewer SPA (PRD-003 / m3/s2) + planning-doc terms
+rendermime
+ioutput
+relitigate
+unsanitized
+footgun
+vegalite
+
+# Local Deepnote UI / m3 ADRs (ADR-005/006/007) + PRD-003 — frontend toolchain + planning terms
+architecting
+assertable
+Assertable
+bottlenecked
+contributable
+depcruise
+empt
+excludable
+greppable
+Greppable
+nbviewer
+nteract
+Pyodide
+Rsbuild
+Rspack
+Turborepo
+
+# Local Deepnote UI / m3-s1 serve backend (runtime-server, GET /api/project)
+unfakeable
+macrotask
+lossily
+affordances
+hlai
+ifqe

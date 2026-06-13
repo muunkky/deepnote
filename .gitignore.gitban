@@ -1,0 +1,10 @@
+# gitban-provided sample — merge the entries you want into your .gitignore. Refreshed on every gitban sync.
+# gitban runtime artifacts — add these to your .gitignore
+.gitban/agents/traces/
+.gitban/agents/*/logs/*.jsonl
+.gitban/agents/*/logs/*.jsonl.*
+.gitban/agents/.active-log
+.gitban/audit/
+.gitban/views/
+.gitban/.viewer-port
+.claude/worktrees/

@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // Use vi.hoisted to create mocks that are available during vi.mock hoisting
 const {
   mockRequestExecute,
+  mockStatusChangedConnect,
+  mockStatusChangedDisconnect,
+  emitStatusChange,
   mockKernel,
   mockSession,
   mockSessionManager,
@@ -12,9 +15,29 @@ const {
   MockSessionManager,
 } = vi.hoisted(() => {
   const mockRequestExecute = vi.fn()
+  // Minimal lumino-ISignal stand-in for kernel.statusChanged so the execute()
+  // mid-run death subscription can be exercised under mocks.
+  const statusSlots = new Set<(sender: unknown, status: string) => void>()
+  const mockStatusChangedConnect = vi.fn((slot: (sender: unknown, status: string) => void) => {
+    statusSlots.add(slot)
+    return true
+  })
+  const mockStatusChangedDisconnect = vi.fn((slot: (sender: unknown, status: string) => void) => {
+    statusSlots.delete(slot)
+    return true
+  })
+  const emitStatusChange = (status: string) => {
+    for (const slot of [...statusSlots]) {
+      slot(mockKernel, status)
+    }
+  }
   const mockKernel = {
     status: 'idle' as string,
     requestExecute: mockRequestExecute,
+    statusChanged: {
+      connect: mockStatusChangedConnect,
+      disconnect: mockStatusChangedDisconnect,
+    },
   }
   const mockSession = {
     kernel: mockKernel as typeof mockKernel | null,
@@ -45,6 +68,9 @@ const {
 
   return {
     mockRequestExecute,
+    mockStatusChangedConnect,
+    mockStatusChangedDisconnect,
+    emitStatusChange,
     mockKernel,
     mockSession,
     mockSessionManager,
@@ -64,6 +90,7 @@ vi.mock('@jupyterlab/services', () => ({
 }))
 
 import { KernelClient } from './kernel-client'
+import { KernelDiedError, KernelLaunchError, KernelNotRegisteredError } from './kernel-errors'
 
 // Helper to create a mock execution future
 function createMockFuture() {
@@ -72,6 +99,36 @@ function createMockFuture() {
     done: Promise.resolve(),
     dispose: vi.fn(),
   }
+}
+
+// A deferred-resolution future for tests that need to control when done settles
+// (e.g. mid-run kernel death while a request is pending).
+function createPendingFuture() {
+  let resolveDone!: () => void
+  let rejectDone!: (reason?: unknown) => void
+  const done = new Promise<void>((resolve, reject) => {
+    resolveDone = resolve
+    rejectDone = reject
+  })
+  return {
+    onIOPub: null as ((msg: unknown) => void) | null,
+    done,
+    dispose: vi.fn(),
+    resolveDone,
+    rejectDone,
+  }
+}
+
+/** Build a mocked `GET /api/kernelspecs` response from a name → language map. */
+function mockKernelspecsResponse(specs: Record<string, string>): Response {
+  const kernelspecs: Record<string, unknown> = {}
+  for (const [name, language] of Object.entries(specs)) {
+    kernelspecs[name] = { name, spec: { display_name: name, language } }
+  }
+  return {
+    ok: true,
+    json: async () => ({ default: 'python3', kernelspecs }),
+  } as unknown as Response
 }
 
 describe('KernelClient', () => {
@@ -84,9 +141,16 @@ describe('KernelClient', () => {
     // Reset mock state
     mockKernel.status = 'idle'
     mockSession.kernel = mockKernel
+    mockSessionManager.startNew.mockReset()
     mockSessionManager.startNew.mockResolvedValue(mockSession)
     mockRequestExecute.mockReset()
     mockSession.shutdown.mockReset()
+    mockStatusChangedConnect.mockClear()
+    mockStatusChangedDisconnect.mockClear()
+
+    // By default, no kernel reaches pre-flight (tests connect with python3),
+    // but stub global fetch so any accidental call is observable, not a crash.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockKernelspecsResponse({ python3: 'python' }))
   })
 
   afterEach(() => {
@@ -164,7 +228,8 @@ describe('KernelClient', () => {
       await vi.advanceTimersByTimeAsync(100)
 
       const error = await errorPromise
-      expect(error).toBeInstanceOf(Error)
+      expect(error).toBeInstanceOf(KernelDiedError)
+      expect(error.category).toBe('kernel-died')
       expect(error.message).toBe('Kernel is dead')
     })
 
@@ -189,10 +254,95 @@ describe('KernelClient', () => {
       await expect(client.connect('http://localhost:8888')).rejects.toThrow('Failed to start kernel')
     })
 
-    it('disconnects on connection error', async () => {
+    it('wraps a startNew rejection in a KernelLaunchError', async () => {
       mockSessionManager.startNew.mockRejectedValueOnce(new Error('Connection failed'))
 
-      await expect(client.connect('http://localhost:8888')).rejects.toThrow('Connection failed')
+      const error = await client.connect('http://localhost:8888').catch(e => e)
+      expect(error).toBeInstanceOf(KernelLaunchError)
+      expect(error.category).toBe('kernel-launch')
+      expect(error.kernelName).toBe('python3')
+      expect(error.cause).toBeInstanceOf(Error)
+      expect((error.cause as Error).message).toBe('Connection failed')
+    })
+
+    describe('kernel name threading + pre-flight', () => {
+      it('connect(url, python3) skips the kernelspecs GET and resolves undefined', async () => {
+        const language = await client.connect('http://localhost:8888', 'python3')
+
+        expect(globalThis.fetch).not.toHaveBeenCalled()
+        expect(language).toBeUndefined()
+        expect(mockSessionManager.startNew).toHaveBeenCalledWith(
+          expect.objectContaining({ kernel: { name: 'python3' } })
+        )
+      })
+
+      it('passes the explicit kernel name to startNew and resolves its language', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockKernelspecsResponse({ python3: 'python', bash: 'bash' }))
+
+        const language = await client.connect('http://localhost:8888', 'bash')
+
+        expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:8888/api/kernelspecs')
+        expect(mockSessionManager.startNew).toHaveBeenCalledWith(expect.objectContaining({ kernel: { name: 'bash' } }))
+        expect(language).toBe('bash')
+      })
+
+      it('throws KernelNotRegisteredError BEFORE startNew for an unregistered name', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockKernelspecsResponse({ python3: 'python' }))
+
+        const error = await client.connect('http://localhost:8888', 'bash').catch(e => e)
+
+        expect(error).toBeInstanceOf(KernelNotRegisteredError)
+        expect(error.category).toBe('missing-kernel')
+        expect(error.requested).toBe('bash')
+        expect(error.available.map((k: { name: string }) => k.name)).toContain('python3')
+        expect(mockSessionManager.startNew).not.toHaveBeenCalled()
+      })
+
+      it('falls through (no missing-kernel error) when the kernelspecs GET rejects', async () => {
+        vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'))
+
+        const language = await client.connect('http://localhost:8888', 'bash')
+
+        expect(language).toBeUndefined()
+        expect(mockSessionManager.startNew).toHaveBeenCalledWith(expect.objectContaining({ kernel: { name: 'bash' } }))
+      })
+
+      it('falls through when the kernelspecs GET returns a non-ok response', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+          ok: false,
+          json: async () => ({}),
+        } as unknown as Response)
+
+        const language = await client.connect('http://localhost:8888', 'bash')
+
+        expect(language).toBeUndefined()
+        expect(mockSessionManager.startNew).toHaveBeenCalled()
+      })
+
+      it('wraps a startNew rejection for a registered kernel in KernelLaunchError', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockKernelspecsResponse({ python3: 'python', bash: 'bash' }))
+        mockSessionManager.startNew.mockRejectedValueOnce(new Error('boom'))
+
+        const error = await client.connect('http://localhost:8888', 'bash').catch(e => e)
+
+        expect(error).toBeInstanceOf(KernelLaunchError)
+        expect(error.kernelName).toBe('bash')
+      })
+
+      it('forwards a non-default kernelStartupTimeoutMs into waitForKernelIdle', async () => {
+        const slowClient = new KernelClient({ kernelStartupTimeoutMs: 5000 })
+        mockKernel.status = 'starting'
+
+        const connectPromise = slowClient.connect('http://localhost:8888')
+        const errorPromise = connectPromise.catch(e => e)
+
+        // Advance just past the configured 5s budget; the kernel never idles.
+        await vi.advanceTimersByTimeAsync(5100)
+
+        const error = await errorPromise
+        expect(error).toBeInstanceOf(Error)
+        expect(error.message).toContain('within 5000ms')
+      })
     })
   })
 
@@ -373,6 +523,105 @@ describe('KernelClient', () => {
 
       expect(future.dispose).toHaveBeenCalled()
     })
+
+    it('subscribes and unsubscribes from statusChanged across a normal execution', async () => {
+      const future = createMockFuture()
+      mockRequestExecute.mockReturnValue(future)
+
+      await client.execute('print("hello")')
+
+      expect(mockStatusChangedConnect).toHaveBeenCalled()
+      expect(mockStatusChangedDisconnect).toHaveBeenCalled()
+    })
+
+    it('rejects with a typed KernelDiedError when the kernel dies mid-execution', async () => {
+      const future = createPendingFuture()
+      mockRequestExecute.mockReturnValue(future)
+
+      const resultPromise = client.execute('while True: pass')
+      const errorPromise = resultPromise.catch(e => e)
+
+      // Kernel dies while the execute request is still pending.
+      mockKernel.status = 'dead'
+      emitStatusChange('dead')
+
+      const error = await errorPromise
+      expect(error).toBeInstanceOf(KernelDiedError)
+      expect(error.category).toBe('kernel-died')
+      // The mid-run subscription must be torn down so it does not leak.
+      expect(mockStatusChangedDisconnect).toHaveBeenCalled()
+      expect(future.dispose).toHaveBeenCalled()
+    })
+
+    it('surfaces a KernelDiedError when the future rejects and the kernel is dead', async () => {
+      const future = createPendingFuture()
+      mockRequestExecute.mockReturnValue(future)
+
+      const resultPromise = client.execute('print(1)')
+      const errorPromise = resultPromise.catch(e => e)
+
+      mockKernel.status = 'dead'
+      future.rejectDone(new Error('connection lost'))
+
+      const error = await errorPromise
+      expect(error).toBeInstanceOf(KernelDiedError)
+    })
+
+    it('surfaces the underlying error when the future rejects and the kernel is alive', async () => {
+      const future = createPendingFuture()
+      mockRequestExecute.mockReturnValue(future)
+
+      const resultPromise = client.execute('print(1)')
+      const errorPromise = resultPromise.catch(e => e)
+
+      future.rejectDone(new Error('transient glitch'))
+
+      const error = await errorPromise
+      expect(error).not.toBeInstanceOf(KernelDiedError)
+      expect(error.message).toBe('transient glitch')
+    })
+
+    // A hard crash (`os._exit(1)`) makes the Jupyter server AUTO-RESTART the kernel rather than
+    // leaving it `'dead'`: the status goes `busy → autorestarting → … → idle`. From the in-flight
+    // execution's view that is still a death — the request is abandoned and can never complete.
+    // Without detecting these statuses the cancelled future surfaces as a plain in-block error
+    // (card wd2nil — the real toolkit auto-restarts, so `'dead'` is never observed mid-run).
+    it.each(['autorestarting', 'restarting'])(
+      'rejects with a typed KernelDiedError when the kernel %s mid-execution (server auto-restart, never `dead`)',
+      async status => {
+        const future = createPendingFuture()
+        mockRequestExecute.mockReturnValue(future)
+
+        const resultPromise = client.execute('import os; os._exit(1)')
+        const errorPromise = resultPromise.catch(e => e)
+
+        // The server initiates an auto-restart; the status never becomes `'dead'`.
+        mockKernel.status = status
+        emitStatusChange(status)
+
+        const error = await errorPromise
+        expect(error).toBeInstanceOf(KernelDiedError)
+        expect(error.category).toBe('kernel-died')
+        expect(mockStatusChangedDisconnect).toHaveBeenCalled()
+        expect(future.dispose).toHaveBeenCalled()
+      }
+    )
+
+    it('surfaces a KernelDiedError when the future is cancelled while the kernel is auto-restarting', async () => {
+      const future = createPendingFuture()
+      mockRequestExecute.mockReturnValue(future)
+
+      const resultPromise = client.execute('import os; os._exit(1)')
+      const errorPromise = resultPromise.catch(e => e)
+
+      // The real toolkit rejects the in-flight future ("Canceled future for execute_request
+      // message before replies were done") while the kernel status is `autorestarting`.
+      mockKernel.status = 'autorestarting'
+      future.rejectDone(new Error('Canceled future for execute_request message before replies were done'))
+
+      const error = await errorPromise
+      expect(error).toBeInstanceOf(KernelDiedError)
+    })
   })
 
   describe('disconnect', () => {
@@ -399,6 +648,95 @@ describe('KernelClient', () => {
     it('does nothing if not connected', async () => {
       // Should not throw
       await client.disconnect()
+    })
+  })
+
+  // Determinism guard for the Scenario-4 teardown leak (card wd2nil, reviewer-2 B1).
+  //
+  // When a kernel auto-restarts mid-run and is then disposed, `@jupyterlab/services`
+  // leaks an unhandled `Error('Kernel connection disconnected')` from a fire-and-forget
+  // internal reconnect microtask we cannot reach. `disconnect()` must swallow exactly that
+  // benign rejection so the integration suite exits 0 deterministically — while still
+  // letting any *other* unhandled rejection escape. These tests use REAL timers because
+  // the guard drains the macrotask queue with a real `setTimeout(0)`.
+  describe('disconnect — dead-kernel rejection guard', () => {
+    beforeEach(() => {
+      vi.useRealTimers()
+    })
+
+    /**
+     * Collect any `unhandledRejection` that escapes the process while `run()` executes,
+     * isolating it from vitest's own global handler. Returns the captured reasons. Mirrors
+     * the library's leak: disposing schedules a fire-and-forget rejecting microtask with no
+     * `.catch`, exactly like `DefaultKernel`'s auto-restart `void Promise.resolve().then(…)`.
+     */
+    async function captureUnhandledRejections(run: () => Promise<void>): Promise<unknown[]> {
+      const escaped: unknown[] = []
+      const priorListeners = process.listeners('unhandledRejection')
+      const sink = (reason: unknown) => {
+        escaped.push(reason)
+      }
+      process.removeAllListeners('unhandledRejection')
+      process.on('unhandledRejection', sink)
+      try {
+        await run()
+        // Give any rejection the guard *failed* to swallow a real tick to surface.
+        await new Promise<void>(resolve => setTimeout(resolve, 0))
+      } finally {
+        process.removeListener('unhandledRejection', sink)
+        for (const listener of priorListeners) {
+          process.on('unhandledRejection', listener as (reason: unknown, promise: Promise<unknown>) => void)
+        }
+      }
+      return escaped
+    }
+
+    /** Make `session.dispose()` leak the library's benign teardown rejection. */
+    function leakOnDispose(message: string) {
+      mockSession.dispose.mockImplementationOnce(() => {
+        // Fire-and-forget rejecting promise with no `.catch`, exactly like the library's
+        // internal `void Promise.resolve().then(async () => { await this.reconnect() })`.
+        void Promise.resolve().then(async () => {
+          throw new Error(message)
+        })
+      })
+    }
+
+    it('swallows the benign "Kernel connection disconnected" leak from dispose', async () => {
+      const escaped = await captureUnhandledRejections(async () => {
+        await client.connect('http://localhost:8888')
+        leakOnDispose('Kernel connection disconnected')
+        await client.disconnect()
+      })
+
+      expect(escaped).toEqual([])
+      expect(mockSession.dispose).toHaveBeenCalled()
+    })
+
+    it('does NOT swallow an unrelated unhandled rejection during teardown', async () => {
+      const escaped = await captureUnhandledRejections(async () => {
+        await client.connect('http://localhost:8888')
+        leakOnDispose('some unrelated catastrophic failure')
+        await client.disconnect()
+      })
+
+      expect(escaped).toHaveLength(1)
+      expect((escaped[0] as Error).message).toBe('some unrelated catastrophic failure')
+    })
+
+    it('restores the prior unhandledRejection listeners after disconnect', async () => {
+      const sentinel = (() => {}) as (reason: unknown, promise: Promise<unknown>) => void
+      process.on('unhandledRejection', sentinel)
+      try {
+        const before = process.listeners('unhandledRejection')
+        await client.connect('http://localhost:8888')
+        await client.disconnect()
+        const after = process.listeners('unhandledRejection')
+        expect(after).toEqual(before)
+        expect(after).toContain(sentinel)
+      } finally {
+        process.removeListener('unhandledRejection', sentinel)
+      }
     })
   })
 })

@@ -1,6 +1,6 @@
 {
   "name": "@deepnote/runtime-core",
-  "version": "0.3.0",
+  "version": "0.6.0",
   "description": "Core runtime for executing Deepnote projects",
   "keywords": [
     "deepnote",
@@ -39,6 +39,7 @@
     "@ai-sdk/mcp": "^1.0.25",
     "@ai-sdk/openai": "^3.0.0",
     "@deepnote/blocks": "workspace:*",
+    "@deepnote/database-integrations": "workspace:*",
     "@jupyterlab/nbformat": "^4.3.2",
     "@jupyterlab/services": "^7.3.2",
     "ai": "^6.0.0",

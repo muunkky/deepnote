@@ -1,5 +1,9 @@
 import fs from 'node:fs/promises'
 import { decodeUtf8NoBom, deepnoteFileSchema, ParseError, parseYaml } from '@deepnote/blocks'
+// KD-3 lift: `ValidationIssue` is canonicalized in `@deepnote/runtime-core` (the shared home
+// the lifted `parseIntegrationsFile` reports issues with). Re-exported here so the cli's
+// public `validate` surface keeps the same name + shape with no duplicate definition.
+import type { ValidationIssue } from '@deepnote/runtime-core'
 import type { Command } from 'commander'
 import type { ZodIssue } from 'zod'
 import { ExitCode } from '../exit-codes'
@@ -10,11 +14,7 @@ export interface ValidateOptions {
   output?: OutputFormat
 }
 
-export interface ValidationIssue {
-  path: string
-  message: string
-  code: string
-}
+export type { ValidationIssue }
 
 export interface ValidationResult {
   success: true

@@ -42,10 +42,20 @@ vi.mock('node:child_process', async importOriginal => {
   }
 })
 
+// Mock integrations module for testing integration validation. The integration env
+// helpers were lifted into @deepnote/runtime-core (KD-3), so run.ts now imports
+// `parseIntegrationsFile` / `getDefaultIntegrationsFilePath` / `injectIntegrationEnvVars`
+// from there — the overrides therefore live in the runtime-core mock below.
+const mockParseIntegrationsFile = vi.fn()
+const mockInjectIntegrationEnvVars = vi.fn<(integrations: unknown[], workingDirectory: string) => string[]>()
+mockInjectIntegrationEnvVars.mockReturnValue([])
+
 // Mock @deepnote/runtime-core before importing run. ExecutionEngine and
 // resolvePythonExecutable are stubbed (no real server / filesystem probe), but
 // selectPythonSpec + detectDefaultPython are kept REAL so the precedence chain
 // (arg > DEEPNOTE_PYTHON > autodetect) is genuinely exercised here.
+// `collectRequiredIntegrationIds` stays REAL (spread from `actual`) so SQL-block
+// integration-id collection is genuinely exercised; only parse + inject are stubbed.
 vi.mock('@deepnote/runtime-core', async importOriginal => {
   const actual = await importOriginal<typeof import('@deepnote/runtime-core')>()
   return {
@@ -65,6 +75,9 @@ vi.mock('@deepnote/runtime-core', async importOriginal => {
       }
     },
     resolvePythonExecutable: (pythonPath: string) => Promise.resolve(pythonPath),
+    parseIntegrationsFile: (...args: unknown[]) => mockParseIntegrationsFile(...args),
+    getDefaultIntegrationsFilePath: (dir: string) => join(dir, DEFAULT_INTEGRATIONS_FILE),
+    injectIntegrationEnvVars: (...args: [unknown[], string]) => mockInjectIntegrationEnvVars(...args),
   }
 })
 
@@ -76,14 +89,6 @@ vi.mock('@deepnote/reactivity', () => {
   }
 })
 
-// Mock integrations module for testing integration validation
-const mockParseIntegrationsFile = vi.fn()
-vi.mock('../integrations/parse-integrations', () => {
-  return {
-    parseIntegrationsFile: (...args: unknown[]) => mockParseIntegrationsFile(...args),
-    getDefaultIntegrationsFilePath: (dir: string) => join(dir, DEFAULT_INTEGRATIONS_FILE),
-  }
-})
 // Mock fetchIntegrations for API integration tests
 const mockFetchIntegrations =
   vi.fn<(baseUrl: string, token: string, integrationIds?: string[]) => Promise<ApiIntegration[]>>()
@@ -94,13 +99,6 @@ vi.mock('../integrations/fetch-integrations', async importOriginal => {
     fetchIntegrations: (...args: Parameters<typeof actual.fetchIntegrations>) => mockFetchIntegrations(...args),
   }
 })
-
-// Mock injectIntegrationEnvVars for testing integration env var injection
-const mockInjectIntegrationEnvVars = vi.fn<(integrations: unknown[], workingDirectory: string) => string[]>()
-mockInjectIntegrationEnvVars.mockReturnValue([])
-vi.mock('../integrations/inject-integration-env-vars', () => ({
-  injectIntegrationEnvVars: (...args: [unknown[], string]) => mockInjectIntegrationEnvVars(...args),
-}))
 
 // Mock openDeepnoteFileInCloud for --open flag tests
 const mockOpenDeepnoteFileInCloud = vi.fn()
@@ -1654,7 +1652,8 @@ describe('run command', () => {
             expect.objectContaining({ id: 'local-only-id', name: 'Local DB' }),
             expect.objectContaining({ id: REQUIRED_INTEGRATION_ID, name: 'API DB' }),
           ]),
-          expect.any(String)
+          expect.any(String),
+          expect.any(Function)
         )
 
         expect(mockStart).toHaveBeenCalled()
@@ -1690,7 +1689,8 @@ describe('run command', () => {
               metadata: expect.objectContaining({ host: 'local.example.com' }),
             }),
           ],
-          expect.any(String)
+          expect.any(String),
+          expect.any(Function)
         )
 
         expect(mockStart).toHaveBeenCalled()
@@ -1726,7 +1726,8 @@ describe('run command', () => {
         expect(mockFetchIntegrations).toHaveBeenCalled()
         expect(mockInjectIntegrationEnvVars).toHaveBeenCalledWith(
           [expect.objectContaining({ id: REQUIRED_INTEGRATION_ID, name: 'Test PostgreSQL' })],
-          expect.any(String)
+          expect.any(String),
+          expect.any(Function)
         )
         expect(programErrorSpy).not.toHaveBeenCalled()
         expect(mockStart).toHaveBeenCalled()
@@ -1812,7 +1813,8 @@ describe('run command', () => {
               name: 'Local DB',
             }),
           ],
-          expect.any(String)
+          expect.any(String),
+          expect.any(Function)
         )
 
         expect(mockStart).toHaveBeenCalled()

@@ -9,15 +9,19 @@ import { getBlockDependencies, getUpstreamBlocks } from '@deepnote/reactivity'
 import {
   type AgentStreamEvent,
   type BlockExecutionResult,
+  collectRequiredIntegrationIds,
   ExecutionEngine,
   type ExecutionSummary,
   executableBlockTypeSet,
+  getDefaultIntegrationsFilePath,
+  injectIntegrationEnvVars,
   type IOutput,
   isNonPythonKernel,
   KernelDiedError,
   type KernelFailureCategory,
   KernelLaunchError,
   KernelNotRegisteredError,
+  parseIntegrationsFile,
   type DeepnoteBlock as RuntimeDeepnoteBlock,
   resolvePythonExecutable,
   selectKernelName,
@@ -32,10 +36,7 @@ marked.use(markedTerminal())
 
 import { DEEPNOTE_TOKEN_ENV, DEFAULT_ENV_FILE } from '../constants'
 import { ExitCode } from '../exit-codes'
-import { collectRequiredIntegrationIds } from '../integrations/collect-integrations'
 import { fetchAndMergeApiIntegrations } from '../integrations/fetch-and-merge-integrations'
-import { injectIntegrationEnvVars } from '../integrations/inject-integration-env-vars'
-import { getDefaultIntegrationsFilePath, parseIntegrationsFile } from '../integrations/parse-integrations'
 import { debug, getChalk, log, error as logError, type OutputFormat, output, outputJson, outputToon } from '../output'
 import { renderOutput } from '../output-renderer'
 import { analyzeProject, buildBlockMap, diagnoseBlockFailure, type ProjectStats } from '../utils/analysis'
@@ -401,8 +402,10 @@ async function setupProject(path: string | undefined, options: RunOptions): Prom
   await validateRequirements(file, inputs, pythonEnv, allIntegrations, kernelName, isMachineOutput, options.notebook)
 
   // Inject integration environment variables into process.env
-  // This allows SQL blocks to access database connections
-  injectIntegrationEnvVars(allIntegrations, workingDirectory)
+  // This allows SQL blocks to access database connections. The integration helpers now live
+  // in @deepnote/runtime-core (KD-3 lift); `debug` is threaded so the diagnostic output is
+  // unchanged from when this logic was cli-private.
+  injectIntegrationEnvVars(allIntegrations, workingDirectory, debug)
 
   return {
     absolutePath,

@@ -32,6 +32,8 @@ import {
   type KernelFailureCategory,
   KernelLaunchError,
   KernelNotRegisteredError,
+  resolveIntegrationEnv,
+  type ResolveIntegrationEnvResult,
   resolvePythonExecutable,
   selectKernelName,
   selectPythonSpec,
@@ -203,6 +205,13 @@ export class Session implements ServerSession {
   #engine: ExecutionEngine | null = null
 
   /**
+   * Whether the integration env has been resolved + injected for this session (Phase 8). Set on
+   * the first {@link Session.resolveIntegrationEnvForRun}; gates re-injection so a repeated run
+   * does not re-parse/re-inject. Mirrors the one-engine-per-session lifecycle of `#engine`.
+   */
+  #integrationEnvInjected = false
+
+  /**
    * Open a `.deepnote` file: read its bytes, hash them, deserialize, and resolve the
    * capability flags — **no kernel is started** (KD-6). Throws on an unreadable path or
    * an invalid file (the caller maps that to a `400`). Idempotent: re-opening replaces the
@@ -226,16 +235,52 @@ export class Session implements ServerSession {
   }
 
   /**
+   * Resolve + inject the integration environment for the opened project (Phase 8 — SQL/integration
+   * parity with `deepnote run`). Delegates to the shared `resolveIntegrationEnv` wiring in
+   * `@deepnote/runtime-core` (KD-3) — the **same** `parse → collect → inject` sequence `run.ts`'s
+   * `setupProject` runs — so a SQL block executed through the server resolves its integration env to
+   * the exact values `run` injects for the same project + integrations file. The integrations file is
+   * resolved relative to the project's own directory, mirroring `run`.
+   *
+   * **Local-first (load-bearing).** No fetcher is passed, so this performs **no outbound network
+   * request**: the resolved set is exactly the project's local integrations file. An API-backed
+   * integration fetch is not wired into the server in s1; the only way one could ever fire is an
+   * explicit, token-gated fetcher, which the server never supplies. Idempotent: injects once per
+   * session (a repeated run reuses the already-injected env), mirroring the one-engine lifecycle.
+   *
+   * Called by {@link Session.startEngine} **before** the engine launches — but kept a separate,
+   * kernel-free method so the parity + local-first guarantees are unit-testable without a kernel.
+   */
+  async resolveIntegrationEnvForRun(): Promise<ResolveIntegrationEnvResult> {
+    const loaded = this.#requireLoaded()
+    // Resolve integrations relative to the project directory, exactly as `deepnote run` does.
+    const result = await resolveIntegrationEnv({
+      file: loaded.file,
+      workingDirectory: dirname(loaded.path),
+    })
+    this.#integrationEnvInjected = true
+    return result
+  }
+
+  /**
    * Lazily construct + launch the single {@link ExecutionEngine} (the `startEngine` half of the
    * KD-6 split) and connect its kernel. Idempotent: the first call starts the engine; later calls
    * reuse it. A missing / unlaunchable / dead-at-launch kernel surfaces here — **on run** — as a
    * typed {@link StartEngineError} carrying the design-doc {@link KernelFailureCategory} (R5),
    * never as an open failure (KD-6). The discriminant is read from the typed kernel-failure-family
    * instance `engine.start()` throws (KD-5), exactly as `run.ts` preserves it.
+   *
+   * Before launching the engine it resolves + injects the integration env (Phase 8 parity) so SQL
+   * blocks see the same DB connection env vars `deepnote run` provides — local-first, no network.
    */
   async startEngine(): Promise<void> {
     if (this.#engine) {
       return
+    }
+    // Phase 8: integration env parity with `run`. Inject before the engine/kernel starts so the
+    // toolkit server inherits the same integration env vars (local-first; no outbound request).
+    if (!this.#integrationEnvInjected) {
+      await this.resolveIntegrationEnvForRun()
     }
     const loaded = this.#requireLoaded()
     const engine = new ExecutionEngine({

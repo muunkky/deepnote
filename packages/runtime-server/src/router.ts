@@ -95,11 +95,28 @@ async function handleRun(
   sendJson(res, 202, { runId: result.runId })
 }
 
-/** Read the full request body as a UTF-8 string (the save body is small JSON). */
+/** Hard cap on a request body (the save payload is a single notebook's JSON). */
+const MAX_BODY_BYTES = 256 * 1024 * 1024
+
+/**
+ * Read the full request body as a UTF-8 string, bounded by {@link MAX_BODY_BYTES}. The bound
+ * prevents an oversized (or slow-loris-streamed) request from buffering unboundedly into memory
+ * and OOM-killing the serve process — even on a localhost-trust server, a runaway client write
+ * should fail the request, not the host.
+ */
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
-    req.on('data', (chunk: Buffer) => chunks.push(chunk))
+    let total = 0
+    req.on('data', (chunk: Buffer) => {
+      total += chunk.length
+      if (total > MAX_BODY_BYTES) {
+        reject(new Error('request body exceeds maximum size'))
+        req.destroy()
+        return
+      }
+      chunks.push(chunk)
+    })
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
     req.on('error', reject)
   })

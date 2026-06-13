@@ -275,7 +275,13 @@ export class KernelClient {
       // cancelled future as an in-block user error (card wd2nil — verified against the
       // real toolkit, which auto-restarts rather than going `'dead'`).
       const onStatusChanged = (_sender: unknown, status: string) => {
-        if ((status === 'dead' || status === 'restarting' || status === 'autorestarting') && !settled) {
+        // `'terminating'` (kernel being shut down out from under an in-flight run) is as fatal to
+        // the execute as `'dead'`/auto-restart — without it the future never settles and the run
+        // hangs (the exact failure mode this guard exists to eliminate).
+        if (
+          (status === 'dead' || status === 'terminating' || status === 'restarting' || status === 'autorestarting') &&
+          !settled
+        ) {
           settled = true
           kernel.statusChanged.disconnect(onStatusChanged)
           future.dispose()
@@ -325,7 +331,8 @@ export class KernelClient {
           // replies were done") before the status settles, so we guard the catch path
           // on the same death/restart predicate (card wd2nil).
           const status = kernel.status
-          const kernelDied = status === 'dead' || status === 'restarting' || status === 'autorestarting'
+          const kernelDied =
+            status === 'dead' || status === 'terminating' || status === 'restarting' || status === 'autorestarting'
           reject(kernelDied ? new KernelDiedError() : error)
         })
         .finally(() => {

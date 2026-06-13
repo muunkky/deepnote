@@ -107,7 +107,13 @@ export function createServer(options: CreateServerOptions = {}): RuntimeServer {
       const payload = JSON.stringify(event)
       for (const socket of sockets) {
         if (socket.readyState === WebSocket.OPEN) {
-          socket.send(payload)
+          try {
+            socket.send(payload)
+          } catch {
+            // A socket that throws synchronously (e.g. it transitioned to CLOSING between the
+            // readyState check and send) must not abort the broadcast — the remaining healthy
+            // subscribers would otherwise miss this event, including a terminal one, and hang.
+          }
         }
       }
     },

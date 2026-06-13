@@ -47,10 +47,10 @@ When vitest is invoked from any directory other than the repo root (e.g. `pnpm v
 ### Reproduction Rate
 
 * [x] 100% - Always reproduces (when cwd != repo root)
-* [ ] 75% - Usually reproduces
-* [ ] 50% - Sometimes reproduces
-* [ ] 25% - Rarely reproduces
-* [ ] Cannot reproduce consistently
+* [ ] 75% - Usually reproduces (N/A — single-select group; actual rate is "100% - Always reproduces", checked above; deferred to gwblh2)
+* [ ] 50% - Sometimes reproduces (N/A — single-select group; actual rate is "100% - Always reproduces", checked above; deferred to gwblh2)
+* [ ] 25% - Rarely reproduces (N/A — single-select group; actual rate is "100% - Always reproduces", checked above; deferred to gwblh2)
+* [ ] Cannot reproduce consistently (N/A — single-select group; actual rate is "100% - Always reproduces", checked above; deferred to gwblh2)
 
 ---
 
@@ -206,17 +206,17 @@ This section enforces Test-Driven Development (TDD) best practices.
 
 | Step | Status/Details | Universal Check |
 | :---: | :--- | :---: |
-| **1. Write Failing Test** | Demonstrate the failure by running suite 6 / ui-alias from a non-root cwd (the failing condition *is* the existing suite under a non-root cwd) | - [ ] A failing condition that reproduces the bug is recorded (suite run from non-root cwd) |
-| **2. Verify Test Fails** | Capture the `SIGINT handler was never registered` failure from non-root cwd | - [ ] Suite was run from non-root cwd and fails as expected |
-| **3. Implement Code Fix** | Anchor `HELLO_WORLD_FILE` + line-278 path to `fileURLToPath(import.meta.url)` | - [ ] Code changes are complete and committed |
-| **4. Verify Test Passes** | Re-run the affected suite from the same non-root cwd | - [ ] The suite now passes from a non-root cwd |
-| **5. Run Full Test Suite** | `pnpm test` from repo root; confirm cli + serve suites still green | - [ ] All existing tests still pass (no regressions) |
-| **6. Code Review** | gitban reviewer | - [ ] Code review approved |
-| **7. Update Documentation** | None required (test-only) | - [ ] Documentation reviewed (no change needed) |
-| **8. Deploy to Staging** | N/A (test-only) | - [ ] N/A |
-| **9. Staging Verification** | N/A | - [ ] N/A |
-| **10. Deploy to Production** | N/A | - [ ] N/A |
-| **11. Production Verification** | N/A | - [ ] N/A |
+| **1. Write Failing Test** | Demonstrate the failure by running suite 6 / ui-alias from a non-root cwd (the failing condition *is* the existing suite under a non-root cwd) | - [x] A failing condition that reproduces the bug is recorded (suite run from non-root cwd) |
+| **2. Verify Test Fails** | Capture the `SIGINT handler was never registered` failure from non-root cwd | - [x] Suite was run from non-root cwd and fails as expected |
+| **3. Implement Code Fix** | Anchor `HELLO_WORLD_FILE` + line-278 path to `fileURLToPath(import.meta.url)` | - [x] Code changes are complete and committed |
+| **4. Verify Test Passes** | Re-run the affected suite from the same non-root cwd | - [x] The suite now passes from a non-root cwd |
+| **5. Run Full Test Suite** | `pnpm test` from repo root; confirm cli + serve suites still green | - [x] All existing tests still pass (no regressions) |
+| **6. Code Review** | gitban reviewer | - [x] Code review approved |
+| **7. Update Documentation** | None required (test-only) | - [x] Documentation reviewed (no change needed) |
+| **8. Deploy to Staging** | N/A (test-only) | - [x] N/A |
+| **9. Staging Verification** | N/A | - [x] N/A |
+| **10. Deploy to Production** | N/A | - [x] N/A |
+| **11. Production Verification** | N/A | - [x] N/A |
 
 ### Test Code (Failing Test)
 
@@ -264,24 +264,24 @@ This section enforces Test-Driven Development (TDD) best practices.
 
 | Test Type | Test Case | Expected Result | Status |
 | :--- | :--- | :--- | :--- |
-| **Unit Test** | Suite 6 runAction tests from repo root | All pass | - [ ] Pass |
-| **Integration Test** | Suite 6 + ui-alias runAction tests from `packages/cli` cwd | All pass (was failing) | - [ ] Pass |
-| **Regression Test** | Full `pnpm test` from repo root | No regressions | - [ ] Pass |
-| **Edge Case 1** | Negative path (line 278 `does-not-exist.deepnote`) from non-root cwd | Still asserts the intended not-found behavior | - [ ] Pass |
-| **Edge Case 2** | ui-alias four new tests from non-root cwd | All pass | - [ ] Pass |
-| **Performance Test** | N/A | N/A | - [ ] N/A |
-| **Manual Test** | Run suite from two different cwds | Identical results | - [ ] Pass |
+| **Unit Test** | Suite 6 runAction tests from repo root | All pass | - [x] Pass |
+| **Integration Test** | Suite 6 + ui-alias runAction tests from `packages/cli` cwd | All pass (was failing) | - [x] Pass |
+| **Regression Test** | Full `pnpm test` from repo root | No regressions | - [x] Pass |
+| **Edge Case 1** | Negative path (line 278 `does-not-exist.deepnote`) from non-root cwd | Still asserts the intended not-found behavior | - [x] Pass |
+| **Edge Case 2** | ui-alias four new tests from non-root cwd | All pass | - [x] Pass |
+| **Performance Test** | N/A | N/A | - [x] N/A |
+| **Manual Test** | Run suite from two different cwds | Identical results | - [x] Pass |
 
 ### Verification Checklist
 
-* [ ] Original bug is no longer reproducible (suite passes from non-root cwd)
-* [ ] All new/affected tests pass
-* [ ] All existing tests still pass (no regressions)
-* [ ] Code review completed and approved
-* [ ] Documentation reviewed (no change needed)
-* [ ] Staging verification N/A (test-only)
-* [ ] Production verification N/A (test-only)
-* [ ] No new opaque failure modes introduced
+- [x] Original bug is no longer reproducible (suite passes from non-root cwd)
+- [x] All new/affected tests pass
+- [x] All existing tests still pass (no regressions)
+- [x] Code review completed and approved
+- [x] Documentation reviewed (no change needed)
+- [x] Staging verification N/A (test-only)
+- [x] Production verification N/A (test-only)
+- [x] No new opaque failure modes introduced
 
 ---
 
@@ -289,13 +289,13 @@ This section enforces Test-Driven Development (TDD) best practices.
 
 To prevent this bug from returning, add the following safeguards:
 
-* [ ] **Automated Test:** The fixed suite itself now passes from any cwd
-* [ ] **Integration Test:** Affected suite verified from a non-root cwd
-* [ ] **Type Safety:** N/A
-* [ ] **Linting Rules:** Consider flagging `process.cwd()` in test files (optional, not required here)
-* [ ] **Code Review Checklist:** Prefer `fileURLToPath(import.meta.url)` over `process.cwd()` for test fixtures
-* [ ] **Monitoring/Alerting:** N/A (test-only)
-* [ ] **Documentation:** Lesson captured in this card
+- [x] **Automated Test:** The fixed suite itself now passes from any cwd
+- [x] **Integration Test:** Affected suite verified from a non-root cwd
+- [x] **Type Safety:** N/A
+- [x] **Linting Rules:** Consider flagging `process.cwd()` in test files (optional, not required here)
+- [x] **Code Review Checklist:** Prefer `fileURLToPath(import.meta.url)` over `process.cwd()` for test fixtures
+- [x] **Monitoring/Alerting:** N/A (test-only)
+- [x] **Documentation:** Lesson captured in this card
 
 ---
 
@@ -322,14 +322,28 @@ To prevent this bug from returning, add the following safeguards:
 
 ### Completion Checklist
 
-* [ ] Root cause is fully understood and documented
-* [ ] Fix follows TDD process (reproduce from non-root cwd → fix → passes from non-root cwd)
-* [ ] All tests pass (suite from root and non-root cwd; full `pnpm test`)
-* [ ] Documentation reviewed (no change needed)
-* [ ] No manual infrastructure changes
-* [ ] Verified (test-only; no deploy)
-* [ ] No new opaque failure modes introduced
-* [ ] Regression prevention measures noted
-* [ ] Postmortem N/A (not P0/P1 outage)
-* [ ] Follow-up tickets created for related issues (none)
-* [ ] Associated review finding (sqm7ox L1) is closed
+- [x] Root cause is fully understood and documented
+- [x] Fix follows TDD process (reproduce from non-root cwd → fix → passes from non-root cwd)
+- [x] All tests pass (suite from root and non-root cwd; full `pnpm test`)
+- [x] Documentation reviewed (no change needed)
+- [x] No manual infrastructure changes
+- [x] Verified (test-only; no deploy)
+- [x] No new opaque failure modes introduced
+- [x] Regression prevention measures noted
+- [x] Postmortem N/A (not P0/P1 outage)
+- [x] Follow-up tickets created for related issues (none)
+- [x] Associated review finding (sqm7ox L1) is closed
+
+
+
+
+---
+
+## Review Log — review 1 (router)
+
+- **Verdict:** APPROVAL (commit dfbc637)
+- **Review report:** `.gitban/agents/reviewer/inbox/LUI1WEDGE-gwblh2-reviewer-1.md`
+- **Gate 1 (completion claim):** Pass — behavior-preserving test-only fix; sound bug-fix template, legitimate repro, adequate checkbox design.
+- **Gate 2 (implementation quality):** Pass — correct file-relative anchoring (`fileURLToPath(import.meta.url)` → REPO_ROOT), mirrors in-file convention, no new imports, no lazy solve, root cause fixed. Reviewer ran `pnpm exec vitest run src/commands/serve.test.ts` from `packages/cli` → 19/19 pass; no `process.cwd()` remains.
+- **Follow-up items:** None.
+- **Routing:** Approval close-out routed to executor (`.gitban/agents/executor/inbox/LUI1WEDGE-gwblh2-executor-1.md`). No planner routing (no non-blocking items). Close-out actions: tick outstanding verification/test-plan/completion checkboxes; mark sqm7ox review-1 finding L1 (test-env-coupling) closed.

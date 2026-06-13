@@ -1,30 +1,13 @@
-# Executor directive — LUI1WEDGE / gwblh2 (executor-1, step 7C: decouple cli suite-6 fixture from process.cwd)
+Use `.venv/Scripts/python.exe` to run Python commands.
 
-## ⚠️ BRANCH OVERRIDE
-This sprint runs on **`milestone/m3-local-ui`**, NOT `sprint/LUI1WEDGE`.
-- Worktree base check: `git merge-base --is-ancestor milestone/m3-local-ui HEAD && echo "base ok" || echo "WRONG BASE"`.
-- Merge-back target `milestone/m3-local-ui`; completion tag `LUI1WEDGE-gwblh2-done`. Commit **code only**.
+The code for the gitban card with id gwblh2 has been approved as of commit dfbc637. Please use the gitban tools to update the gitban card and begin the tasks required to properly complete it.
 
-## The fix (test-only, behavior-preserving)
-`read_card(gwblh2)` for full detail. **Touch ONLY `packages/cli/src/commands/serve.test.ts`.**
+## Card Close-out tasks:
+- Use gitban's checkbox tools to ensure all checkboxes on the card are checked off for completed work if not already.
+- Do not mark any work as deferred. This card will be closed and archived and likely never seen again.
+- Use gitban's complete card tool to submit and validate if not already completed.
+- Close-out items:
+  - Tick the card's outstanding verification / test-plan / completion checkboxes to reflect the work that is in fact complete: the suite passes from both the repo root and a non-root cwd (verified by the dispatcher and confirmed by the reviewer running `pnpm exec vitest run src/commands/serve.test.ts` from inside `packages/cli` → 19/19 pass), full `pnpm test` is green, the negative-path test still asserts not-found behavior, and no new opaque failure modes were introduced.
+  - Mark the associated sqm7ox review-1 finding L1 (test-env-coupling) closed — tick the card's final "Associated review finding (sqm7ox L1) is closed" checkbox.
 
-`HELLO_WORLD_FILE` (line ~18) and the negative path (line ~278, `does-not-exist.deepnote`) resolve the
-fixture against `process.cwd()`, so the suite only passes when vitest runs from the repo root (from any
-other cwd the `runAction` harness fails with an opaque `"SIGINT handler was never registered"`). Sqm7ox
-added 4 more `runAction` tests inheriting the coupling.
-
-**Fix:** anchor both to the test file's own location, mirroring the pattern **already in this file at
-line ~408**: `const here = dirname(fileURLToPath(import.meta.url))` then resolve the fixture relative to
-`here` (compute the path to `<repo-root>/examples/1_hello_world.deepnote` from the test file's dir).
-`fileURLToPath` is already imported (line 3); reuse `dirname`/`resolve`. Behaviour is identical from the
-repo root — the only change is the suite now also passes from any cwd.
-
-**TDD/verify:** demonstrate the failure first (run the suite from a NON-root cwd, e.g.
-`cd packages/cli && pnpm exec vitest run src/commands/serve.test.ts` — observe the SIGINT failure), apply
-the fix, then confirm the SAME non-root-cwd invocation passes AND the repo-root run still passes. Do NOT
-weaken any assertion; the negative-path test must still assert the intended not-found behaviour.
-
-## Before you finish — gates (run from repo root)
-`pnpm test` (mocked, green — no regressions), `pnpm typecheck` (both halves), `pnpm exec biome check --write packages/cli`,
-`pnpm spell-check` (from parent; add terms to `docs-dictionary.txt`). A lint/spell/format/typecheck
-failure is a completion failure. Do not push or open a PR — the dispatcher owns lifecycle.
+Note: You are closing out this card only. The dispatcher owns sprint lifecycle — do not close, archive, or finalize the sprint itself. The exception is a sprint close-out card, which will be obvious from its content.

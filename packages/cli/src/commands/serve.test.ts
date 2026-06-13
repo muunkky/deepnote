@@ -107,9 +107,13 @@ function makeHarness(opts: { findPortResult: number; listenResult: number }): Ha
     },
     waitForSigintHandler: async () => {
       // The action does async work (resolve path, load session, find port, bind) before it
-      // registers the SIGINT handler. Poll the microtask/macrotask queue until it appears.
-      for (let i = 0; i < 1000 && !sigintHandler; i++) {
-        await new Promise(r => setImmediate(r))
+      // registers the SIGINT handler. Poll until it appears, bounded by a WALL-CLOCK deadline
+      // rather than a fixed `setImmediate` tick budget: under heavy parallel load (the full suite),
+      // a fixed tick count can be starved before the real-fs path resolve completes, producing a
+      // spurious "handler never registered". A short timer yield + deadline is load-tolerant.
+      const deadline = Date.now() + 5000
+      while (!sigintHandler && Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 2))
       }
       if (!sigintHandler) {
         throw new Error('SIGINT handler was never registered')

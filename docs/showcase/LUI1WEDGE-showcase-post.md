@@ -1,7 +1,8 @@
-> ⚠️ **DRAFT — awaiting Cameron's approval before posting to `muunkky/deepnote` Discussion #5.**
-> This file is the _draft_ of the per-sprint reply for the dry-run showcase thread. It has **not** been
-> posted. Nothing here has been pushed or sent to `deepnote/deepnote`. Cameron writes/approves the post
-> and posts it; an agent never auto-posts. Edit freely before it goes up.
+> ✅ **POSTED** to `muunkky/deepnote` Discussion #5 (fork dry-run showcase thread) on 2026-06-13:
+> https://github.com/muunkky/deepnote/discussions/5#discussioncomment-17287165
+> Fork-only — nothing was pushed or sent to `deepnote/deepnote`. Fork posts are pre-authorized by Cameron;
+> only upstream (`deepnote/deepnote`) posts require his explicit approval. The `sprint-record/LUI1WEDGE`
+> link in the posted copy was finalized to "cut at closeout" (the placeholder note was resolved).
 
 ---
 
@@ -93,5 +94,4 @@ reactivity story.
 
 ---
 
-> ⚠️ **End of draft.** Not posted. Awaiting Cameron's review/approval before anything goes to
-> `muunkky/deepnote` Discussion #5. Nothing to `deepnote/deepnote`.
+> ✅ **End of post.** Posted to `muunkky/deepnote` Discussion #5 (fork only). Nothing to `deepnote/deepnote`.

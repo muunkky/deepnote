@@ -39,17 +39,17 @@ describe('CodeRenderer', () => {
     expect(container.querySelector('[contenteditable="true"]')).toBeNull()
   })
 
-  it('renders persisted outputs through the output slot', () => {
-    // Step 6 supplies the real OutputRenderer; until then CodeRenderer must still mount an
-    // output region driven by `block.outputs ?? []` so the wiring is in place. A stream
-    // output's text should reach the DOM.
+  it('renders persisted outputs through the OutputRenderer', () => {
+    // Step 6 wires CodeRenderer to the real OutputRenderer (replacing the step-5 OutputSlot
+    // placeholder); the output region is driven by `block.outputs ?? []`. A stream output's
+    // text should reach the DOM.
     const block = makeBlock('c5', 'code', 'pass  # no echo', {
       outputs: [{ output_type: 'stream', name: 'stdout', text: 'streamed-output-line\n' }],
     })
     const { container } = render(<CodeRenderer block={block} />)
-    const slot = container.querySelector('.output-slot')
-    expect(slot).not.toBeNull()
-    expect(slot?.textContent).toContain('streamed-output-line')
+    const region = container.querySelector('.output-renderer')
+    expect(region).not.toBeNull()
+    expect(region?.textContent).toContain('streamed-output-line')
   })
 
   it('renders with no outputs without throwing', () => {

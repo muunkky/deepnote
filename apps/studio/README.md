@@ -92,6 +92,44 @@ contract change becomes a compile error here rather than silent drift. The
 the DOM-env suite work in a worktree without first building the backend `dist`; it stays a
 type-only edge (the isolation test still forbids the bare runtime entry or any `node:` builtin).
 
+## Output rendering (`src/outputs/`)
+
+Persisted Jupyter `IOutput[]` (a code block's `block.outputs`) renders to the DOM through
+`src/outputs/OutputRenderer.tsx` — the **browser counterpart to the terminal
+[`packages/cli/src/output-renderer.ts`](../../packages/cli/src/output-renderer.ts)**. Both
+dispatch on `output_type` over exactly the four types Jupyter persists, 1:1:
+
+| `output_type`                     | Terminal (`renderOutput`) | Browser (`OutputRenderer`)                 |
+| --------------------------------- | ------------------------- | ------------------------------------------ |
+| `stream`                          | `renderStreamOutput`      | `StreamRenderer` (stderr styled)           |
+| `display_data` / `execute_result` | `renderDataOutput` (MIME) | `DataRenderer` → MIME registry             |
+| `error`                           | `renderErrorOutput`       | `ErrorRenderer` (ename/evalue + traceback) |
+
+A parity-of-shape test pins the dispatch to exactly those four types — no fifth `output_type`
+(e.g. `update_display_data`) is silently re-routed.
+
+**Rich-first MIME precedence — the deliberate inversion.** The terminal prefers `text/plain`
+(its richest renderable form) and prints `[HTML output — not rendered in terminal]` for
+anything richer. The browser is a real DOM, so `src/outputs/mime/registry.ts` **inverts** that
+ordering: `pickRenderer` walks a rich-first `MIME_PRECEDENCE` (`text/html` → image → svg →
+`text/markdown` → `text/plain` last) and renders the richest representation a bundle carries —
+an HTML dataframe table wins over its `text/plain` fallback. A bundle with no renderable MIME
+type emits a typed `[Output with MIME types: …]` marker rather than dropping the output (parity
+with the terminal fallback).
+
+**Sanitization.** `text/html` and `image/svg+xml` become live DOM markup, so both are
+DOMPurify-sanitized before injection — `text/markdown` reuses the shared
+`renderMarkdownToSafeHtml` seam (the same sanitizer the markdown/text block renderers funnel
+through). `text/plain` and stream/traceback text reach the DOM as escaped React text nodes
+(no injection surface) and are ANSI-stripped (`src/outputs/ansi.ts`) so colour codes render as
+text rather than leaking raw escape bytes — matching the terminal's traceback handling without
+reaching for a `node:` builtin.
+
+This is the read-only viewer: it renders persisted state only — no execution, no run
+affordance. It consumes `IOutput` **type-only** from the `@deepnote/runtime-server/types`
+contract subpath (re-exported there from `@deepnote/runtime-core`), so the SPA never takes a
+runtime edge on `runtime-core` and the isolation invariant holds.
+
 ### Live HMR proof (`e2e/`)
 
 `e2e/hmr.e2e.test.ts` is a real, timed HMR edit→reflect loop: it boots an actual Vite dev server

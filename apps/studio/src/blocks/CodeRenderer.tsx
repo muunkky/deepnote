@@ -1,6 +1,7 @@
+import type { IOutput } from '@deepnote/runtime-server/types'
 import hljs from 'highlight.js/lib/common'
+import { OutputRenderer } from '../outputs/OutputRenderer'
 import type { BlockVM } from '../shell/viewModels'
-import { OutputSlot } from './OutputSlot'
 
 // Renders a `code` block read-only (design Phase 4, R8): syntax-highlighted source from
 // `block.content` plus its persisted outputs. There is deliberately NO run control and NO
@@ -18,8 +19,10 @@ export interface CodeRendererProps {
 export function CodeRenderer({ block }: CodeRendererProps) {
   const source = block.content ?? ''
   const { value: highlighted } = hljs.highlightAuto(source)
-  // `outputs` exists only on executable block kinds; read it defensively off the union.
-  const outputs = 'outputs' in block && Array.isArray(block.outputs) ? block.outputs : []
+  // `outputs` exists only on executable block kinds; read it defensively off the union. The
+  // persisted shape is the Jupyter `IOutput` the runtime produces (the schema types it as
+  // `any[]`), so we narrow to `IOutput[]` for the renderer, which dispatches per `output_type`.
+  const outputs = ('outputs' in block && Array.isArray(block.outputs) ? block.outputs : []) as IOutput[]
 
   return (
     <div className='code-renderer'>
@@ -28,7 +31,7 @@ export function CodeRenderer({ block }: CodeRendererProps) {
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: highlight.js output is its own escaped token spans. */}
         <code className='hljs' dangerouslySetInnerHTML={{ __html: highlighted }} />
       </pre>
-      <OutputSlot outputs={outputs} />
+      <OutputRenderer outputs={outputs} />
     </div>
   )
 }

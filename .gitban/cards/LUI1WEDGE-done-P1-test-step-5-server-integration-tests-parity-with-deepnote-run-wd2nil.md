@@ -104,7 +104,7 @@ boot server over fixture → GET /api/project → open WS → POST /api/project/
 
 ### Quality Gates
 - [x] All tests pass locally
-- [ ] All tests pass in CI
+- [ ] All tests pass in CI — deferred to od8esg (integration-kernels CI runs at PR time; od8esg Gate 0 gates on CI-green). Local real-venv evidence only: 10/10 executor + 5/5 reviewer + 3/3 dispatcher consecutive clean exit-0 runs on 1c97429; no integration-kernels CI run exists for this commit.
 - [x] No flaky tests introduced
 - [x] Test execution time acceptable
 - [x] Code coverage meets target [if applicable]
@@ -297,3 +297,13 @@ SUMMARY: 10/10 clean (exit 0)
 - The `examples/1_hello_world.deepnote` ENOENT seen when running runtime-core via `pnpm -F` from the repo root is a CWD-relative-fixture artifact (passes from the package dir: 192 passed), pre-existing and unrelated to this change.
 
 Leaving the card `in_progress` for the reviewer. Did not close, archive, or finalize.
+
+## Router log — review 3 (APPROVAL)
+
+**Verdict:** APPROVAL. Review report: `.gitban/agents/reviewer/inbox/LUI1WEDGE-wd2nil-reviewer-3.md` (commit `1c97429`).
+
+The single review-2 Gate-2 blocker (B1: parity suite flaked ~50% of full-file runs from an unhandled `Error('Kernel connection disconnected')` during Scenario-4 teardown, falsifying `[x] No flaky tests introduced` / `[x] Tests are deterministic`) is **RESOLVED**. The fix is scoped exactly to the directive (`disconnect()` in `kernel-client.ts` + its unit test only — the four scenarios and the kernel-death fix untouched, confirmed 2-file diff). Reviewer independently reproduced 5/5 consecutive clean real-venv exits (0 unhandled-rejection lines) against the parent venv, corroborating the executor's 10/10. New unit tests verified genuinely red→green by mutation. `[ ] All tests pass in CI` correctly remains UNCHECKED — the reviewer affirmed this is the honest state (CI/dispatcher confirmation step), not an integrity violation.
+
+**Routing:**
+- **Executor** (`.gitban/agents/executor/inbox/LUI1WEDGE-wd2nil-executor-4.md`): close-out tasks — verify checkboxes, complete + validate the card. Explicit instruction to leave `[ ] All tests pass in CI` UNCHECKED (honest state, per review 3). No close-out items folded in; the two FOLLOW-UP items go to the planner.
+- **Planner** (`.gitban/agents/planner/inbox/LUI1WEDGE-wd2nil-planner-3.md`): 2 non-blocking FOLLOW-UP items grouped into 1 sprint card — "Harden the dead-kernel disconnect rejection guard" (L1 teardown-listener-reentrancy: make `#withDeadKernelRejectionGuard` re-entrant before multi-session server; L2 drain-tuning-fragility: regression-gate the determinism check on the next `@jupyterlab/services` bump, optionally self-tune the fixed drain count). Both touch `kernel-client.ts`'s teardown/guard path → one card. Dedup note passed: distinct from the review-1/2 follow-ups (fixture/union-of-keys, coverage-wording, ci-budget-watch) — these are about the guard machinery introduced in the review-2→3 flake fix.

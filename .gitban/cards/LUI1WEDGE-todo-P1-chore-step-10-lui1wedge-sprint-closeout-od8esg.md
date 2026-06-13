@@ -316,3 +316,91 @@ today); it does not block any sprint card.
 
 - [ ] Item 6 classified (exactly one deferral type marked `true` above)
 - [ ] Item 6 actioned (action taken matches chosen type)
+
+### Item 7: Make the dead-kernel disconnect rejection guard re-entrant before multi-session
+
+Reviewer cycle 3 on wd2nil flagged this (L1, teardown-listener-reentrancy, code-quality, low-risk),
+a FOLLOW-UP on commit `1c97429` (the review-2→3 flake fix that introduced the
+`#withDeadKernelRejectionGuard` teardown machinery — distinct from the review-1/2 follow-ups already
+captured as Items 5 and 6, which predate this machinery).
+
+The finding: `#withDeadKernelRejectionGuard` in `disconnect()` mutates the process-global
+`unhandledRejection` listener set (removeAllListeners → install guard → restore prior listeners). It
+is safe in the wedge today — a `Session` holds a single `#engine`, runs serialized, and `close()`
+fires once on SIGINT, so two `disconnect()` calls never overlap. But the guard is NOT re-entrant: if
+a future caller ever invokes `disconnect()` concurrently with another (a multi-session server, or a
+test racing two teardowns), the second call's `priorListeners` snapshot would capture the first
+call's guard, and restore ordering could leak a guard or double-restore. Failure mode under that
+future concurrency: a stuck or duplicated `unhandledRejection` handler surviving past teardown.
+
+The hardening: add a re-entrancy guard (ref-count, or an "already-armed" flag) so nested/overlapping
+calls share one armed window and the listener set is restored exactly once when the last caller
+exits. Currently unreachable in this card's single-engine design, but a hard prerequisite before the
+server grows to multiple concurrent sessions.
+
+Captured here (not a sprint card) because no downstream LUI1WEDGE card is blocked — the remaining
+sprint cards (sqm7ox `deepnote ui` alias, yzd78n SQL parity, dx99dj contrib-cut, k65hcx showcase) all
+run against the single-engine design where this path is provably safe — and the triggering condition
+(multiple concurrent sessions) is a different-milestone shape change, not an external prerequisite
+that merely needs resolving within this sprint. The closeout agent revisits with full sprint context;
+this likely reads as `note-only` for this sprint (record the constraint against the multi-session
+work) or a `sprint`/backlog card if multi-session lands sooner — the exactly-one-true grid below is
+for the closeout agent to fill.
+
+| Deferral Type | Description | Applies (true/false) |
+|---------------|-------------|----------------------|
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
+| note-only | Captured for record; no action; current output is fine as-is. | |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+
+**Source:** wd2nil review 3 (L1)
+**Files touched:** packages/runtime-core/src/kernel-client.ts (`disconnect()` / `#withDeadKernelRejectionGuard` teardown path), packages/runtime-core/src/kernel-client.test.ts
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 7 classified (exactly one deferral type marked `true` above)
+- [ ] Item 7 actioned (action taken matches chosen type)
+
+### Item 8: Gate the teardown-drain magic count against the next `@jupyterlab/services` bump
+
+Reviewer cycle 3 on wd2nil flagged this (L2, drain-tuning-fragility, test-robustness, low-risk),
+a FOLLOW-UP on commit `1c97429` — same review-2→3 flake fix that introduced the
+`#withDeadKernelRejectionGuard` machinery (distinct from Items 5/6, which predate it).
+
+The finding: the teardown drain in `disconnect()` is a fixed 2 passes × (5 microtask flushes + 1 real
+macrotask). It is empirically sufficient today (5/5 + 10/10 clean real-venv exits) but the magic count
+is tuned to the CURRENT `@jupyterlab/services` internal reconnect layering. A library upgrade that
+adds another async hop could let the unhandled rejection escape after the guard has torn down,
+resurfacing the original Scenario-4 flake — and the existing unit test models a single-hop leak, so it
+would NOT catch the regression.
+
+Two parts to the ask:
+1. Regression gate (the minimum): on the next `@jupyterlab/services` bump, re-run the 5–10× real-venv
+   determinism check — the full `server-run-parity.integration.test.ts`, capturing exit codes and
+   grepping output for `Unhandled Rejection`. Document this as a required check tied to that dependency
+   bump (e.g. a note near the drain code or in the integration suite's README).
+2. Optional hardening (if cheaply achievable): make the drain self-tuning — loop until a quiescent
+   tick with no escaped rejection rather than a fixed magic count — so it is resilient to added async
+   hops without a hand-retuned constant.
+
+Captured here (not a sprint card) because there is no current failure and no downstream LUI1WEDGE card
+is blocked — the drain is correct against the version pinned today. The trigger is a future dependency
+bump, not an in-sprint prerequisite, so it is a watch/regression-gate item rather than blocking work.
+The closeout agent revisits with full sprint context; this pairs naturally with Item 6 (CI
+wall-clock / real-venv integration hygiene) and likely reads as `note-only` (record the gate) or a
+small `fixed-with-note` documentation drop — the exactly-one-true grid below is for the closeout agent
+to fill.
+
+| Deferral Type | Description | Applies (true/false) |
+|---------------|-------------|----------------------|
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
+| note-only | Captured for record; no action; current output is fine as-is. | |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+
+**Source:** wd2nil review 3 (L2)
+**Files touched:** packages/runtime-core/src/kernel-client.ts (`disconnect()` drain count), packages/runtime-core/src/kernel-client.test.ts, packages/runtime-server/test-integration/server-run-parity.integration.test.ts (real-venv determinism gate)
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 8 classified (exactly one deferral type marked `true` above)
+- [ ] Item 8 actioned (action taken matches chosen type)

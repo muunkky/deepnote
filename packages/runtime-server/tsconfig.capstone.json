@@ -1,0 +1,14 @@
+{
+  "//": "Capstone-only tsconfig (Definition of Done). Typechecks types-consumer.capstone.ts against the BUILT package via its `exports` map under bundler resolution. It deliberately does NOT inherit the root `paths` alias (which maps @deepnote/* to package source index.ts and cannot express the `/types` subpath) — resolution goes through the pnpm node_modules symlink + the package `exports` entry, exactly as a real downstream SPA consumer resolves it.",
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "files": ["types-consumer.capstone.ts"]
+}

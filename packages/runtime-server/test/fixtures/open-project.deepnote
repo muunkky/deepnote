@@ -1,0 +1,29 @@
+metadata:
+  createdAt: 2026-06-11T00:00:00.000Z
+  modifiedAt: 2026-06-11T00:00:00.000Z
+project:
+  name: open-project-fixture
+  id: 00000000-0000-0000-0000-0000000000a1
+  notebooks:
+    - id: 00000000-0000-0000-0000-0000000000a2
+      name: Analysis
+      blocks:
+        - blockGroup: "0"
+          id: 00000000-0000-0000-0000-0000000000a3
+          sortingKey: "0"
+          type: markdown
+          content: "# Open-project fixture\n\nDrives the `GET /api/project` deep-equal capstone with a persisted code output."
+        - blockGroup: "1"
+          id: 00000000-0000-0000-0000-0000000000a4
+          sortingKey: "1"
+          type: code
+          content: |
+            # A block carrying a previously-saved (persisted) output so the open
+            # payload can be asserted to reproduce it without a kernel ever starting.
+            print("hello from a persisted run")
+          executionCount: 1
+          outputs:
+            - output_type: stream
+              name: stdout
+              text: "hello from a persisted run\n"
+version: 1.0.0

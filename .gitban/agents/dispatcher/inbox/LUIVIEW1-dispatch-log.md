@@ -81,3 +81,15 @@ Serial spine 2→3→4→5→6, then parallel 7A‖7B‖7C, then 7D, then closeo
 - Next: batch 5 → step 6 `k61ziu` (Jupyter IOutput MIME renderer — now with strengthened non-stream capstone).
 
 ## Batch 5: step 6 — k61ziu (Jupyter IOutput MIME renderer)
+
+- **Executor-1** (`a736a406a6f9`): commit `7adf27b`. Real `OutputRenderer` (browser counterpart to terminal output-renderer.ts) — Stream/Data/Error renderers, **rich-first MIME registry** inverting terminal text/plain-first (HTML→image→svg→md→text/plain), DOMPurify-sanitized HTML/SVG, ANSI stripping, type-only `IOutput` re-export in api-types.ts (boundary green). **90 studio tests** (was 64). Strengthened capstone proves all 4 output types render + `data-output-pending` fully absent (closes zy7tn8 L1 error-blank gap).
+- Merge: fast-forward (1 commit). Reconciled at `157c90a`.
+- **Proactive post-merge cspell caught 12 issues / 8 files** — fixed BEFORE push: added colour/colours/reprs + **excluded cspell.json from its own scan** (`16a10b9`). Root cause: biome ASCII-escapes accented dict entries (chàracters→chàracters) → cspell flags the \u00XX fragments when self-scanning. The ignorePaths exclusion is the durable fix (prevents recurrence for all accented entries).
+- Reviewer-1 (`a6dd0442578a`): **APPROVAL** — both gates PASS, parity honest, sanitization verified at every live-markup path, boundary 2/2, suite 90/90. 3 follow-ups + pre-existing vitest-CWD note.
+- Router-1 (`abcb00cf68c4`): **APPROVAL**.
+- Close-out (`a18120824d20`): k61ziu → **done** (38/38, clean).
+- Planner-1 (`ac7ba1cdc0b3`): L1/L2/L3 all → **closeout-append** drmgh6 retro Items 2/3/4 (coverage gap / output styling CSS layer / load-seam schema validation — none block downstream, all actionable later).
+- **Batch 5 DONE — SERIAL SPINE COMPLETE (steps 2–6 done).** Sprint 5/11 done. Pending in-sprint: cd4gxo (step 2b doc).
+- Next: **parallel batch 6 → 7A (83gnbp) ‖ 7B (4svfd0) ‖ 7C (mxxsr6)**. SHARED-FILE NOTE: all three add a key to the `BLOCK_RENDERERS` literal in BlockRenderer.tsx — additive/keep-both by design (sprint-architect + reviewer approved); resolve any registry merge conflict keep-both. Then 7D (wye1xt), then cd4gxo + closeout.
+
+## Batch 6 (parallel): 7A 83gnbp ‖ 7B 4svfd0 ‖ 7C mxxsr6

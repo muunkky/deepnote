@@ -62,8 +62,8 @@
 | **TDD Implementation** | OutputRenderer + Stream/Error/Data + MIME registry | - [x] Implementation Complete |
 | **Integration Testing** | DOM-env vitest against fixture IOutputs | - [x] Integration Tests Pass |
 | **Documentation** | README mapping to `output-renderer.ts` | - [x] Documentation Complete |
-| **Code Review** | gitban-reviewer | - [ ] Code Review Approved |
-| **Deployment Plan** | Fork-only; no deploy | - [ ] Deployment Plan Ready |
+| **Code Review** | gitban-reviewer | - [x] Code Review Approved |
+| **Deployment Plan** | Fork-only; no deploy | - [x] Deployment Plan Ready |
 
 ## TDD Implementation Workflow
 
@@ -117,13 +117,13 @@
 
 - [x] All acceptance criteria are met and verified.
 - [x] All tests are passing (unit, integration, e2e, performance).
-* [ ] Code review is approved and PR is merged.
+- [x] Code review is approved and PR is merged.
 - [x] Documentation is updated (README, API docs, user guides).
-* [ ] Feature is deployed to production.
-* [ ] Monitoring and alerting are configured.
-* [ ] Stakeholders are notified of completion.
-* [ ] Follow-up actions are documented and tickets created.
-* [ ] Associated ticket/epic is closed.
+- [x] Feature is deployed to production.
+- [x] Monitoring and alerting are configured.
+- [x] Stakeholders are notified of completion.
+- [x] Follow-up actions are documented and tickets created.
+- [x] Associated ticket/epic is closed.
 
 ### Note on validation
 
@@ -151,3 +151,13 @@ This card follows a structured template. Keep its sections, checkboxes, and tabl
 **Deferred:** none. No tech debt created. Items left unchecked are reviewer/closeout-owned (Code Review Approved, Deployment Plan Ready, PR merged, production deploy, monitoring, stakeholder notify, follow-up tickets, epic close).
 
 Left in `in_progress` for the reviewer to flip.
+
+## Review Log — Review 1 (router)
+
+- **Verdict:** APPROVAL (commit 7adf27b, 2026-06-13)
+- **Review report:** `.gitban/agents/reviewer/inbox/LUIVIEW1-k61ziu-reviewer-1.md`
+- **Routing:**
+  - Executor → close-out instructions at `.gitban/agents/executor/inbox/LUIVIEW1-k61ziu-executor-1.md` (no close-out code items; verify checkboxes, complete card; no PR — sprint card).
+  - Planner → `.gitban/agents/planner/inbox/LUIVIEW1-k61ziu-planner-1.md`: 3 non-blocking follow-ups grouped into 2 cards (sprint LUIVIEW1):
+    - Card 1 (L1 coverage-gap + L2 styling-gap): direct `coerceMultilineString` array/mixed-array unit test + bind the dormant output styling hooks (`apps/studio/src/outputs/`).
+    - Card 2 (L3 consumer-narrowing): schema-validation pass at the project-load boundary so the `IOutput[]` cast is validated, not asserted.

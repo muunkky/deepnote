@@ -156,3 +156,57 @@ The `cdp.ts` `findChromeBinary()` helper defaults to a Playwright-cached Chromiu
 
 - [ ] Item 1 classified (exactly one deferral type marked `true` above)
 - [ ] Item 1 actioned (action taken matches chosen type)
+
+### Item 2: Direct unit test for `coerceMultilineString` array/mixed-array contract
+
+The IOutput MIME renderer's `coerceMultilineString` helper accepts the Jupyter `multiline_string` shape (a scalar `string` or a `string[]` joined together). For the array form it returns `undefined` unless *every* element is a string, so a mixed `(string | object)[]` MIME value coerces to `undefined` and renders nothing — a silent drop, correct-by-design per the inline comment but not directly locked by a test. Today only the scalar-string paths are exercised transitively through the renderers; there is no direct unit test for the `string[]` join path nor for the mixed-array `undefined` path. Captured for closeout triage because it is a non-blocking coverage gap: behaviour is already correct and test-asserted at the renderer level, nothing downstream in this sprint depends on the direct test, and no external prerequisite gates it. The closeout agent should weigh adding a direct unit test for (a) the `string[]` join behaviour and (b) the mixed-array `undefined` path, to lock the contract the inline comment describes against future refactors of the registry.
+
+| Deferral Type | Description | Applies (true/false) |
+|---------------|-------------|----------------------|
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
+| note-only | Captured for record; no action; current output is fine as-is. | |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+
+**Source:** k61ziu review 1
+**Files touched:** apps/studio/src/outputs/mime/registry.ts (or wherever `coerceMultilineString` lives), apps/studio/src/outputs/ (test files)
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 2 classified (exactly one deferral type marked `true` above)
+- [ ] Item 2 actioned (action taken matches chosen type)
+
+### Item 3: Bind the dormant output styling hooks in a stylesheet
+
+Every IOutput renderer emits semantic class names (`output-stream--stderr`, `output-error`, `output-mime--html`, etc.) and `data-*` hooks, and the DOM contract is correct and test-asserted. But no stylesheet in this slice binds those hooks, so the actual visual distinction is dormant — stderr is "visually distinguished" only by an unstyled modifier class, with no stderr colour, no error red, etc. Captured for closeout triage because it is non-blocking (the DOM contract is right; only the visual layer is missing) and has no external prerequisite — the CSS layer can be authored now. It does not block any downstream sprint card: steps 7A–7D add renderer *logic* (SQL, viz, image, input/button, fallback), not an output CSS layer. The styling hooks must not be dropped, however. The closeout agent should decide the natural home for the output CSS layer: bind these hooks directly in this slice's stylesheet, or fold the work into a dedicated theming/CSS-layer card (current or next sprint) that owns the studio output styling surface as a whole. Either disposition is acceptable; "noted, no action" is not, because the hooks cannot sit permanently dormant.
+
+| Deferral Type | Description | Applies (true/false) |
+|---------------|-------------|----------------------|
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
+| note-only | Captured for record; no action; current output is fine as-is. | |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+
+**Source:** k61ziu review 1
+**Files touched:** apps/studio/src/outputs/ stylesheet/CSS layer (new or existing), apps/studio/src/outputs/ (renderers emitting the semantic class names / `data-*` hooks)
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 3 classified (exactly one deferral type marked `true` above)
+- [ ] Item 3 actioned (action taken matches chosen type)
+
+### Item 4: Validate persisted `block.outputs` shape at the project-load boundary
+
+`CodeRenderer` casts `block.outputs` to `IOutput[]` because the schema types the field `any[]`. The cast is reasonable and commented, but nothing validates the persisted shape at the load seam — a malformed persisted output (e.g. missing `output_type`) falls through `renderOne` to `null`, which is safe but silent: a corrupt output is indistinguishable from an absent one, with no diagnostic. Captured for closeout triage because it is non-blocking (the failure mode is safe today) and has no external prerequisite (the validation can be added at the existing `ApiProject` materialization seam). It is a different concern/module from the renderer slice — the load boundary where `ApiProject` is materialized, not the outputs renderers. The closeout agent should weigh adding a schema-validation pass at the project-load boundary so the `IOutput[]` narrowing becomes honest (validated) rather than asserted (cast), surfacing malformed persisted outputs at the seam instead of silently dropping them downstream.
+
+| Deferral Type | Description | Applies (true/false) |
+|---------------|-------------|----------------------|
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
+| note-only | Captured for record; no action; current output is fine as-is. | |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+
+**Source:** k61ziu review 1
+**Files touched:** apps/studio/src/ CodeRenderer (the `block.outputs` consumer), the project-load boundary/seam where `ApiProject` is materialized
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 4 classified (exactly one deferral type marked `true` above)
+- [ ] Item 4 actioned (action taken matches chosen type)

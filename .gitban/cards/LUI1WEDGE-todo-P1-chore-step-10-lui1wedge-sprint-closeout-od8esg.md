@@ -404,3 +404,67 @@ to fill.
 
 - [ ] Item 8 classified (exactly one deferral type marked `true` above)
 - [ ] Item 8 actioned (action taken matches chosen type)
+
+### Item 9: Single-source the lifted integration helpers across the cli ↔ runtime-core boundary (close the KD-3 DRY gap)
+
+Reviewer cycle 1 on yzd78n (SQL/integration env parity + KD-3 helper lift, APPROVED) flagged three
+non-blocking follow-ups (L1, L2, L3) that share ONE root cause: the KD-3 lift made runtime-core the
+home of the shared integration helpers, but left the cli side as duplicated copies / inlined
+orchestration instead of re-exporting/consuming the runtime-core source. Grouped here as a single
+self-contained item (the reviewer/router grouped all three into one card; they share one fix shape).
+Completing all three makes runtime-core the single source of truth for the integration constants, the
+errno predicates, AND the env-resolution orchestration — fully realizing the parity guarantee the lift
+promised.
+
+**L1 (dry-shared-constants):** `DEFAULT_INTEGRATIONS_FILE` (`.deepnote.env.yaml`) and
+`BUILTIN_INTEGRATIONS` (`{deepnote-dataframe-sql, pandas-dataframe}`) are now defined in BOTH
+`packages/cli/src/constants.ts` and `packages/runtime-core/src/integrations/constants.ts`. Byte-identical
+today, but two independent sources of truth across the package boundary — if either drifts, `deepnote run`
+and the server disagree on the integrations-file name or built-in set, the exact parity-divergence the
+KD-3 lift was meant to eliminate. Fix: cli `constants.ts` re-exports both from `@deepnote/runtime-core`
+(same shim pattern already applied to parse/collect/inject/schemas). The many cli call sites (`cli.ts`,
+`commands/integrations.ts`, `utils/analysis.ts`, `commands/lint.test.ts`) keep importing from cli
+`constants.ts` unchanged.
+
+**L2 (dry-shared-errno):** `isErrnoException` / `isErrnoENOENT` now exist in BOTH
+`packages/cli/src/utils/file-resolver.ts` and `packages/runtime-core/src/integrations/errno.ts`. Same
+drift-risk shape as L1, far lower stakes (a 2-line predicate). file-resolver retains other consumers
+(`dotenv.ts`, `commands/integrations.ts`) and a sibling `isErrnoENOTDIR`, so it could not simply move;
+consolidate by having file-resolver re-export `isErrno*` from `@deepnote/runtime-core` (keep
+`isErrnoENOTDIR` local if not lifted).
+
+**L3 (parity-orchestration-asymmetry):** `run.ts` still inlines the `parse → collect → fetch → inject`
+sequence rather than calling the shared `resolveIntegrationEnv` — so the orchestration is single-sourced
+on the server side only. If `run`'s sequence changes (e.g. ordering of collect vs fetch), the server's
+`resolveIntegrationEnv` would not automatically track it. Fix: `run.ts` consumes `resolveIntegrationEnv`,
+threading its terminal warning-display callback (the concern that kept it inlined) so the orchestration
+is single-sourced too. Must remain behavior-preserving — verify `deepnote run`'s existing integration
+tests and the parity capstone in `session-integration-env.test.ts` stay green.
+
+Captured here (not filed as a sprint card now) because it routes to closeout-append under the three-way
+taxonomy: (1) it does not block any downstream LUI1WEDGE card — the remaining cards (gwblh2 cli-test
+decouple, dx99dj contrib-cut, k65hcx showcase, od8esg closeout) do not consume these helpers, and the
+duplication is byte-identical and tested-green today so nothing downstream fails without the
+consolidation; (2) there is no external prerequisite — the inbox explicitly states "Not BLOCKED —
+runtime-core helpers already exist and are tested green; this is consolidation work executable in this
+cycle." Neither (a) nor (b) holds, so it is (c) closeout-append. The closeout agent revisits with full
+sprint context: this is real DRY tech debt with a concrete drift→parity-divergence failure mode, so it
+likely reads as a `sprint` card (current or next sprint — the consolidation is mechanical re-export/
+consume work) rather than note-only; but the exactly-one-true grid below is for the closeout agent to
+fill. Note the three sub-fixes are independently shippable (L1 high-value, L2 trivial, L3 the
+behavior-preserving orchestration consume) — if promoted to a card, all three belong on it together
+since they share the single-source-of-truth capstone.
+
+| Deferral Type | Description | Applies (true/false) |
+|---------------|-------------|----------------------|
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
+| note-only | Captured for record; no action; current output is fine as-is. | |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+
+**Source:** yzd78n review 1 (L1 + L2 + L3)
+**Files touched:** packages/cli/src/constants.ts, packages/runtime-core/src/integrations/constants.ts, packages/cli/src/utils/file-resolver.ts, packages/runtime-core/src/integrations/errno.ts, packages/cli/src/commands/run.ts, packages/runtime-core/src/integrations/resolve-integration-env.ts (or wherever `resolveIntegrationEnv` lives)
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 9 classified (exactly one deferral type marked `true` above)
+- [ ] Item 9 actioned (action taken matches chosen type)

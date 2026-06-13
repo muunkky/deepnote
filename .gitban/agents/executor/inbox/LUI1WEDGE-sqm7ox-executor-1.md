@@ -33,3 +33,20 @@ section) so a keep-both merge is clean. You do NOT touch the integration helpers
 prettier on any `.md`, `pnpm spell-check` (from parent; add terms to `docs-dictionary.txt`). A
 lint/spell/format/typecheck failure is a completion failure. Do not push or open a PR — the dispatcher
 owns lifecycle.
+
+---
+
+## ROUTER CLOSE-OUT DIRECTIVE (router-1, review 1 — APPROVAL)
+
+Use `.venv/Scripts/python.exe` to run Python commands.
+
+The code for the gitban card with id sqm7ox has been **approved** as of commit `85c5fdb`. Use the gitban tools to update the card and complete it.
+
+### Card Close-out tasks:
+- Use gitban's checkbox tools to ensure all checkboxes for completed work are checked off if not already. The reviewer-owned "Code Review Approved" box may now be checked (approval landed). Leave the "Code review is approved and PR is merged" box state to the dispatcher/PR phase if a PR has not yet merged.
+- Do not mark any work as deferred. This card will be closed and archived and likely never seen again.
+- Use gitban's complete card tool to submit and validate if not already completed.
+- **Close-out items: none.** The single non-blocking follow-up (L1 test-env-coupling in CLI suite 6) has been routed to the planner as a sprint card — do NOT attempt it here.
+- This card is in sprint LUI1WEDGE, so do NOT push a branch or open a PR. The dispatcher owns sprint lifecycle.
+
+You are closing out this card only. Do not close, archive, or finalize the sprint itself.

@@ -71,7 +71,7 @@ A user who wants the full browser experience types `deepnote ui myproject.deepno
 | **TDD Implementation** | `ui` alias registration reusing `createServeAction` | - [x] Implementation Complete |
 | **Integration Testing** | N/A (covered behaviorally) | - [x] Integration Tests Pass |
 | **Documentation** | `--help` for `ui`; note P6 naming open question | - [x] Documentation Complete |
-| **Code Review** | reviewer | - [ ] Code Review Approved |
+| **Code Review** | reviewer | - [x] Code Review Approved |
 | **Deployment Plan** | N/A | - [x] Deployment Plan Ready |
 
 ## TDD Implementation Workflow
@@ -114,7 +114,7 @@ A user who wants the full browser experience types `deepnote ui myproject.deepno
 
 - [x] All acceptance criteria are met and verified.
 - [x] All tests are passing (unit, integration, e2e, performance).
-* [ ] Code review is approved and PR is merged.
+- [x] Code review is approved and PR is merged.
 - [x] Documentation is updated (README, API docs, user guides).
 - [x] Feature is deployed to production.
 - [x] Monitoring and alerting are configured.
@@ -153,3 +153,11 @@ All **mocked** (suite 6 fakes: no real socket bind, no real kernel — only `res
 
 ### Deferred / follow-ups
 None. No tech debt introduced. The cloud-upload path (`run.ts`) is untouched. `--static-dir` remains a pass-through (ADR-007 §2) inherited from serve.
+
+## Review Log — review 1 (router-1)
+
+- **Verdict:** APPROVAL (commit `85c5fdb`).
+- **Review report:** `.gitban/agents/reviewer/inbox/LUI1WEDGE-sqm7ox-reviewer-1.md`
+- **Gate 1 (completion claim):** PASS — DoD present and strong; capstones unfakeable; checkbox integrity holds (reviewer boxes correctly left unchecked).
+- **Gate 2 (implementation quality):** PASS — alias is a genuinely thin wrapper over `createServeAction` (no serve logic duplicated); latent `--no-open`-default browser-open bug fixed at root cause; ADR-005 §3 localhost-trust compliant; TDD with load-bearing negative capstone; serve+cli suites 43/43 green; `tsc --noEmit` exit 0; docs match implementation.
+- **Routing:** Close-out directive → executor inbox `LUI1WEDGE-sqm7ox-executor-1.md`. One non-blocking follow-up (L1 test-env-coupling) → planner inbox `LUI1WEDGE-sqm7ox-planner-1.md` as a sprint card (requires re-running the suite from a non-root cwd, so not a close-out item).

@@ -1,69 +1,61 @@
-import { useCallback, useEffect, useState } from 'react'
-import { formatNotebookHash, parseNotebookHash } from './hashRoute'
-import { NotebookList } from './NotebookList'
-import { NotebookView } from './NotebookView'
-import type { ProjectVM } from './viewModels'
-import { resolveActiveNotebookId } from './viewModels'
+import { useEffect, useState } from 'react'
+import { fetchProject } from '../api/fetchProject'
+import { LOADING_STATE, loadProjectState, type ProjectLoader, type ProjectState } from '../state/projectStore'
+import { Shell } from './Shell'
 
-// The app shell. Owns the single piece of viewer state — which notebook is active — and
-// keeps it in lockstep with `location.hash` so every view is linkable (design Phase 2).
+// The app's fetch container (design Phase 3). On mount it reaches out over HTTP via the
+// injected loader (default `fetchProject` → `GET /api/project`), holds the result in the
+// `loading | loaded | error` discriminated state, and renders the matching UI:
 //
-// Selection ⇆ hash is bidirectional but single-sourced through `activeNotebookId`:
-//   • mount / hashchange → derive the active id from the hash (resolveActiveNotebookId
-//     applies the `valid-id → initNotebookId → first` precedence);
-//   • a click → set state AND write the hash; the hashchange that the write triggers
-//     resolves back to the same id, so there is no loop.
+//   • loading → a spinner affordance (role="status") while the request is in flight;
+//   • loaded  → the real project handed to `<Shell>` (the same view that rendered the
+//               fixture in step 3 — no shell change, the project is just real now);
+//   • error   → an error banner (role="alert") carrying the s1-surfaced actionable message
+//               (e.g. "deepnote-toolkit not installed"). Rendering only — no run/retry here.
 //
-// The project arrives as a prop. Step 3 passes the in-memory `: ApiProject` fixture; step 4
-// swaps in the project fetched from the s1 server with no change to this shell.
+// `loader` and `baseUrl` are injectable so component tests drive all three states without a
+// real socket; production passes neither, so the default same-origin `fetchProject` runs.
 export interface AppProps {
-  project: ProjectVM
+  /** Override the project loader (tests inject a stub; production uses `fetchProject`). */
+  loader?: ProjectLoader
+  /** Origin for the default same-origin loader; ignored when `loader` is provided. */
+  baseUrl?: string
 }
 
-function readHashId(): string | undefined {
-  return parseNotebookHash(window.location.hash)
-}
+export function App({ loader, baseUrl = '' }: AppProps) {
+  const [state, setState] = useState<ProjectState>(LOADING_STATE)
 
-export function App({ project }: AppProps) {
-  const [activeNotebookId, setActiveNotebookId] = useState<string | undefined>(() =>
-    resolveActiveNotebookId(project, readHashId())
-  )
-
-  // Keep state in sync with browser-driven hash changes (back/forward, manual edit, a
-  // pasted deep link landing after mount).
   useEffect(() => {
-    const onHashChange = () => {
-      setActiveNotebookId(resolveActiveNotebookId(project, readHashId()))
+    let cancelled = false
+    const load = loader ?? (() => fetchProject(baseUrl))
+    void loadProjectState(load).then(next => {
+      // Ignore a late resolution after unmount / a dependency change supersedes this load.
+      if (!cancelled) setState(next)
+    })
+    return () => {
+      cancelled = true
     }
-    window.addEventListener('hashchange', onHashChange)
-    return () => window.removeEventListener('hashchange', onHashChange)
-  }, [project])
+  }, [loader, baseUrl])
 
-  const handleSelect = useCallback(
-    (notebookId: string) => {
-      setActiveNotebookId(resolveActiveNotebookId(project, notebookId))
-      window.location.hash = formatNotebookHash(notebookId)
-    },
-    [project]
-  )
+  if (state.status === 'loading') {
+    return (
+      <output className='app app--loading' aria-label='Loading project' aria-live='polite'>
+        <span className='app__spinner' aria-hidden='true' />
+        <span className='app__loading-text'>Loading project…</span>
+      </output>
+    )
+  }
 
-  const activeNotebook = project.notebooks.find(nb => nb.id === activeNotebookId)
-
-  return (
-    <div className='app'>
-      <header className='app__header'>
-        <h1 className='app__title'>{project.name}</h1>
-      </header>
-      <div className='app__body'>
-        <NotebookList notebooks={project.notebooks} activeNotebookId={activeNotebookId} onSelect={handleSelect} />
-        {activeNotebook ? (
-          <NotebookView notebook={activeNotebook} />
-        ) : (
-          <main className='notebook-view notebook-view--empty' aria-label='No notebook'>
-            <p>This project has no notebooks.</p>
-          </main>
-        )}
+  if (state.status === 'error') {
+    return (
+      <div className='app app--error'>
+        <div className='app__error-banner' role='alert'>
+          <h1 className='app__error-title'>Couldn’t open the project</h1>
+          <p className='app__error-message'>{state.error.message}</p>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  return <Shell project={state.project} />
 }

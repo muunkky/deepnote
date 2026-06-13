@@ -1,20 +1,20 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { sampleProject } from '../__fixtures__/sampleProject'
+import { ProjectLoadError } from '../api/fetchProject'
 import { App } from './App'
 
-// Shell + routing component tests, driven entirely off the shared `: ApiProject` fixture.
-// These encode the card's acceptance criteria: the list renders every notebook; clicking
-// one routes (active selection updates) AND updates `location.hash`; the active notebook's
-// blocks render in persisted array order; and `#/notebook/<id>` / no-hash default routing.
+// App-level load integration (design Phase 3 capstone). The shell + routing behaviour is
+// covered by Shell.test.tsx against the fixture; here we drive the THREE load states by
+// injecting a loader thunk (so no real socket opens), and assert:
+//   • loading  → a spinner / loading affordance, NOT the shell;
+//   • loaded   → the real project renders (notebooks from the response appear in the DOM);
+//   • error    → an error banner carrying the s1-surfaced message, NOT the shell.
 //
-// Only `@testing-library/react` + vitest matchers are used (no jest-dom / user-event):
-// assertions read attributes off the real DOM (`getAttribute` + `toBe`) so the suite needs
-// no test dependency beyond what step 2 already installed.
-const project = sampleProject.project
+// The `loader` prop is the test seam; in the browser `App` defaults it to `fetchProject`,
+// so production wiring fetches `GET /api/project` for real (see main.tsx).
 
 beforeEach(() => {
-  // Each test starts from a clean hash so default-routing assertions are deterministic.
   window.location.hash = ''
 })
 
@@ -22,65 +22,49 @@ afterEach(() => {
   window.location.hash = ''
 })
 
-describe('App shell — notebook list', () => {
-  it('renders one list entry per notebook in the fixture', () => {
-    render(<App project={project} />)
-    const list = screen.getByRole('navigation', { name: 'Notebooks' })
-    const entries = within(list).getAllByRole('button')
-    expect(entries).toHaveLength(project.notebooks.length)
-    expect(entries.map(el => el.textContent)).toEqual(project.notebooks.map(nb => nb.name))
+/** A loader that never settles — lets us assert the synchronous loading state. */
+function pendingLoader(): Promise<typeof sampleProject> {
+  return new Promise<typeof sampleProject>(() => {})
+}
+
+describe('App — load lifecycle', () => {
+  it('renders a loading affordance before the project resolves (not the shell)', () => {
+    render(<App loader={pendingLoader} />)
+
+    expect(screen.getByRole('status', { name: /loading/i })).toBeDefined()
+    // The shell (notebook navigation) is NOT present while loading.
+    expect(screen.queryByRole('navigation', { name: 'Notebooks' })).toBeNull()
   })
 
-  it('selecting a notebook routes to it (active selection updates) and updates location.hash', () => {
-    render(<App project={project} />)
+  it('renders the shell from the real fetched project on success', async () => {
+    render(<App loader={() => Promise.resolve(sampleProject)} />)
 
-    const target = project.notebooks[1] // not the default → a real change
-    fireEvent.click(screen.getByRole('button', { name: target.name }))
-
-    // Active selection updated: the clicked entry is now aria-current, and the main pane
-    // shows that notebook.
-    expect(screen.getByRole('button', { name: target.name }).getAttribute('aria-current')).toBe('page')
-    expect(screen.getByRole('main', { name: `Notebook: ${target.name}` })).toBeDefined()
-
-    // …and the hash updated so the view is linkable.
-    expect(window.location.hash).toBe(`#/notebook/${target.id}`)
-  })
-})
-
-describe('App shell — block order', () => {
-  it('renders the active notebook blocks top-to-bottom in persisted blocks[] order', () => {
-    render(<App project={project} />)
-    const main = screen.getByRole('main', { name: `Notebook: ${project.notebooks[0].name}` })
-    const renderedIds = Array.from(main.querySelectorAll('.block')).map(el => el.getAttribute('data-block-id'))
-    expect(renderedIds).toEqual(project.notebooks[0].blocks.map(b => b.id))
-  })
-})
-
-describe('App shell — routing', () => {
-  it('loading #/notebook/<id> selects that notebook', () => {
-    const target = project.notebooks[2]
-    window.location.hash = `#/notebook/${target.id}`
-    render(<App project={project} />)
-    expect(screen.getByRole('button', { name: target.name }).getAttribute('aria-current')).toBe('page')
-    expect(screen.getByRole('main', { name: `Notebook: ${target.name}` })).toBeDefined()
+    // The shell appears once loaded…
+    const nav = await screen.findByRole('navigation', { name: 'Notebooks' })
+    expect(nav).toBeDefined()
+    // …and every notebook from the RESPONSE renders in the DOM (real data, not a fixture prop).
+    for (const nb of sampleProject.project.notebooks) {
+      expect(screen.getByRole('button', { name: nb.name })).toBeDefined()
+    }
+    expect(screen.getByRole('heading', { name: sampleProject.project.name })).toBeDefined()
   })
 
-  it('with no hash, the default selects initNotebookId', () => {
-    expect(project.initNotebookId).toBe('nb-analysis')
-    render(<App project={project} />)
-    const initNotebook = project.notebooks.find(nb => nb.id === project.initNotebookId)
-    expect(initNotebook).toBeDefined()
-    expect(screen.getByRole('button', { name: initNotebook?.name ?? '' }).getAttribute('aria-current')).toBe('page')
+  it('renders an error banner with the s1-surfaced message on a non-2xx (not the shell)', async () => {
+    const error = new ProjectLoadError('deepnote-toolkit not installed', 400)
+    render(<App loader={() => Promise.reject(error)} />)
+
+    const banner = await screen.findByRole('alert')
+    expect(banner.textContent).toContain('deepnote-toolkit not installed')
+    // The shell never renders on the error path.
+    expect(screen.queryByRole('navigation', { name: 'Notebooks' })).toBeNull()
   })
 
-  it('reacts to a browser-driven hashchange after mount', async () => {
-    render(<App project={project} />)
-    const target = project.notebooks[1]
-    window.location.hash = `#/notebook/${target.id}`
-    // hashchange is async in jsdom; wait for the listener to settle.
+  it('does not leave the loading affordance up once the error state is reached', async () => {
+    render(<App loader={() => Promise.reject(new ProjectLoadError('boom', 500))} />)
+
+    await screen.findByRole('alert')
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: target.name }).getAttribute('aria-current')).toBe('page')
+      expect(screen.queryByRole('status', { name: /loading/i })).toBeNull()
     })
-    expect(screen.getByRole('main', { name: `Notebook: ${target.name}` })).toBeDefined()
   })
 })

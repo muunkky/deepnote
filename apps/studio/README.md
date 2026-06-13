@@ -33,15 +33,44 @@ pnpm --filter @deepnote/studio test:hmr     # real timed Vite-HMR edit→reflect
 It is **not** part of `pnpm test` because it boots a live Vite dev server and a real headless
 Chromium — see "Live HMR proof" below.
 
+## Project load path
+
+The app reaches out over HTTP for the real project on mount — there is no fixture in the
+production path. The load is a single read-only seam (GET only; no POST/WS in this story):
+
+- **`src/api/fetchProject.ts`** — `fetchProject(baseUrl = ''): Promise<ApiProject>` performs one
+  `GET /api/project` and returns the **full** `ApiProject` envelope. On a non-2xx it throws a typed
+  `ProjectLoadError` carrying the s1 server's own `{ error }` message (e.g. "deepnote-toolkit not
+  installed") and the HTTP status; a pre-response network failure throws the same error with no
+  status. The return type **is** the imported `ApiProject` — never a re-declared local shape — so a
+  server contract change is a compile error, asserted by `fetchProject.test-d.ts`
+  (`expectTypeOf<Awaited<ReturnType<typeof fetchProject>>>().toEqualTypeOf<ApiProject>()`).
+- **`src/state/projectStore.ts`** — the `{ status: 'loading' } | { status: 'loaded'; project;
+capabilities; activeNotebookId } | { status: 'error'; error }` discriminated state.
+  `loadProjectState(loader = fetchProject)` runs the loader and maps success → `loaded` (resolving
+  the initial notebook via the shared `initNotebookId` precedence) / failure → `error`.
+- **`src/shell/App.tsx`** — the **fetch container**. On mount it runs the loader and renders the
+  matching UI: a spinner (`role="status"`) while in flight, `<Shell>` once loaded, or an error
+  banner (`role="alert"`) carrying `error.message` on failure (rendering only — no run/retry). The
+  `loader`/`baseUrl` props are injectable so component tests drive all three states without a real
+  socket; production passes neither, so the same-origin `fetchProject` runs.
+
+> **`api-types` import boundary.** Both `fetchProject.ts` and `projectStore.ts` import **only**
+> `import type { ApiProject } from '@deepnote/runtime-server/types'` — the Node-free `/types` entry.
+> No runtime value, no `node:` builtin, no bare `@deepnote/runtime-server` runtime entry crosses
+> into the SPA, keeping the one-way boundary intact (enforced by
+> `test-helpers/apps-studio-isolation.test.ts`).
+
 ## Shell + routing model
 
-The app is a read-only viewer shell driven entirely by an `ApiProject` (the `GET /api/project`
-envelope; step 3 supplies an in-memory fixture, step 4 a real fetch). The shape:
+The loaded view is driven entirely by an `ApiProject['project']` (the `GET /api/project` envelope's
+`project` slice). The shape:
 
-- **`src/shell/App.tsx`** — the shell. Owns the single piece of viewer state, `activeNotebookId`,
-  and keeps it in lockstep with `location.hash` so every view is linkable. It renders the
-  notebook list beside the active notebook and takes the project as a prop (so step 4 swaps the
-  fixture for a fetch with no shell change).
+- **`src/shell/Shell.tsx`** — the loaded-project view. Owns the single piece of viewer state,
+  `activeNotebookId`, and keeps it in lockstep with `location.hash` so every view is linkable. It
+  renders the notebook list beside the active notebook and takes the project as a prop. `App`
+  renders it once the load resolves (step 3 rendered this same view directly off the fixture; step 4
+  put the fetch container in front of it with no change to the view itself).
 - **`src/shell/NotebookList.tsx`** — the left-hand list: one focusable `<button>` per notebook;
   the active entry carries `aria-current="page"`. Clicking selects + routes.
 - **`src/shell/NotebookView.tsx`** — the main pane: the active notebook's `blocks[]` rendered

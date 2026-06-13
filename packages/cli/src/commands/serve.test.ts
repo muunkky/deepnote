@@ -14,8 +14,12 @@ import { createServeAction, type ServeDeps, type ServeOptions } from './serve'
  * is the step-5 integration card (`wd2nil`), not here.
  */
 
-// A real, resolvable .deepnote file so `resolvePathToDeepnoteFile` succeeds (tests run from root).
-const HELLO_WORLD_FILE = resolve(process.cwd(), 'examples', '1_hello_world.deepnote')
+// A real, resolvable .deepnote file so `resolvePathToDeepnoteFile` succeeds. Anchored to this test
+// file's own location (not `process.cwd()`) so the suite passes regardless of the cwd vitest is
+// invoked from — mirroring the `dirname(fileURLToPath(import.meta.url))` pattern used below.
+const TEST_DIR = dirname(fileURLToPath(import.meta.url))
+const REPO_ROOT = resolve(TEST_DIR, '..', '..', '..', '..')
+const HELLO_WORLD_FILE = resolve(REPO_ROOT, 'examples', '1_hello_world.deepnote')
 
 /** Record of every `listen(port, host)` call the action made on the fake server. */
 interface ListenCall {
@@ -275,7 +279,7 @@ describe('serve command (mocked, suite 6)', () => {
     const harness = makeHarness({ findPortResult: 8080, listenResult: 8080 })
     const action = createServeAction(program, harness.deps)
 
-    await action(resolve(process.cwd(), 'does-not-exist.deepnote'), { open: false })
+    await action(resolve(REPO_ROOT, 'does-not-exist.deepnote'), { open: false })
 
     expect(exitSpy).toHaveBeenCalledWith(2)
     expect(consoleErrorSpy).toHaveBeenCalled()

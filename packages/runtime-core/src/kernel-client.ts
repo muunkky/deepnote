@@ -315,15 +315,32 @@ export class KernelClient {
 
   /**
    * Disconnect from the kernel and clean up resources.
+   *
+   * Disposing an already-dead kernel (the Scenario-4 / `os._exit(1)` path) makes
+   * `@jupyterlab/services` synchronously fire `connectionStatusChanged → 'disconnected'`,
+   * which rejects its internal reconnect `PromiseDelegate` with `Error('Kernel connection
+   * disconnected')` (`default.js` `reconnect()`). That delegate is library-internal — we
+   * never receive it — so the rejection lands unhandled and a strict consumer (vitest) flags
+   * it as a potential false-positive. It is benign: we are tearing the kernel down on purpose.
+   * Pre-attaching a sink to the kernel's `info` promise (which rejects on the same signal)
+   * and guarding the dispose calls keeps the predictable teardown rejection from leaking,
+   * without swallowing real errors. (card wd2nil — surfaced once Scenario 4 kills a real kernel.)
    */
   async disconnect(): Promise<void> {
+    // Sink the kernel `info` promise's disconnect-rejection (shares the signal that leaks).
+    this.kernel?.info?.catch(() => {})
+
     if (this.session) {
       try {
         await this.session.shutdown()
       } catch {
-        // Ignore shutdown errors
+        // Ignore shutdown errors (a dead kernel cannot be shut down cleanly).
       }
-      this.session.dispose()
+      try {
+        this.session.dispose()
+      } catch {
+        // Ignore dispose errors on an already-dead kernel.
+      }
       this.session = null
     }
 

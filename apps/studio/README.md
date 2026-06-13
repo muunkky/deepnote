@@ -140,6 +140,30 @@ HMR cycle **via a React Fast Refresh hot update** (it checks a `window` sentinel
 no full reload), recording the measured latency. The browser is the Playwright-cached Chromium;
 override its path with `HMR_CHROME_BIN`. The probe edit is always restored afterwards.
 
+## Visualization / big-number / image renderers (`src/blocks/`)
+
+`visualization`, `big-number`, and `image` blocks each have their own read-only renderer, registered
+additively into the `BlockRenderer` registry. All three are a **pure function of persisted state**
+(R8) — nothing re-executes.
+
+**Persisted-first, metadata-fallback (Key Design Decision M1).** `visualization` and `big-number`
+both carry two potential sources of truth: their persisted `outputs[]` and their authoring metadata.
+The rule is **prefer the persisted output; fall back to metadata only when `outputs` is empty** — a
+block that has run carries the actual computed result (ground truth), while metadata is the
+pre-execution authoring spec.
+
+- **`VisualizationRenderer`** renders the persisted chart through the shared
+  `OutputRenderer` / MIME registry (a persisted `image/png`, an HTML chart, or — as an additive
+  registry upgrade, Decision 3a — a native vega/plotly bundle). It **never re-executes** the
+  `deepnote_visualization_spec`; a chart that has never run (empty `outputs`) shows a labelled
+  "not yet rendered" placeholder rather than a kernel call. Native vega/plotly is an additive
+  MIME-registry entry that degrades to the persisted image, so the image path alone satisfies R3.
+- **`BigNumberRenderer`** renders the persisted output tile when present; a never-run tile falls back
+  to the `deepnote_big_number_title` / `_value` (+ optional comparison) authoring metadata.
+- **`ImageRenderer`** renders the `deepnote_img_src` image, reusing `@deepnote/blocks`'
+  `createMarkdown` image derivation and **sanitizing** the resulting `<img>` markup through DOMPurify
+  before injection (an untrusted `javascript:`/`onerror` src cannot reach the DOM live).
+
 ## Why it is isolated — and how
 
 Introducing a UI framework + browser bundler is a load-bearing, one-way decision

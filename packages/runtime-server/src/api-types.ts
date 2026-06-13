@@ -23,8 +23,6 @@ import type { IOutput, KernelFailureCategory } from '@deepnote/runtime-core'
 
 // Re-export the helper discriminant so a `/types` consumer gets the full contract
 // from one entry without reaching into `@deepnote/runtime-core` directly.
-export type { KernelFailureCategory } from '@deepnote/runtime-core'
-
 // Re-export the Jupyter output union (and its members) the same way: the m3/s2 SPA
 // viewer renders persisted `block.outputs` and must type its OutputRenderer against the
 // canonical `IOutput` shape WITHOUT importing `@deepnote/runtime-core` (a non-type
@@ -32,7 +30,14 @@ export type { KernelFailureCategory } from '@deepnote/runtime-core'
 // re-export erases at compile time, so this keeps `api-types.ts` Node-free (the
 // `api-types-no-runtime-import.test.ts` invariant still holds) while the SPA consumes
 // `import type { IOutput, ... } from '@deepnote/runtime-server/types'`.
-export type { IDisplayData, IError, IExecuteResult, IOutput, IStream } from '@deepnote/runtime-core'
+export type {
+  IDisplayData,
+  IError,
+  IExecuteResult,
+  IOutput,
+  IStream,
+  KernelFailureCategory,
+} from '@deepnote/runtime-core'
 
 /**
  * Monotonic per-server run identifier. Every {@link WsServerEvent} carries it so a

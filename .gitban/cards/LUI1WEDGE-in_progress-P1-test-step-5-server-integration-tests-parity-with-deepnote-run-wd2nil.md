@@ -257,3 +257,43 @@ reviewer-2 B1 (Gate 2, code-quality): the review-1 Gate 1 capstone-integrity blo
 **Routing:**
 - **Executor** (`.gitban/agents/executor/inbox/LUI1WEDGE-wd2nil-executor-3.md`): B1 — the parity integration suite is FLAKY, intermittently exiting non-zero (~50% of full-file runs) from an unhandled promise rejection during Scenario 4 teardown (`Error: Kernel connection disconnected` at `kernel-client.ts:340` `this.session.dispose()`). The `bbfd6da` `disconnect()` fix sank the rejection on the wrong promise (`kernel.info`); the leak escapes from `session.dispose()`'s internal reconnect `PromiseDelegate`. All 4 assertions always pass, but a non-zero exit reds the `integration-kernels` CI job — the card's verification locus — falsifying the checked `[x] No flaky tests introduced` and `[x] Tests are deterministic` boxes. Fix in `disconnect()` (NOT the test harness — also satisfies L2/teardown-symmetry), add a unit test asserting no unhandled rejection when disposing a dead kernel (red→green), then record 5–10 consecutive clean (exit 0) real-venv runs as evidence. Do NOT touch the four scenarios or the kernel-death fix. (Executor file numbered `-3` because `-2` is occupied by the prior review-1 rework directive.)
 - **Planner** (`.gitban/agents/planner/inbox/LUI1WEDGE-wd2nil-planner-2.md`): non-blocking follow-ups L1 + L3 grouped into 2 sprint cards — Card 1: parity-suite hardening (L1 union-of-keys fix + coverage-claim wording) on `server-run-parity.integration.test.ts`/fixture; Card 2: `integration-kernels` CI wall-clock budget watch (L3). **Dedup flag passed to planner:** the review-1 planner-1 grouping of these same items was never actually executed — no cards were created and the items are absent from the closeout (`od8esg`) retrospective — so they are orphaned/untracked and must be created this cycle. L2 (teardown-symmetry) is NOT routed to the planner; it is fully covered by the B1 executor directive's "fix in `disconnect()`, not the harness" mandate.
+
+## Close-out — executor-3 (retry 2, Gate-2 REJECTION rework: flaky teardown rejection FIXED)
+
+**Branch:** `worktree-agent-a0ad7a6e70cc6a863` → merges to `milestone/m3-local-ui`. **Tag:** `LUI1WEDGE-wd2nil-done` @ `1c97429`.
+
+### Scope
+Single mandatory blocker (reviewer-2 B1): the parity integration suite exited non-zero ~50% of runs from an unhandled promise rejection during Scenario-4 teardown, falsifying `[x] No flaky tests introduced` and `[x] Tests are deterministic`. **The four scenarios and the kernel-death fix were NOT touched** — only `disconnect()` in `kernel-client.ts` and a new unit test.
+
+### Root cause (the `bbfd6da` fix sank the wrong promise)
+The leak does NOT come from `kernel.info`. When a kernel auto-restarts mid-run (the `os._exit(1)` path), `@jupyterlab/services`' `DefaultKernel._handleMessage` (node_modules `.../kernel/default.js` ~L1406) schedules a **fire-and-forget** microtask `void Promise.resolve().then(async () => { … await this.reconnect() })` with **no `.catch`**. `reconnect()` (L649) returns a fresh `PromiseDelegate` whose `connectionStatusChanged` listener rejects with `Error('Kernel connection disconnected')` (L660) the instant the status goes `disconnected`. When we then `session.dispose()` → `kernel.dispose()` → `_updateConnectionStatus('disconnected')` (L450), that pending reconnect delegate rejects, and because the awaiting microtask has no handler the rejection escapes as **unhandled** → non-zero process exit reding `integration-kernels`. The rejecting promise is genuinely unreachable from our code (no exposed handle), so `this.kernel?.info?.catch()` could never have caught it.
+
+### Fix — `packages/runtime-core/src/kernel-client.ts` (`disconnect()`, NOT the harness)
+Wrapped the teardown in a scoped `#withDeadKernelRejectionGuard()` that installs a temporary `process.on('unhandledRejection')` guard which **swallows ONLY** `Error('Kernel connection disconnected')` and **re-delegates every other rejection to the pre-existing listeners** (real errors are never masked). After teardown it flushes microtasks + a real macrotask so Node's asynchronously-emitted `unhandledRejection` event lands while the guard is armed, then removes the guard and restores the exact prior listener set. Real `setImmediate`/`setTimeout` refs are captured at module load so the macrotask drain never hangs under fake timers (`disconnect()` is reached from `connect()`'s failure path, which the existing unit suite runs under `vi.useFakeTimers()`). Fixed at the `kernel-client` layer per reviewer L2/teardown-symmetry: the same dead-kernel `disconnect()` runs at the end of every run, so the fix is inherited by any future kernel-killing test or caller.
+
+### TDD (red→green) — `packages/runtime-core/src/kernel-client.test.ts`
+New `describe('disconnect — dead-kernel rejection guard')` (real timers), simulating the library's exact leak (`session.dispose()` schedules a no-`.catch` rejecting microtask):
+- **swallows the benign "Kernel connection disconnected" leak** — asserts ZERO `unhandledRejection` escapes the process. **Verified RED** (fails with the rejection escaping) when the guard is bypassed; GREEN with it.
+- **does NOT swallow an unrelated unhandled rejection** — a different rejection still escapes to the test's listener (guard is not a blanket sink).
+- **restores the prior `unhandledRejection` listeners after disconnect** — listener set is identical before/after.
+Full file: **39/39 pass** (36 prior + 3 new). No existing test changed.
+
+### Determinism evidence (the ~50% flake retired)
+Built the full workspace into the worktree — `pnpm install --frozen-lockfile` then **`pnpm -r build`** (NOT just `-F cli`/`-F runtime-server`: a `-F build` does not build transitive deps, and the CLI subprocess `deepnote run` needs `@deepnote/reactivity/dist` resolvable — a partial build reproduced an `ERR_MODULE_NOT_FOUND @deepnote/reactivity` Scenario-1 failure that is a build-completeness artifact, not a code issue). Then ran the full parity file against the parent venv `/home/cameron/projects/deepnote/.venv` (deepnote-toolkit[server]==2.3.1), `RUN_INTEGRATION_TESTS=true DEEPNOTE_INTEGRATION_VENV=… VITEST_TEST_TIMEOUT=120000`, **10 consecutive times**, capturing each exit code:
+```
+RUN 1..10: exit=0 :: Tests 4 passed (4)
+SUMMARY: 10/10 clean (exit 0)
+```
+**0/10 runs** showed any `Unhandled Rejection` or `Errors N` line (grep across all 10 captured outputs). All four scenarios pass on every run. (Single pre-loop smoke run also exit 0, 0 unhandled markers.)
+
+### Checkbox state (honest)
+- `[x] No flaky tests introduced` / `[x] Tests are deterministic [no flakiness]` — now TRUE, backed by the 10/10 consecutive clean-exit evidence above (these were the two boxes reviewer-2 B1 falsified).
+- `[x] All tests pass locally` — TRUE: 39/39 unit (kernel-client) + 62/62 runtime-server mocked + 4/4 real-venv parity (×10).
+- **`[ ] All tests pass in CI` — left UNCHECKED (honest).** No `integration-kernels` run exists for `1c97429`; per the directive I do not tick a CI pass that hasn't happened. CI green is the reviewer/dispatcher confirmation step.
+- All other boxes (capstone, missing-kernel, serve/loopback, only-under-test:integration, etc.) remain TRUE and untouched — the four scenarios and the kernel-death fix were not modified.
+
+### Other gates
+- biome clean on both changed files; root `tsc --noEmit` shows no `kernel-client` errors. No new cspell terms.
+- The `examples/1_hello_world.deepnote` ENOENT seen when running runtime-core via `pnpm -F` from the repo root is a CWD-relative-fixture artifact (passes from the package dir: 192 passed), pre-existing and unrelated to this change.
+
+Leaving the card `in_progress` for the reviewer. Did not close, archive, or finalize.

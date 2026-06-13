@@ -24,6 +24,15 @@ pnpm --filter @deepnote/studio test     # the jsdom + @testing-library/react sui
 all include this package — the SPA suite runs as a distinct DOM-env vitest **project** (see
 the root `vitest.config.ts`), separate from the node-env backend suite.
 
+> **Run `pnpm install` after pulling the `apps/*` workspace glob, or the `studio` vitest
+> project will not be collected.** The root `vitest.config.ts` references
+> `./apps/studio/vitest.config.ts`, which imports `@vitejs/plugin-react` at config-eval
+> time. On a cold checkout that runs `pnpm test` **before** a fresh `pnpm install` has
+> resolved this app's dependencies, that import fails to resolve and vitest reports a
+> confusing **"project setup failed"** (with zero `studio` tests collected) instead of a
+> clean test result. The fix is always a fresh `pnpm install` first — CI must order the
+> install step before `pnpm test`.
+
 A separate, browser-driven HMR end-to-end check lives outside that always-on suite:
 
 ```bash

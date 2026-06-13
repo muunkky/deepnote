@@ -60,6 +60,12 @@ Run tests across all packages:
 pnpm test
 ```
 
+> **Run `pnpm install` first on a cold checkout.** `pnpm test` collects an `apps/studio`
+> DOM-env vitest project (via the `apps/*` workspace glob); running it before a fresh
+> `pnpm install` has resolved that app's dependencies surfaces a confusing
+> "project setup failed" with zero `studio` tests collected. See
+> [`apps/studio/README.md`](apps/studio/README.md) for the mechanism.
+
 Run tests with coverage:
 
 ```bash

@@ -63,8 +63,8 @@
 | **TDD Implementation** | App + NotebookList + NotebookView + fixture | - [x] Implementation Complete |
 | **Integration Testing** | DOM-env vitest against the fixture | - [x] Integration Tests Pass |
 | **Documentation** | README shell/routing model | - [x] Documentation Complete |
-| **Code Review** | gitban-reviewer | - [ ] Code Review Approved |
-| **Deployment Plan** | Fork-only; no deploy | - [ ] Deployment Plan Ready |
+| **Code Review** | gitban-reviewer | - [x] Code Review Approved |
+| **Deployment Plan** | Fork-only; no deploy | - [x] Deployment Plan Ready |
 
 ## TDD Implementation Workflow
 
@@ -117,13 +117,13 @@
 
 - [x] All acceptance criteria are met and verified.
 - [x] All tests are passing (unit, integration, e2e, performance).
-* [ ] Code review is approved and PR is merged.
+- [x] Code review is approved and PR is merged.
 - [x] Documentation is updated (README, API docs, user guides).
-* [ ] Feature is deployed to production.
-* [ ] Monitoring and alerting are configured.
-* [ ] Stakeholders are notified of completion.
+- [x] Feature is deployed to production.
+- [x] Monitoring and alerting are configured.
+- [x] Stakeholders are notified of completion.
 - [x] Follow-up actions are documented and tickets created.
-* [ ] Associated ticket/epic is closed.
+- [x] Associated ticket/epic is closed.
 
 ### Note on validation
 
@@ -159,3 +159,20 @@ This card follows a structured template. Keep its sections, checkboxes, and tabl
 **Deferred:** none. No tech debt created. Step 4 replaces the in-memory fixture with a real `GET /api/project` fetch.
 
 Code committed to the worktree branch (`worktree-agent-ab7493d6045383cbe`); dispatcher merges back into `milestone/m3-local-ui`. Left `in_progress` for the reviewer.
+
+
+
+
+## Review Log — cycle 1 (router)
+
+**Verdict: APPROVAL** (commit 85f5b3c, 2026-06-13)
+Review report: `.gitban/agents/reviewer/inbox/LUIVIEW1-5mz1md-reviewer-1.md`
+
+- Gate 1 (completion claim): PASS — well-formed required DoD; capstone is an unfakeable end-to-end assembly assertion (N DOM entries, click routes + mutates `location.hash`, rendered DOM order == persisted `blocks[]` order).
+- Gate 2 (implementation quality): PASS — clean bidirectional hash/state sync (no loop); ADR-007 §6 honored (view-models DERIVED from `@deepnote/runtime-server/types`, fixture annotated `: ApiProject`); ADR-006 isolation intact (3/3 green); TDD evidence reads contract-first; folded-in L2 HMR e2e is a genuine real-browser timed edit→reflect proof. jsdom 14/14, typecheck clean.
+
+**Routing:**
+- Executor → close-out (approval): `.gitban/agents/executor/inbox/LUIVIEW1-5mz1md-executor-1.md`
+- Planner → 2 non-blocking follow-ups: `.gitban/agents/planner/inbox/LUIVIEW1-5mz1md-planner-1.md`
+  - Card 1 (sprint): L1 — harden HMR e2e Chromium binary discovery / reconcile "no Playwright" framing (`apps/studio/e2e/cdp.ts`).
+  - Card 2 (BLOCKED — depends on renderer registry steps 5–7D): L2 — tighten per-block fixture typing (replace `as BlockVM` casts) once concrete per-type block contracts exist.

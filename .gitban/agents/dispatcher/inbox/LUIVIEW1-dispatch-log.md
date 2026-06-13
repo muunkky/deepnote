@@ -48,3 +48,14 @@ Serial spine 2→3→4→5→6, then parallel 7A‖7B‖7C, then 7D, then closeo
 - **Batch 1 DONE.** Sprint now 1/11 done (+ planning v9apte deferred to closeout). cd4gxo (step 2b) added to remaining plan — P2 doc, parallel-safe, will run in the 7-batch or just before closeout.
 
 ## Batch 2: step 3 — 5mz1md (spa-foundation app shell + routing)
+
+- **Executor-1** (`ab7493d60453`): commit `85f5b3c`, tag `LUIVIEW1-5mz1md-done`. Built shell (App/NotebookList/NotebookView/BlockRenderer stub), hashRoute (`#/notebook/<id>` bidirectional), derived view-models (type-only `@deepnote/runtime-server/types`, fixture `: ApiProject`). Folded-in **L2 HMR e2e**: real Vite dev server + headless Chromium over CDP (no Playwright dep), measured ~656ms Fast-Refresh hot-update, gated under `test:hmr` (sandbox-disabled). In-worktree: 14/14 jsdom, 3/3 isolation, 1/1 HMR e2e, typecheck/biome/prettier/cspell clean.
+- Merge: fast-forward `89e252d..85f5b3c` (24 files, +850). Reconciled at `6ed7584`.
+- Reviewer-1 (`aebab729283b`): **APPROVAL** — both gates PASS, all live-verified. 2 non-blocking follow-ups (L1 cdp.ts hardcoded `chromium-1223`; L2 fixture `as BlockVM` cast).
+- Router-1 (`ac62ef849c23`): **APPROVAL**.
+- Close-out (`a492659fb29e`): 5mz1md → **done** (38/38 boxes, clean first try, no BLOCKED-loop).
+- Planner-1 (`a6c72b5d4ddd`): L1 → closeout-append `drmgh6` retro Item 1 (fixable now); L2 → **blocked backlog card `e23yj2`** (P2 refactor, depends on renderer registry steps 5–7D — NOT in sprint).
+- **Batch 2 DONE.** Sprint 2/11 done. Pending in-sprint: cd4gxo (step 2b doc, parallel-safe).
+- Next: batch 3 → step 4 `4p6tbf` (project load over s1 API).
+
+## Batch 3: step 4 — 4p6tbf (project load over s1 API + state)

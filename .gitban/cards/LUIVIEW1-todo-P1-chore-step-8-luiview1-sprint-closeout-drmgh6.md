@@ -138,3 +138,21 @@ Process each item appended under `## Sprint Retrospective` above via the four-ty
 ### Note on validation
 
 This card follows a structured template. Keep its sections, checkboxes, and tables and fill them in rather than removing them — gitban validates card structure when the card is created and when it is completed, and a non-conforming card is held as a draft until it is corrected.
+
+### Item 1: Harden HMR e2e Chromium binary discovery (reconcile "no Playwright" framing)
+
+The `cdp.ts` `findChromeBinary()` helper defaults to a Playwright-cached Chromium path with the revision **hard-coded** (`~/.cache/ms-playwright/chromium-1223/...`), while the module header states "no Playwright/Puppeteer dependency." The runtime DevTools driver genuinely has no Playwright dependency, but the browser binary still originates from `playwright install chromium`, and pinning `chromium-1223` means a future `playwright install` browser-cache revision bump will silently break the default lookup — surfacing as an opaque "DevTools endpoint did not come up" failure on a fresh checkout until someone sets `HMR_CHROME_BIN`. Captured for closeout triage because it is non-blocking: an `HMR_CHROME_BIN` override exists today and the HMR e2e test is gated out of the always-on `pnpm test` (it needs a browser binary + live dev server), so nothing downstream in this sprint depends on it. Two candidate fixes for the closeout agent to weigh: (a) reconcile the module header wording so it accurately describes the binary's Playwright-cache origin, or (b) discover the cached Chromium revision dynamically (glob the cache dir / resolve latest) instead of pinning `chromium-1223`. Option (b) is the more durable fix.
+
+| Deferral Type | Description | Applies (true/false) |
+|---------------|-------------|----------------------|
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
+| note-only | Captured for record; no action; current output is fine as-is. | |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+
+**Source:** 5mz1md review 1
+**Files touched:** apps/studio/e2e/cdp.ts (module header comment + `findChromeBinary()`)
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 1 classified (exactly one deferral type marked `true` above)
+- [ ] Item 1 actioned (action taken matches chosen type)

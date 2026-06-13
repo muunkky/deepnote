@@ -201,3 +201,35 @@ This card follows a structured template. Keep its sections, checkboxes, and tabl
 
 ## BLOCKED
 Blocked on the LUIVIEW1 block-renderer registry (steps 5–7D: zy7tn8, k61ziu, 83gnbp, 4svfd0, mxxsr6, wye1xt). Those cards define the concrete per-type block contracts (the BlockVM discriminated-union members) that this refactor must type the fixture blocks against. Until the renderer registry's per-type contracts are stable there is no fixed discriminated-union target to conform to, so replacing the `as BlockVM` casts with precisely-typed literals cannot be done in isolation. Unblock once the registry's per-type block contracts have landed and stabilised. Source: LUIVIEW1 card 5mz1md review 1, item L2 (non-blocking).
+
+
+## Scope extension — fixture-factory consolidation (LUIVIEW1 zy7tn8 review 1, item L3)
+
+A second LUIVIEW1 reviewer finding (card zy7tn8 review 1, item L3 — `fixture-duplication`) overlaps
+this card and is **merged here** rather than tracked as a duplicate. Both concern `as BlockVM` casts in
+test fixtures, and both are gated on the same prerequisite (the block-renderer registry, steps 5–7D,
+defining concrete per-type block contracts). This card's scope is therefore **widened** from one file to
+the studio block-test fixture-factory surface as a whole:
+
+* **Original scope:** `apps/studio/src/__fixtures__/sampleProject.ts` — replace per-block
+  `{ ... } as BlockVM` casts with precisely-typed literals.
+* **Added scope (L3):** `apps/studio/src/blocks/testBlocks.ts` (`makeBlock`) duplicates the shape of the
+  shared `__fixtures__` block factory with an `as BlockVM` cast. Today only two factories exist, so DRY
+  is not yet breached and the colocation is justified — but steps 7A–7D (cards 83gnbp / 4svfd0 / mxxsr6 /
+  wye1xt) each potentially add a third/fourth colocated block factory. **Consolidate toward ONE typed
+  factory** so "a valid persisted block" cannot drift across test suites, and so the same precise
+  per-type typing (removing the `as BlockVM` cast) applies at the single consolidated factory.
+
+**Combined goal:** one typed block-fixture factory, conforming to the renderer registry's per-type
+discriminated-union contracts, with no `as BlockVM` casts — shared across `sampleProject.ts`,
+`testBlocks.ts`, and any factories introduced by the 7A–7D renderer cards.
+
+**Why still blocked:** unchanged — the consolidated factory must type against the concrete per-type
+block contracts the renderer registry defines (steps 5–7D). Until those land and stabilise there is no
+fixed discriminated-union target to consolidate and type against. Re-evaluate the consolidation timing
+after 7A–7D land, since those cards are what would introduce the third/fourth factory that makes
+consolidation worthwhile.
+
+**Files touched (combined):** `apps/studio/src/__fixtures__/sampleProject.ts`,
+`apps/studio/src/blocks/testBlocks.ts` (`makeBlock`).
+**Source:** LUIVIEW1 card 5mz1md review 1 item L2 (original) + card zy7tn8 review 1 item L3 (merged).

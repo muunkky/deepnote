@@ -88,7 +88,7 @@
 
 **Observable outcomes (unfakeable):**
 
-* [ ] **Capstone:** a fixture output bundle carrying multiple MIME types renders the **richest available** (assert the `image`/`text/html` renders, not `text/plain`); and `stream`, `display_data`, `execute_result`, and `error` each render in the DOM from fixtures (real DOM assertions per type).
+* [ ] **Capstone:** a fixture output bundle carrying multiple MIME types renders the **richest available** (assert the `image`/`text/html` renders, not `text/plain`); and `stream`, `display_data`, `execute_result`, and `error` each render in the DOM from fixtures (real DOM assertions per type). The capstone must exercise at least one **non-`stream`** output (minimum an `error` output; ideally `execute_result`/`display_data` too) end-to-end through the real `OutputRenderer`, asserting the step-5 `data-output-pending` placeholder is **fully replaced** for all output types — not just `stream`. (Closes LUIVIEW1 zy7tn8 review-1 item L1: `OutputSlot` currently renders every non-`stream` persisted output as an empty `data-output-pending` div, silently dropping content — e.g. an `error` would show blank — until this renderer lands; the capstone must prove that gap is closed for non-`stream` types, asserting the `data-output-pending` placeholder is absent once a real output renders.)
 * [ ] HTML dataframe tables, images, and ANSI error tracebacks render correctly; a malicious HTML/SVG fixture is sanitized (no script execution).
 * [ ] MIME precedence prefers the richest renderable bundle; a `text/plain`-only bundle renders text (last resort).
 * [ ] Dispatch covers exactly the four `output_type`s `renderOutput` handles (parity-of-shape test passes).

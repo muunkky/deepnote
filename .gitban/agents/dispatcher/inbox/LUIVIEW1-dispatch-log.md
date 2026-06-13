@@ -69,3 +69,15 @@ Serial spine 2→3→4→5→6, then parallel 7A‖7B‖7C, then 7D, then closeo
 - Next: batch 4 → step 5 `zy7tn8` (code/markdown/text + BlockRenderer registry).
 
 ## Batch 4: step 5 — zy7tn8 (code/markdown/text + BlockRenderer registry)
+
+- **Pre-dispatch push REJECTED** (cspell: 5 issues / 4 files) — step-4 SPA terms (`unparseable`, `subclassing`, `normalises`) slipped past the executor (cspell `useGitignore` worktree quirk reports 0 files). Fixed at gate: added 3 terms to cspell.json (`46936a5`), re-pushed green. Validates the L1 cspell follow-up's root cause.
+- **Executor-1** (`a00c6288a61d`): HEAD `0ef87a5` (+ build commit `00ef45a` adding marked/highlight.js/dompurify/@deepnote/blocks). BlockRenderer registry `Partial<Record<BlockVM['type'],FC>> & {default}` (additive seam for 7A-D), Code/Markdown/Text renderers, centralized DOMPurify `renderMarkdownToSafeHtml` seam (XSS-stripped: script/onerror/javascript:). **64 studio tests** (was 29), isolation 0 apps/ files. Executor proactively added renderer vocab to cspell.json.
+- Merge: fast-forward (2 commits). Reconciled at `9f7a8e5`. **Proactive post-merge cspell caught 1 more** (`recognised`) → fixed `1613b1e` BEFORE next push (avoided a second rejection).
+- Reviewer-1 (`a4bba9e67939`): **APPROVAL** — both gates PASS, additive seam confirmed, security seam verified, suite 64/64. 3 follow-ups.
+- Router-1 (`abaeb8109692`): **APPROVAL**.
+- Close-out (`aa3dd520eb9f`): zy7tn8 → **done** (37/37, clean).
+- Planner-1 (`aa6af6a327fb`): L1 → folded into **k61ziu** capstone (non-stream output e2e — strengthens step 6); L2 → blocked backlog `jyapgp` (needs language signal); L3 → merged into `e23yj2` (dedup).
+- **Batch 4 DONE.** Sprint 4/11 done. Pending in-sprint: cd4gxo (step 2b doc).
+- Next: batch 5 → step 6 `k61ziu` (Jupyter IOutput MIME renderer — now with strengthened non-stream capstone).
+
+## Batch 5: step 6 — k61ziu (Jupyter IOutput MIME renderer)

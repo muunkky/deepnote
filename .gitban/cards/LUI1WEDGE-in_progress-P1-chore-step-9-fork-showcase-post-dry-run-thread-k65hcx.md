@@ -41,7 +41,7 @@
 
 | Task | Status / Details | Done? |
 | :--- | :--- | :---: |
-| **Showcase draft** | comment drafted: shipped scope, both diffs linked + labeled | - [ ] |
+| **Showcase draft** | comment drafted: shipped scope, both diffs linked + labeled | - [x] |
 | **Cameron approval** | first post approved by Cameron (DO NOT auto-post) | - [ ] |
 | **Post to fork thread** | posted on `muunkky/deepnote` (record thread `#<n>`) | - [ ] |
 | **Upstream check** | confirm NOTHING pushed/posted to `deepnote/deepnote` | - [ ] |
@@ -92,3 +92,41 @@ This is a documentation/process artifact, not runtime behavior. Success is: a cl
 * [ ] Code changes (if any) are reviewed and merged.
 * [ ] Follow-up tickets are created and prioritized for next sprint.
 * [ ] Team retrospective includes discussion of cleanup backlog (if significant).
+
+
+## Executor close-out (executor-1, step 9 — DRAFT ONLY)
+
+**Drafted, NOT posted.** Showcase comment drafted to a new fork-only file:
+`docs/showcase/LUI1WEDGE-showcase-post.md` (committed on the worktree branch, doc-only —
+no `.gitban/` staged). The card remains `in_progress`.
+
+**What the draft covers** (per the directive + design-doc Phase 10 + `.claude/CLAUDE.md` "Showcase
+thread"):
+- Per-sprint reply for `muunkky/deepnote` Discussion #5 (the dry-run thread; opening post is
+  Cameron's). Tells the story, not a changelog.
+- **What shipped (m3/s1 wedge):** `@deepnote/runtime-server` (kernel-free `GET /api/project`, run over
+  WS via single-concurrency run queue with guaranteed terminal event, atomic save w/ external-change
+  detection) + `deepnote serve`/`ui` + SQL/integration env parity (KD-3 lift) + the real-kernel parity
+  suite; the "zero runtime-core behavior change" invariant.
+- **De-risking / adversarial gates** (verified against real commits): the kernel auto-restart-masks-
+  mid-run-death bug fixed in `packages/runtime-core/src/kernel-client.ts` (commit `ad9738e`,
+  strengthens BOTH server and CLI parity); the loopback security test that was a false positive
+  (asserted client-side address; reworked to server-side bind — commits `4866ab5`/`8ab721c`); the serve
+  packaging/typecheck gap and the flaky teardown unhandled-rejection (`1c97429`/`bbfd6da`); multiple
+  reviewer rejection→rework→green cycles.
+- **Two diffs, labeled:** `contrib/m3-serve` (pushed to origin) = upstream-ready code-only slice
+  guarded by the import-form slice-integrity gate; `sprint-record/LUI1WEDGE` = fork-only process diff,
+  linked as a placeholder ("to be cut at closeout — branch does not exist yet").
+- The diff-size / monolith→slice story.
+- DRAFT banners top and bottom; explicit "nothing to `deepnote/deepnote`".
+
+**Gates run:** `prettier --check` PASS (reflow-stable); `cspell` PASS exit 0 (proper nouns
+`autorestart`/`autorestarting`/`muunkky`/`deepnote` already in `docs-dictionary.txt` — no dictionary
+edit needed). No code tests apply (doc artifact).
+
+**Checkbox state:** only "Showcase draft" ticked. "Cameron approval", "Post to fork thread", and
+"Upstream check" left UNCHECKED — those are Cameron's gated actions. `complete_card` NOT called; card
+stays `in_progress` pending Cameron's approval + post.
+
+**Did NOT** run `gh`, post to any GitHub Discussion/Issue, push any branch, or contact
+`deepnote/deepnote` in any way.

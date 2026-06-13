@@ -44,6 +44,26 @@ integrations wiring exactly as `deepnote run` composes them.
   same integrations-file (`.deepnote.env.yaml`) and built-in integrations, so a
   served project runs SQL and integration blocks identically to `run`.
 
+#### `@deepnote/studio` — read-only notebook viewer SPA
+
+The m3/s2 read-only viewer: a React 19 + Vite 7 single-page app that opens a
+project over the s1 `GET /api/project` endpoint and renders its persisted state in
+a Cloud-like view. No execution, no editing — the browser counterpart to the
+terminal output renderer.
+
+- Renders every block type read-only: code, sql, markdown, text, visualization,
+  big-number, image, the input-\* kinds, button, and separator — driven by a
+  `BlockRenderer` registry.
+- Renders Jupyter `IOutput` (stream / display_data / execute_result / error) via a
+  rich-first MIME registry that prefers the richest representation and sanitizes
+  HTML output before rendering.
+- A safe fallback for unknown / unsupported block types (raw content + a type
+  label) so an unrecognized block never crashes the notebook view.
+- Isolated by construction: the app introduces the monorepo's first UI framework +
+  browser bundler without taking any `packages/*` frontend dependency, so the
+  cleanly-sliceable backend package and the repo-wide backend boundary gate stay
+  green.
+
 ### Changed
 
 - `@deepnote/cli`: registered the `serve` and `ui` commands and added a

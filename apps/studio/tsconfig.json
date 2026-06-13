@@ -1,0 +1,19 @@
+{
+  "//": "apps/studio's OWN tsconfig. The root tsconfig.json deliberately never references this (no `references`, and its `include` names no apps/ path), so the backend's `tsc -p tsconfig.json` never sees this app's JSX (ADR-006 isolation invariant, ADR-007 §3).",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noImplicitAny": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["vitest/globals"]
+  },
+  "include": ["src", "vite.config.ts", "vitest.config.ts"]
+}

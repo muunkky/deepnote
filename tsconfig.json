@@ -24,5 +24,7 @@
     "target": "ES2022",
     "types": ["vitest"]
   },
+  "//include": "Scoped to the backend surface ONLY — names no apps/ path. This is the load-bearing isolation fix (ADR-006 / ADR-007 §3): without it, `tsc -p tsconfig.json` globs the whole repo and would red the backend typecheck on apps/studio's JSX. apps/studio is typechecked by its own apps/studio/tsconfig.json, which the root never references.",
+  "include": ["packages/*/src", "test-helpers", "test-fixtures", "*.config.ts"],
   "exclude": ["node_modules", "dist", "**/*.capstone.ts"]
 }

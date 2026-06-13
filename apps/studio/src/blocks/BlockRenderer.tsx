@@ -1,9 +1,12 @@
 import type { FC } from 'react'
 import type { BlockVM } from '../shell/viewModels'
+import { BigNumberRenderer } from './BigNumberRenderer'
 import { CodeRenderer } from './CodeRenderer'
+import { ImageRenderer } from './ImageRenderer'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { SqlRenderer } from './SqlRenderer'
 import { TextRenderer } from './TextRenderer'
+import { VisualizationRenderer } from './VisualizationRenderer'
 
 export interface BlockRendererProps {
   block: BlockVM
@@ -44,6 +47,9 @@ export const BLOCK_RENDERERS: Partial<Record<BlockVM['type'], BlockRendererCompo
   'text-cell-bullet': TextRenderer,
   'text-cell-todo': TextRenderer,
   'text-cell-callout': TextRenderer,
+  visualization: VisualizationRenderer,
+  'big-number': BigNumberRenderer,
+  image: ImageRenderer,
   default: UnknownBlockRenderer,
 }
 

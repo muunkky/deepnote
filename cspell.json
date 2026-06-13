@@ -36,6 +36,7 @@
     "Normalise",
     "asname",
     "awsathena",
+    "backgrounding",
     "bash_kernel",
     "bijective",
     "Braund",
@@ -70,7 +71,9 @@
     "github",
     "graphviz",
     "groupby",
+    "hashchange",
     "hotreload",
+    "initialised",
     "IJulia",
     "Instantiator",
     "iopub",
@@ -133,6 +136,7 @@
     "résumé",
     "roundtripped",
     "rseidelsohn",
+    "serialisable",
     "Shiki",
     "shikijs",
     "shopt",
@@ -161,6 +165,7 @@
     "vscode",
     "windsurf",
     "workflows",
+    "worktree",
     "xeus"
   ]
 }

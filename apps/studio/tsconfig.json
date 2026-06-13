@@ -1,5 +1,6 @@
 {
   "//": "apps/studio's OWN tsconfig. The root tsconfig.json deliberately never references this (no `references`, and its `include` names no apps/ path), so the backend's `tsc -p tsconfig.json` never sees this app's JSX (ADR-006 isolation invariant, ADR-007 §3).",
+  "//paths": "The canonical s1<->SPA contract is the `@deepnote/runtime-server/types` subpath (ADR-007 §6). The SPA consumes it TYPE-ONLY (`import type`) and derives every view-model from it, never re-declaring a project shape — so a contract change is a compile error, not silent drift. The `paths` aliases below resolve that type (and its transitive `@deepnote/*` type deps) from package SOURCE, so the studio typecheck + DOM-env vitest suite work in a worktree without first building the backend's dist. They are TYPE-only edges: the isolation test still forbids importing the bare `@deepnote/runtime-server` runtime entry or any `node:` builtin.",
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
@@ -13,7 +14,12 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@deepnote/runtime-server/types": ["../../packages/runtime-server/src/api-types.ts"],
+      "@deepnote/*": ["../../packages/*/src/index.ts"]
+    },
     "types": ["vitest/globals"]
   },
-  "include": ["src", "vite.config.ts", "vitest.config.ts"]
+  "include": ["src", "e2e", "vite.config.ts", "vitest.config.ts", "vitest.hmr.config.ts"]
 }

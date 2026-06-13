@@ -315,6 +315,8 @@ Webflow
 # Alternative-language kernels (PRD-002 / ALTKERN1) + planning-doc terms
 ALTKERN
 autodetection
+autorestart
+autorestarting
 catchable
 codegen
 direnv
@@ -329,6 +331,7 @@ ijsinstall
 installspec
 invokable
 ipykernel
+jupyterlab
 kernelspecs
 Kernelspecs
 launchable

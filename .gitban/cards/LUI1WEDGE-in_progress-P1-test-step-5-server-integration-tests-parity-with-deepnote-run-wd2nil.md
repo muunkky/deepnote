@@ -104,7 +104,7 @@ boot server over fixture → GET /api/project → open WS → POST /api/project/
 
 ### Quality Gates
 - [x] All tests pass locally
-- [x] All tests pass in CI
+- [ ] All tests pass in CI
 - [x] No flaky tests introduced
 - [x] Test execution time acceptable
 - [x] Code coverage meets target [if applicable]
@@ -188,3 +188,58 @@ reviewer-1 B1 (Gate 1 integrity): the Capstone, "All tests pass in CI", "All tes
 **Routing:**
 - **Executor** (`.gitban/agents/executor/inbox/LUI1WEDGE-wd2nil-executor-1.md`, ROUTER DIRECTIVE section): B1 — the Capstone, "All tests pass in CI", "All tests pass locally", and the coverage boxes are checked, but the real-kernel test path has never executed (no venv locally → self-skips; no `integration-kernels` run for commit `24e5386`). Test code is correct and all API assumptions verified — do NOT change the test. Either substantiate the boxes with a real green `integration-kernels` run (Path A) or uncheck the capstone/CI/coverage boxes and mark the card merge-blocked-on-CI (Path B), then re-run the reviewer.
 - **Planner** (`.gitban/agents/planner/inbox/LUI1WEDGE-wd2nil-planner-1.md`): 3 non-blocking follow-ups grouped into 2 sprint cards — Card 1: parity-suite hardening (L1 union-of-keys fix + L2 coverage-claim wording) on `server-run-parity.integration.test.ts`/fixture; Card 2: `integration-kernels` CI wall-clock budget watch (L3).
+
+
+## Close-out — executor-2 (retry 1, REJECTION rework: REAL failures fixed)
+
+**Branch:** `worktree-agent-a65b8b2aab463c3df` → merges to `milestone/m3-local-ui`. **Tag:** `LUI1WEDGE-wd2nil-done` @ `bbfd6da`.
+
+### Verification environment
+Built the workspace into the worktree (`pnpm install --frozen-lockfile` + `pnpm -r build` — runtime-core, blocks, runtime-server, cli, all required for the integration gate `existsSync(packages/cli/dist/bin.js)` and the CLI subprocess's externalised `@deepnote/*` dist imports). Ran the real-kernel suite against the parent venv `/home/cameron/projects/deepnote/.venv` (deepnote-toolkit[server]==2.3.1) with `RUN_INTEGRATION_TESTS=true DEEPNOTE_INTEGRATION_VENV=… VITEST_TEST_TIMEOUT=120000`.
+
+### The real failures — diagnosed and FIXED (not checkbox edits)
+
+**Scenario 4 was a deeper bug than the ERROR-file assumed — fixed at TWO layers:**
+
+The ERROR-file diagnosis assumed the engine already hands a typed `KernelDiedError` to `onBlockDone` (so only `run-queue.ts` needed the terminal-elevation). The real venv proved otherwise. I instrumented the live WS event stream over `server-kernel-death.deepnote`: the dead-kernel block's `block-done` reported **`failureCategory: "in-block"`**, not `kernel-died`, and the terminal was `run-done`. Root cause found by tracing the real toolkit:
+
+1. **`packages/runtime-core/src/kernel-client.ts` (the deeper, primary bug).** A hard crash (`os._exit(1)`) does NOT leave the kernel in status `'dead'` — the Jupyter server **auto-restarts** it, so status goes `busy → autorestarting → … → idle` and `'dead'` is never observed mid-run. The mid-run death detector only checked `status === 'dead'`, so it missed the crash entirely; the in-flight future rejected with a plain `Error('Canceled future for execute_request message before replies were done')` → surfaced as `in-block`. **Verified the CLI has the SAME bug** (`deepnote run` on the death fixture also reported `failureCategory: in-block`, error "Canceled future…"). Fix: treat `'restarting'`/`'autorestarting'` during an active execute as a kernel death (typed `KernelDiedError`), on both the status-signal and future-reject paths. This fixes the CLI and the server **identically** — it *strengthens* the parity capstone rather than breaking it. (`@jupyterlab/services` `Status` union confirms `'autorestarting'`/`'restarting'` are real states.)
+
+2. **`packages/runtime-server/src/run-queue.ts` (the ERROR-file patch — still needed).** With (1) in place the engine now resolves `runProject` with a `KernelDiedError` in the block result (it catches/breaks/resolves — it does NOT re-throw mid-run; only launch-time death rejects). The queue emitted `run-failed{kernel-died}` only on the *reject* path, so the resolve path still produced `run-done`. Fix: latch the typed `KernelDiedError` seen in `onBlockDone` and elevate the resolve-path terminal to `run-failed{kernel-died}` in `#runTask`, mirroring the CLI (`run.ts:1196-1200`). Engine and CLI untouched (preserves parity). Documented the resolve-vs-reject semantics in the module docstrings.
+
+3. **`packages/runtime-core/src/kernel-client.ts` `disconnect()` (teardown robustness, surfaced by the fix).** Once Scenario 4 actually kills a real kernel, disposing its dead connection makes `@jupyterlab/services` reject an internal reconnect `PromiseDelegate` with `Error('Kernel connection disconnected')` — an unhandled rejection vitest flags as a potential false-positive (all 4 assertions still passed, but it left an "Errors 1" line). Sink the kernel `info` promise's disconnect-rejection and guard the dispose calls. Benign teardown rejection no longer leaks; real errors are not swallowed.
+
+**TDD:** added unit tests first (red→green):
+- `run-queue.test.ts`: resolve-after-`onBlockDone(KernelDiedError)` → terminal `run-failed{kernel-died}`, no `run-done` (mirrors the real engine; distinct from the existing reject-path and block-done-only tests). 14/14 pass.
+- `kernel-client.test.ts`: parameterised `autorestarting`/`restarting` status-signal death + cancelled-future-while-autorestarting death. 36/36 pass.
+
+### Real-kernel evidence (parent venv, this commit `bbfd6da`)
+
+Each scenario green in isolation AND all four green together in one run with **no unhandled errors**:
+```
+server ↔ `deepnote run` parity (real kernel)
+  ✓ Scenario 1 (Critical): streamed IOutputs deep-equal `deepnote run --output json` …
+  ✓ Scenario 2 (Critical): missing kernel → `missing-kernel` end-to-end, terminal …
+  ✓ Scenario 3 (High): serve boots, GET /api/project, bound to 127.0.0.1 …
+  ✓ Scenario 4 (High): mid-run kernel death is terminal `run-failed { kernel-died }` …
+ Test Files  1 passed (1)   Tests  4 passed (4)   (no "Errors" line)
+```
+
+### Planner follow-ups
+- **L1 (Scenario 1 fixture fragility — `execution_count`/c6 divergence).** Did **not** reproduce: with all `@deepnote/*` dist built so the CLI subprocess resolves, Scenario 1's deep-equal capstone is **green as-is** — both paths run the same blocks on a fresh kernel and `execution_count` matches. I did **not** weaken the assertion (a union-of-keys normalise would mask a real future divergence for no current benefit). The earlier divergence the planner observed was the CLI subprocess failing to start (`ERR_MODULE_NOT_FOUND @deepnote/blocks`), not an output mismatch — fixed by building the workspace, the documented prerequisite. Capstone is a true byte-for-byte deep-equal.
+- **L2 (coverage-claim wording).** Reworded the README parity section + the test comment to name the output-bearing `IOutput` shapes the kernel-only fixture covers (stream stdout/stderr, execute_result, display_data, multi-write) and to state SQL/integration/input blocks are out of scope (design-doc `sql-integration-parity` owns them) — instead of implying every product block type.
+- **L3 (CI wall-clock budget).** Tracked separately by the planner (Card 2); not in scope here.
+
+### Dispatcher item 3 — pre-existing `non-python-kernel.integration.test.ts` "missing-kernel legibility"
+**Characterised: environmental, NOT a regression.** It **passes in isolation** against the same venv on this commit (`1 passed`). My changes touch only the kernel-*death* detection path, not the missing-*kernel* (launch) path. The dispatcher's observed failure was the constrained-box concurrency thrash (6.3 GiB, no swap) the directive itself warns produces flaky failures when scenarios run together. Not folded into this card; no follow-up needed.
+
+### Honest checkbox state
+- **Capstone / "All tests pass locally" / coverage / missing-kernel / serve / "only under test:integration"** — ticked, TRUE with the real-venv evidence above (all 4 green in isolation and together).
+- **"All tests pass in CI" — left UNCHECKED (honest).** No `integration-kernels` job has run for these commits (`095da96`…`bbfd6da`); per the directive I do not tick a CI pass that hasn't happened. The suite is correctly wired to and gated for that job; CI green is the reviewer/dispatcher's confirmation step.
+
+### Quality gates
+- Mocked `pnpm test` scope (runtime-core + runtime-server): **343 passed (18 files)**; integration suite correctly EXCLUDED from the default config (0 `*.integration.test.ts` files collected) and collected (4) only by `vitest.integration.config.ts`.
+- `tsc --noEmit`: runtime-core, runtime-server, cli all clean. biome clean on all changed files. prettier clean (README). cspell clean (added `autorestart`, `autorestarting`, `jupyterlab` to `docs-dictionary.txt`).
+- M2 invariant (`run-queue` is the sole `.runProject` caller) and the engine's 92 tests still pass (engine untouched).
+
+Leaving the card in `in_progress` for the reviewer. The "All tests pass in CI" box is intentionally unchecked pending the `integration-kernels` run.

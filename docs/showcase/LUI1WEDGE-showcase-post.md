@@ -1,97 +1,42 @@
-> ✅ **POSTED** to `muunkky/deepnote` Discussion #5 (fork dry-run showcase thread) on 2026-06-13:
+> ✅ **POSTED** (and revised) to `muunkky/deepnote` Discussion #5 (fork dry-run showcase thread):
 > https://github.com/muunkky/deepnote/discussions/5#discussioncomment-17287165
-> Fork-only — nothing was pushed or sent to `deepnote/deepnote`. Fork posts are pre-authorized by Cameron;
-> only upstream (`deepnote/deepnote`) posts require his explicit approval. The `sprint-record/LUI1WEDGE`
-> link in the posted copy was finalized to "cut at closeout" (the placeholder note was resolved).
+> Fork-only — nothing pushed or sent to `deepnote/deepnote`. Fork posts are pre-authorized; only upstream
+> posts require explicit approval. Rewritten per Cameron's direction: reporter voice, centered on what was
+> built and why, the architectural decisions and how they were implemented, addressed to the maintaining
+> engineering team. This file mirrors the posted copy.
 
 ---
 
-## Milestone update — m3/s1: a headless runtime server + one-command launch (the upstream "wedge")
+## m3/s1 — a headless runtime server and a one-command local launch
 
-This is the first sprint reply on the thread, so a sentence of framing: the experiment is to run the
-whole product-development lifecycle (roadmap → PRD → ADRs → design doc → sprint board → code → review)
-_in lockstep on this fork_, then slice a clean, code-only diff out of the monolith that maps 1:1 to what
-an upstream PR would look like. This reply is the story of the first such slice.
+This sprint landed the first slice of running a Deepnote project locally: a standalone runtime server plus `deepnote serve` / `deepnote ui`. The brief was deliberately narrow — make a `.deepnote` project openable, runnable, and saveable over a local HTTP/WebSocket surface — and the governing constraint was that it had to land as a clean _addition_ to the codebase, not a change to it. Here's what was built, the decisions behind it, and how they came out in the implementation.
 
-### What shipped (the m3/s1 wedge)
+### The shape: a new package behind a one-way arrow
 
-A small, self-contained slice that lets you run a Deepnote project locally with one command — no cloud,
-no kernel-in-the-loop just to open a notebook:
+The server is a new `@deepnote/runtime-server` package, not new surface inside `cli` or `runtime-core`. The dependency arrow is one-way and enforced — `cli → runtime-server`, never the reverse, and `runtime-server` never imports `cli` (ADR-007). Concretely, the only edits to existing files are the new CLI command registration and one dependency line; there is **zero behavior change in `runtime-core`**. Everything the server does, it does by reusing existing runtime-core primitives. That invariant is what makes the slice safe to take: it's additive, and the blast radius on existing `deepnote run` behavior is by construction nil. An always-on test enforces the no-`cli`-import boundary through the TypeScript AST so it can't silently regress.
 
-- **`@deepnote/runtime-server`** — a new package, not a change to anything that exists:
-  - `GET /api/project` opens and lists a project **kernel-free** — you don't pay for a Python kernel
-    just to read the notebook.
-  - **Run over WebSocket**, serialized through a single-concurrency **run queue**. Every run is
-    guaranteed exactly one terminal event (`run-done` on normal completion _including_ an in-block
-    failure, `run-failed` reserved for kernel death) so the UI can never get stuck on a "pending forever"
-    run.
-  - **Atomic save with external-change detection** — SHA-256 of the on-disk bytes at open vs. save, a
-    `409`-no-write on mismatch, temp-then-rename so a concurrent editor write can't be silently clobbered.
-- **`deepnote serve` / `deepnote ui`** — the one-command launch. `serve` is the canonical headless
-  command; `ui` is the alias that defaults to opening a browser.
-- **SQL / integration env parity with `deepnote run`** — the integration-env helpers were lifted to a
-  shared home (the "KD-3 lift") so the server and the existing CLI run path resolve database/integration
-  environment identically, instead of forking behavior.
-- **A real-kernel integration parity suite** — not mocks. It runs an actual kernel and asserts the
-  server produces the same outputs as `deepnote run`.
+### Opening a project without starting a kernel
 
-Crucially, **zero `runtime-core` behavior change** in this slice: no existing file or command changes
-behavior. The server _reuses_ runtime-core primitives; the only edit to an existing file is the CLI
-command registration plus a dependency line. That "no runtime-core change" invariant is what makes the
-wedge safe to offer upstream.
+`GET /api/project` deserializes a `.deepnote` file and returns the full notebook/block tree with its persisted outputs **without starting a Python kernel** (KD-6). The reasoning: you shouldn't pay for a kernel just to read a notebook — a viewer needs to paint the project immediately, and only execution needs a runtime. In implementation that meant splitting the session lifecycle into `loadProject()` (pure deserialization + capability resolution, no kernel) and a lazy `startEngine()` (first run only). Capabilities (`kernelLanguage`, `reactivity`) are resolved from the existing interpreter/kernel-selection logic; a missing or mis-installed kernel surfaces as a capability flag, not an open failure. The open path is verified by deep-equaling its payload against `deserializeDeepnoteFile` on the same bytes, so the served tree is provably identical to the file.
 
-### The de-risking — what the adversarial gates actually caught
+### One kernel, many callers: serialize at the server
 
-This is the part I find most interesting, and I want to be honest rather than triumphant: the value
-wasn't that the plan was perfect, it's that the gates caught real things before they shipped.
+A local UI can fire runs concurrently, but there is exactly one kernel behind it. ADR-005 is explicit that a single shared kernel must be serialized, so rather than expose that hazard the server fronts execution with a single-concurrency FIFO **run queue**. Runs stream over `WS /api/stream`, every event tagged with a `runId`, and the queue is the _only_ caller of `engine.runProject` — enforced structurally so no code path can issue an un-serialized run. Two guarantees fell out of that design and are tested directly: every run emits exactly one terminal event (so a client can never hang on a "pending forever" run, including when a block raises), and cross-block back-pressure is handled by gating on the socket draining rather than buffering without bound.
 
-- **A genuine kernel bug that mocks — and even upstream `deepnote run` — missed.** The real-kernel
-  parity card surfaced it: a hard crash (`os._exit(1)`) makes the Jupyter server **auto-restart** the
-  kernel instead of leaving it `dead`. The status goes `busy → autorestarting → … → idle`; `dead` is
-  never observed mid-run. The in-flight execute future is abandoned and surfaced as a _plain in-block
-  error_ — so a real kernel death was being mis-reported as an ordinary block error by **both** the new
-  server **and** the existing `deepnote run`. Fixed in `packages/runtime-core/src/kernel-client.ts` by
-  treating `restarting`/`autorestarting` during an active execute as a kernel death, on both the
-  status-signal and future-reject paths. Because the fix is in the shared client, it strengthens run
-  parity for the server **and** the CLI at once.
-- **A security test that was a false positive.** A reviewer rejected a loopback-bind test that asserted
-  the _client-side_ address — it would have passed even if the server had bound `0.0.0.0`. Reworked to
-  assert the bind via the **server-side** address so it actually proves the loopback guarantee.
-- **A packaging / typecheck gap** in the serve path and a **flaky teardown unhandled-rejection** (a dead
-  kernel's benign disconnect rejection wasn't being swallowed deterministically) — both caught in review
-  and fixed.
+### Save that can't silently lose work
 
-Several cards were reviewer-**rejected and reworked to green** rather than waved through. That's the
-process working as intended: the adversarial review gate is there to be failed.
+`POST /api/project/save` writes atomically — temp file then rename, in the same directory — and refuses to clobber: it SHA-256s the on-disk bytes at open and re-checks at save, returning `409` with the current on-disk content if they diverged (KD-7). Fidelity is defined as _semantic_, not byte-level, because the serializer re-canonicalizes — so the bar the tests hold is that `deserialize(serialize(project))` deep-equals the project and that a re-save is idempotent. The result is a hard guarantee that a save never corrupts or silently overwrites a user's file.
 
-### The two diffs
+### Integration parity without duplicating logic or inverting the arrow
 
-Per the two-diff model — develop the monolith here, ship a clean slice:
+A SQL/integration block has to resolve the same credentials and environment that `deepnote run` resolves, or the two execution paths quietly diverge. Those integration-env helpers were `cli`-private, and the server couldn't reach them without inverting the ADR-007 arrow — so they were _lifted_ into a shared home in `runtime-core` (KD-3), with `cli` re-exporting them. It's a pure relocation: `run`'s behavior is unchanged, and both paths now resolve integration env through one implementation rather than two. Local-first is preserved — no outbound request fires unless a token is explicitly supplied.
 
-- **`contrib/m3-serve`** — pushed to `origin`. The clean, **`upstream-ready`** code-only slice:
-  `packages/` only, no SPA / no board / no docs. It **builds, typechecks, and tests standalone** off
-  `upstream/main`, and is guarded by an import-form **slice-integrity gate** so nothing from the monolith
-  can leak in. This is the exact diff we'd open against `deepnote/deepnote` once invited.
-- **`sprint-record/LUI1WEDGE`** — the full **`fork-only showcase`** process diff: board, the
-  PRD/ADR/design docs, and the code — showing _how_ the change was reasoned and de-risked. _(To be cut at
-  closeout — this branch does not exist yet; the link is a placeholder until the dispatcher cuts it.)_
+### Verified against a real kernel — and what that turned up
 
-### The diff-size story
+The parity claim — "the server runs your project the way `deepnote run` does" — is checked against an actual kernel, not mocks: an integration suite boots the server over a fixture, runs it, and deep-equals the streamed outputs against `deepnote run --output json` on the same file.
 
-Developing in lockstep with gitban naturally produces a sprint "monolith" far larger than any project
-would accept in one PR — board mutations, planning docs, spikes, and code all co-evolving. The point of
-the two-diff model is that none of that has to reach a maintainer: the **clean contrib slice is just the
-package code**, sliced out and verified to stand on its own off `upstream/main`. The process diff stays
-on the fork as context for anyone who wants to see the reasoning behind the clean one.
+That suite surfaced a real bug, and a notable one: it lives in _existing_ shared code, not the new package. A hard kernel crash mid-run makes the Jupyter server **auto-restart** the kernel — the status goes `busy → autorestarting → idle` and never reports `dead` — so the abandoned execution was being surfaced as an ordinary in-block error by both the new server _and_ `deepnote run`. The fix, treating `restarting`/`autorestarting` during an active execute as a kernel death, went into the shared `kernel-client`, so it corrects the run-failure semantics for the existing CLI at the same time it does for the server.
 
-### Where this sits
+### How it's packaged for review
 
-This is the _wedge_ — the smallest honest slice of "local Deepnote UI" that's useful on its own and safe
-to offer upstream. Deliberately **out** of this slice (and named as m3/s5 follow-ups, not gaps):
-running-cancel of an in-flight run (needs net-new published `runtime-core` interrupt methods), run-all
-coalescing, and reactive `with-upstream` run scope. Queued-cancel ships now; the rest land with the
-reactivity story.
-
----
-
-> ✅ **End of post.** Posted to `muunkky/deepnote` Discussion #5 (fork only). Nothing to `deepnote/deepnote`.
+The whole slice is `packages/` only — a new server library plus a thin CLI command — with no SPA, board, or planning artifacts in the diff. It builds, typechecks, and tests standalone off `main`, and an import-form integrity check keeps any frontend or `apps/` reference out of the boundary. It is structured to read as exactly the PR we would open: a self-contained, additive capability that respects the existing architecture — and, on the way in, strengthens an existing code path.

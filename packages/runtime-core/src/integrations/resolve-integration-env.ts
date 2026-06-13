@@ -1,8 +1,8 @@
 import type { DeepnoteFile } from '@deepnote/blocks'
 import type { DatabaseIntegrationConfig } from '@deepnote/database-integrations'
 import { collectRequiredIntegrationIds } from './collect-integrations'
-import { getDefaultIntegrationsFilePath, parseIntegrationsFile } from './parse-integrations'
 import { type DebugLogger, injectIntegrationEnvVars } from './inject-integration-env-vars'
+import { getDefaultIntegrationsFilePath, parseIntegrationsFile } from './parse-integrations'
 import type { ValidationIssue } from './validation-issue'
 
 /**
@@ -66,9 +66,7 @@ export interface ResolveIntegrationEnvResult {
  * integrations and nothing leaves the machine. The cli's fetcher is itself token-gated, so
  * the opt-in API fetch is off by default everywhere.
  */
-export async function resolveIntegrationEnv(
-  params: ResolveIntegrationEnvParams
-): Promise<ResolveIntegrationEnvResult> {
+export async function resolveIntegrationEnv(params: ResolveIntegrationEnvParams): Promise<ResolveIntegrationEnvResult> {
   const { file, workingDirectory, notebookName, fetcher, debug } = params
 
   const integrationsFilePath = getDefaultIntegrationsFilePath(workingDirectory)

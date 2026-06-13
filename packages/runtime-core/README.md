@@ -74,3 +74,17 @@ Execution methods return `ExecutionSummary`:
 - `executedBlocks`
 - `failedBlocks`
 - `totalDurationMs`
+
+## Integration env wiring (shared by `deepnote run` and the server)
+
+The integration-environment helpers — `parseIntegrationsFile`, `getDefaultIntegrationsFilePath`,
+`collectRequiredIntegrationIds`, `injectIntegrationEnvVars`, and the `resolveIntegrationEnv` wiring that
+composes them — live here so both `@deepnote/cli` (`deepnote run`) and `@deepnote/runtime-server`
+(`deepnote serve`) consume **one** implementation. They were lifted out of `@deepnote/cli` (KD-3) to keep
+the dependency arrow one-way: the server must reach `run`'s integration parity **without** importing the
+cli (ADR-007 §1/§4).
+
+`resolveIntegrationEnv({ file, workingDirectory })` runs the `parse → collect → inject` sequence and is
+**local-first**: it performs **no network I/O**. An API-backed fetch happens only if the caller passes a
+`fetcher` (the cli's is itself token-gated); with no fetcher the resolved set is exactly the project's
+local `.deepnote.env.yaml` — nothing leaves the machine.

@@ -1,4 +1,7 @@
-import { type DatabaseIntegrationConfig, injectIntegrationEnvVars as injectIntegrationEnvVarsCore } from '@deepnote/runtime-core'
+import {
+  type DatabaseIntegrationConfig,
+  injectIntegrationEnvVars as injectIntegrationEnvVarsCore,
+} from '@deepnote/runtime-core'
 import { debug } from '../output'
 
 /**

@@ -12,8 +12,8 @@ export {
   extractEnvVarName,
   generateEnvVarName,
   isEnvVarRef,
-  parseEnvVarRef,
   type ParsedEnvVarRef,
+  parseEnvVarRef,
   resolveEnvVarRefs,
   resolveEnvVarRefsFromMap,
 } from '@deepnote/runtime-core'

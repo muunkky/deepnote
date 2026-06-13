@@ -7,6 +7,7 @@
  * `deepnote run`'s integration parity **without** importing `@deepnote/cli` (which would
  * invert the ADR-007 §1/§4 one-way arrow). Pure relocation: no behavior change.
  */
+export type { DatabaseIntegrationConfig } from '@deepnote/database-integrations'
 export { collectRequiredIntegrationIds } from './collect-integrations'
 export { BUILTIN_INTEGRATIONS, DEFAULT_INTEGRATIONS_FILE } from './constants'
 export {
@@ -16,8 +17,8 @@ export {
   extractEnvVarName,
   generateEnvVarName,
   isEnvVarRef,
-  parseEnvVarRef,
   type ParsedEnvVarRef,
+  parseEnvVarRef,
   resolveEnvVarRefs,
   resolveEnvVarRefsFromMap,
 } from './env-var-refs'
@@ -39,8 +40,8 @@ export {
 } from './parse-integrations'
 export {
   type IntegrationFetcher,
-  resolveIntegrationEnv,
   type ResolveIntegrationEnvParams,
   type ResolveIntegrationEnvResult,
+  resolveIntegrationEnv,
 } from './resolve-integration-env'
 export type { ValidationIssue } from './validation-issue'

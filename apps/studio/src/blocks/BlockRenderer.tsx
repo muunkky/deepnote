@@ -2,6 +2,7 @@ import type { FC } from 'react'
 import type { BlockVM } from '../shell/viewModels'
 import { CodeRenderer } from './CodeRenderer'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { SqlRenderer } from './SqlRenderer'
 import { TextRenderer } from './TextRenderer'
 
 export interface BlockRendererProps {
@@ -35,6 +36,7 @@ export const BLOCK_RENDERERS: Partial<Record<BlockVM['type'], BlockRendererCompo
 } = {
   code: CodeRenderer,
   markdown: MarkdownRenderer,
+  sql: SqlRenderer,
   'text-cell-p': TextRenderer,
   'text-cell-h1': TextRenderer,
   'text-cell-h2': TextRenderer,

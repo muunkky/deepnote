@@ -490,6 +490,7 @@ orphaned process.
 | Option             | Description                                                          | Default           |
 | ------------------ | -------------------------------------------------------------------- | ----------------- |
 | `--port <port>`    | Port to start probing from (falls back to the next free port)        | `8080`            |
+| `--open`           | Open a browser at the served URL                                     | off (headless)    |
 | `--no-open`        | Do not open a browser at the served URL                              | `true` (headless) |
 | `--python <path>`  | Path to Python interpreter or virtual environment                    | auto-detected     |
 | `--kernel <name>`  | Jupyter kernel to run the notebook against                           | `python3`         |
@@ -513,6 +514,47 @@ deepnote serve my-project.deepnote --open
 # Start probing from a specific port (falls back if taken)
 deepnote serve my-project.deepnote --port 3000
 ```
+
+### `ui [path]`
+
+Open a `.deepnote` project in your browser. `ui` is a **thin alias of `serve`** that flips one
+default: it opens a browser at the served `http://localhost` URL automatically, whereas `serve` stays
+headless. It boots the same local server, binds the same loopback interface, and shares the same
+flags — only the browser-open default differs.
+
+```bash
+deepnote ui my-project.deepnote
+```
+
+> **Local-first (never uploads).** `ui` opens the **local** served URL only (`http://localhost:PORT`).
+> It never uploads your project to Deepnote Cloud — that is `deepnote open`'s job, not `ui`'s. The
+> browser-open targets loopback exactly like `serve --open`.
+
+Pass `--no-open` to boot the server but stay headless (identical to `deepnote serve`):
+
+```bash
+deepnote ui my-project.deepnote --no-open
+```
+
+**Options:** identical to [`serve`](#serve-path) — `--port`, `--open`/`--no-open`, `--python`,
+`--kernel`, `--static-dir`. The only difference is the default: `ui` defaults to `--open`, `serve`
+defaults to headless.
+
+**Examples:**
+
+```bash
+# Open the first .deepnote file in the current directory in your browser
+deepnote ui
+
+# Open a specific file
+deepnote ui my-project.deepnote
+
+# Boot the server but stay headless (no browser)
+deepnote ui my-project.deepnote --no-open
+```
+
+> **Naming note.** The final `serve`/`ui` naming is an open product question (PRD-003, P6); both
+> commands ship today and share one implementation.
 
 ### `validate <path>`
 

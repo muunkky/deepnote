@@ -1,4 +1,6 @@
-import { resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { CreateServerOptions, RuntimeServer, ServerSession } from '@deepnote/runtime-server'
 import { Command } from 'commander'
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
@@ -273,5 +275,143 @@ describe('serve command (mocked, suite 6)', () => {
 
     expect(exitSpy).toHaveBeenCalledWith(2)
     expect(consoleErrorSpy).toHaveBeenCalled()
+  })
+
+  // ── serve default posture ──────────────────────────────────────────────────────────────────────
+  // In real commander, serve registers BOTH --open and --no-open, so `options.open` is `undefined`
+  // when the user passes neither. The action must resolve that to serve's HEADLESS default — not
+  // open a browser. (A lone --no-open would make commander default open=true, the bug this guards.)
+  it('serve defaults to headless: open=undefined does NOT launch a browser', async () => {
+    const harness = makeHarness({ findPortResult: 8080, listenResult: 8080 })
+    const action = createServeAction(program, harness.deps, { defaultOpen: false })
+
+    // No --open / --no-open flag → commander leaves `open` undefined.
+    await runAction(action, HELLO_WORLD_FILE, {}, harness)
+
+    expect(harness.openBrowser).not.toHaveBeenCalled()
+  })
+
+  it('serve --open overrides the headless default and opens the local URL', async () => {
+    const harness = makeHarness({ findPortResult: 8080, listenResult: 8080 })
+    const action = createServeAction(program, harness.deps, { defaultOpen: false })
+
+    await runAction(action, HELLO_WORLD_FILE, { open: true }, harness)
+
+    expect(harness.openBrowser).toHaveBeenCalledTimes(1)
+    expect(harness.openBrowser).toHaveBeenCalledWith('http://localhost:8080')
+  })
+})
+
+/**
+ * The `deepnote ui` alias (Phase 7). `ui` is a THIN alias: it reuses `createServeAction` with
+ * `defaultOpen: true` and never duplicates serve logic. These tests pin the load-bearing behavior:
+ * `ui` opens the browser at the LOCAL served URL by default; `serve` does not; and no `ui` path
+ * reaches the cloud-upload code — the local-first guarantee.
+ */
+describe('ui alias (mocked, Phase 7)', () => {
+  let program: Command
+  let consoleErrorSpy: Mock<typeof console.error>
+  let exitSpy: Mock<typeof process.exit>
+
+  beforeEach(() => {
+    program = new Command()
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {}) as Mock<typeof console.error>
+    exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never) as Mock<typeof process.exit>
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    resetOutputConfig()
+  })
+
+  // ── Capstone ─────────────────────────────────────────────────────────────────────────────────
+  it('CAPSTONE: ui opens the browser at the LOCAL served URL by default (open undefined)', async () => {
+    const harness = makeHarness({ findPortResult: 8080, listenResult: 8080 })
+    const uiAction = createServeAction(program, harness.deps, { defaultOpen: true })
+
+    // No --open / --no-open → commander leaves `open` undefined; ui's default opens a browser.
+    await runAction(uiAction, HELLO_WORLD_FILE, {}, harness)
+
+    expect(harness.openBrowser).toHaveBeenCalledTimes(1)
+    const openedUrl = harness.openBrowser.mock.calls[0][0]
+    // The opened URL is the LOCAL loopback URL — never a cloud URL.
+    expect(openedUrl).toBe('http://localhost:8080')
+    expect(openedUrl).toMatch(/^http:\/\/localhost:\d+$/)
+    expect(openedUrl).not.toMatch(/deepnote\.com|app\.deepnote|https:\/\//)
+  })
+
+  it('CAPSTONE: serve does NOT open a browser by default while ui does (same action, flipped default)', async () => {
+    // serve: defaultOpen false, open undefined → headless.
+    const serveHarness = makeHarness({ findPortResult: 8080, listenResult: 8080 })
+    const serveAction = createServeAction(program, serveHarness.deps, { defaultOpen: false })
+    await runAction(serveAction, HELLO_WORLD_FILE, {}, serveHarness)
+    expect(serveHarness.openBrowser).not.toHaveBeenCalled()
+
+    // ui: defaultOpen true, open undefined → opens local URL.
+    const uiHarness = makeHarness({ findPortResult: 8080, listenResult: 8080 })
+    const uiAction = createServeAction(program, uiHarness.deps, { defaultOpen: true })
+    await runAction(uiAction, HELLO_WORLD_FILE, {}, uiHarness)
+    expect(uiHarness.openBrowser).toHaveBeenCalledTimes(1)
+    expect(uiHarness.openBrowser).toHaveBeenCalledWith('http://localhost:8080')
+  })
+
+  it('ui --no-open overrides the default and stays headless', async () => {
+    const harness = makeHarness({ findPortResult: 8080, listenResult: 8080 })
+    const uiAction = createServeAction(program, harness.deps, { defaultOpen: true })
+
+    // commander represents --no-open as { open: false } — an explicit override of ui's default.
+    await runAction(uiAction, HELLO_WORLD_FILE, { open: false }, harness)
+
+    expect(harness.openBrowser).not.toHaveBeenCalled()
+  })
+
+  it('ui opens the actually-bound port (reports the real URL after a port fallback)', async () => {
+    // findPort suggests 8080 but the OS binds 8090 — ui must open the bound URL, not the requested one.
+    const harness = makeHarness({ findPortResult: 8080, listenResult: 8090 })
+    const uiAction = createServeAction(program, harness.deps, { defaultOpen: true })
+
+    await runAction(uiAction, HELLO_WORLD_FILE, {}, harness)
+
+    expect(harness.openBrowser).toHaveBeenCalledWith('http://localhost:8090')
+  })
+
+  it('ui still binds localhost (127.0.0.1), never 0.0.0.0', async () => {
+    const harness = makeHarness({ findPortResult: 8080, listenResult: 8080 })
+    const uiAction = createServeAction(program, harness.deps, { defaultOpen: true })
+
+    await runAction(uiAction, HELLO_WORLD_FILE, {}, harness)
+
+    expect(harness.listenCalls[0].host).toBe('127.0.0.1')
+    expect(harness.listenCalls[0].host).not.toBe('0.0.0.0')
+    expect(exitSpy).not.toHaveBeenCalled()
+    expect(consoleErrorSpy).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Load-bearing NEGATIVE capstone (static guarantee): the serve/ui command module must NOT reference
+ * the cloud-upload path `openDeepnoteFileInCloud` (run.ts). `ui` opens the LOCAL URL only; reaching
+ * the cloud-upload code would violate the local-first guarantee. We assert this by source inspection
+ * because it is a structural invariant — the module simply does not import or call that symbol.
+ */
+describe('ui local-first guarantee (no cloud-upload path reachable)', () => {
+  it('serve.ts never imports or calls openDeepnoteFileInCloud (the cloud-upload path)', () => {
+    // Read the command module source and assert the cloud-upload path is neither imported nor
+    // invoked. We strip comments first so that prose mentioning the symbol (the local-first rationale)
+    // does not count — only real code (an import binding or a call expression) is a violation.
+    // (Read via the runtime fs so the check tracks the actual shipped file, not a snapshot.)
+    const here = dirname(fileURLToPath(import.meta.url))
+    const rawSource = readFileSync(resolve(here, 'serve.ts'), 'utf-8')
+    const codeOnly = rawSource
+      .replace(/\/\*[\s\S]*?\*\//g, '') // block comments (incl. JSDoc)
+      .replace(/\/\/.*$/gm, '') // line comments
+
+    // No import binding for the cloud-upload symbol.
+    expect(codeOnly).not.toMatch(/import[\s\S]*openDeepnoteFileInCloud/)
+    // No call expression invoking it.
+    expect(codeOnly).not.toMatch(/openDeepnoteFileInCloud\s*\(/)
+    // And the module does not pull in run.ts (where the cloud-upload path lives) at all.
+    expect(codeOnly).not.toContain('./run')
   })
 })

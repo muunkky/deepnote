@@ -29,9 +29,13 @@ export interface ServeOptions {
   /** Explicit start port (`--port`). When set, probing begins here instead of {@link DEFAULT_START_PORT}. */
   port?: string
   /**
-   * Whether to open a browser at the served URL. Commander's `--no-open` sets this to `false`;
-   * the `ui` alias (Phase 7) will default it to `true`. Undefined here means "use the command's
-   * default", which `serve` resolves to *not* opening (headless).
+   * Whether to open a browser at the served URL. With BOTH `--open` and `--no-open` registered on the
+   * command, commander leaves this `undefined` unless the user passes one of them — `--open` sets
+   * `true`, `--no-open` sets `false`. The action resolves an `undefined` value to the command's
+   * `defaultOpen` ({@link ServeActionConfig}): `serve` → headless (`false`), `ui` → open (`true`).
+   * Registering both flags (rather than a lone `--no-open`) is deliberate: a lone `--no-open` makes
+   * commander default `open` to `true`, which would make `serve` open a browser by default — the
+   * wrong headless posture for `serve`.
    */
   open?: boolean
   /** Explicit Python interpreter (`--python`), threaded into the session's ADR-001 resolver. */
@@ -64,6 +68,22 @@ export interface ServeDeps {
   openBrowser: (url: string) => Promise<void>
   /** Register a `SIGINT` handler. Defaults to `process.on('SIGINT', …)`; overridable in tests. */
   onSigint: (handler: () => void) => void
+}
+
+/**
+ * Per-command configuration for {@link createServeAction}. The only knob is the browser-open default,
+ * which is what distinguishes the two registrations sharing this one action:
+ * - `deepnote serve` → `defaultOpen: false` (headless; `--open` opts in).
+ * - `deepnote ui`    → `defaultOpen: true`  (opens a browser; `--no-open` opts out).
+ *
+ * `ui` is a **thin alias** (design-doc Phase 7): it reuses this exact action and only flips this
+ * default, never duplicating serve logic. Because both registrations register BOTH `--open` and
+ * `--no-open`, `ServeOptions.open` is `undefined` when the user passes neither flag, and the action
+ * falls back to this default.
+ */
+export interface ServeActionConfig {
+  /** Browser-open behavior when the user passes neither `--open` nor `--no-open`. */
+  defaultOpen: boolean
 }
 
 /** Production wiring for {@link ServeDeps}: the real server, real port finder, real browser opener. */
@@ -100,14 +120,18 @@ function defaultServeDeps(): ServeDeps {
  * `listen()`), so a fallback to a different port is always reported truthfully.
  *
  * @param deps - injected collaborators; defaults to the real runtime-server wiring.
+ * @param config - per-command config; `defaultOpen` selects headless (`serve`) vs browser-open (`ui`).
+ *   Defaults to `{ defaultOpen: false }` so a bare `createServeAction(program)` keeps `serve`'s
+ *   headless posture.
  */
 export function createServeAction(
   _program: Command,
-  deps: ServeDeps = defaultServeDeps()
+  deps: ServeDeps = defaultServeDeps(),
+  config: ServeActionConfig = { defaultOpen: false }
 ): (path: string | undefined, options: ServeOptions) => Promise<void> {
   return async (path, options) => {
     try {
-      await runServe(path, options, deps)
+      await runServe(path, options, deps, config)
     } catch (error) {
       // File-resolution problems are user-input errors (exit 2); everything else is a runtime error (exit 1).
       const exitCode = error instanceof FileResolutionError ? ExitCode.InvalidUsage : ExitCode.Error
@@ -118,7 +142,12 @@ export function createServeAction(
 }
 
 /** Boot the server and block until `SIGINT`. Extracted from the action so the try/catch stays thin. */
-async function runServe(path: string | undefined, options: ServeOptions, deps: ServeDeps): Promise<void> {
+async function runServe(
+  path: string | undefined,
+  options: ServeOptions,
+  deps: ServeDeps,
+  config: ServeActionConfig
+): Promise<void> {
   const c = getChalk()
   const { absolutePath } = await resolvePathToDeepnoteFile(path)
 
@@ -136,7 +165,12 @@ async function runServe(path: string | undefined, options: ServeOptions, deps: S
   output(`${c.green('✓')} deepnote serve ready at ${c.cyan(url)}`)
   log(c.dim('Press Ctrl-C to stop.'))
 
-  if (options.open) {
+  // Resolve the effective browser-open: an explicit `--open`/`--no-open` wins; otherwise the
+  // command default (`serve` headless, `ui` open). The opened URL is ALWAYS the local served URL
+  // (`http://localhost:${boundPort}`) — the `ui` alias never reaches the cloud-upload path
+  // (`openDeepnoteFileInCloud`); it opens this loopback URL only, preserving the local-first guarantee.
+  const shouldOpen = options.open ?? config.defaultOpen
+  if (shouldOpen) {
     debug(`Opening browser at ${url}`)
     // A browser-launch failure must not take the server down — the URL is already printed.
     await deps.openBrowser(url).catch(err => {

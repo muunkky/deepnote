@@ -32,6 +32,8 @@ describe('CLI', () => {
       expect(commandNames).toContain('convert')
       expect(commandNames).toContain('validate')
       expect(commandNames).toContain('completion')
+      expect(commandNames).toContain('serve')
+      expect(commandNames).toContain('ui')
     })
   })
 
@@ -94,6 +96,37 @@ describe('CLI', () => {
 
       const optionFlags = validateCmd?.options.map(o => o.flags)
       expect(optionFlags).toContain('-o, --output <format>')
+    })
+
+    it('serve command registers both --open and --no-open (so open defaults to undefined → headless)', () => {
+      const program = createProgram()
+      const serveCmd = program.commands.find(cmd => cmd.name() === 'serve')
+
+      expect(serveCmd).toBeDefined()
+      const optionFlags = serveCmd?.options.map(o => o.flags)
+      // Both flags present: commander then leaves `open` undefined unless the user opts in, and the
+      // action resolves that to serve's headless default. A lone --no-open would default open=true.
+      expect(optionFlags).toContain('--open')
+      expect(optionFlags).toContain('--no-open')
+      expect(optionFlags).toContain('--port <port>')
+    })
+
+    it('ui command is registered as a thin serve alias with the same flag surface', () => {
+      const program = createProgram()
+      const uiCmd = program.commands.find(cmd => cmd.name() === 'ui')
+
+      expect(uiCmd).toBeDefined()
+      expect(uiCmd?.description()).toContain('alias of serve')
+
+      const optionFlags = uiCmd?.options.map(o => o.flags)
+      // ui mirrors serve's flag surface; the only behavioral difference is the open-by-default posture,
+      // which lives in the action config (defaultOpen: true), not the flags.
+      expect(optionFlags).toContain('--open')
+      expect(optionFlags).toContain('--no-open')
+      expect(optionFlags).toContain('--port <port>')
+      expect(optionFlags).toContain('--python <path>')
+      expect(optionFlags).toContain('--kernel <name>')
+      expect(optionFlags).toContain('--static-dir <path>')
     })
   })
 

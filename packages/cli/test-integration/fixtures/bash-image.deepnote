@@ -1,0 +1,29 @@
+metadata:
+  createdAt: 2026-06-11T00:00:00.000Z
+  modifiedAt: 2026-06-11T00:00:00.000Z
+project:
+  name: bash-image-integration
+  id: 00000000-0000-0000-0000-0000000000b1
+  notebooks:
+    - id: 00000000-0000-0000-0000-0000000000b2
+      name: BashImage
+      blocks:
+        - blockGroup: "0"
+          id: 00000000-0000-0000-0000-0000000000b3
+          sortingKey: "0"
+          type: markdown
+          content: "# Bash image output\n\nEmits an `image/png` via the bash_kernel `display` helper."
+        - blockGroup: "1"
+          id: 00000000-0000-0000-0000-0000000000b4
+          sortingKey: "1"
+          type: code
+          content: |
+            # Decode a minimal valid 1x1 PNG and emit it as an image/png display_data
+            # via the bash_kernel `display` helper (`cat <png> | display`). This drives a
+            # real binary MIME bundle back through the JSON-only WebSocket transport and
+            # the IOPub decode path — the headline launch criterion (R7).
+            tmp="${TMPDIR:-/tmp}/deepnote-bash-fixture-$$.png"
+            printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' | base64 -d > "$tmp"
+            cat "$tmp" | display
+            rm -f "$tmp"
+version: 1.0.0

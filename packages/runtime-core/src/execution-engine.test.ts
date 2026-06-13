@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import type { DeepnoteFile } from '@deepnote/blocks'
-import { decodeUtf8NoBom, deserializeDeepnoteFile } from '@deepnote/blocks'
+import { decodeUtf8NoBom, deserializeDeepnoteFile, UnsupportedBlockOnKernelError } from '@deepnote/blocks'
 import type { IOutput } from '@jupyterlab/nbformat'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentBlockContext } from './agent-handler'
@@ -141,10 +141,59 @@ describe('ExecutionEngine', () => {
       )
     })
 
-    it('connects kernel client to server URL', async () => {
+    it('connects kernel client to server URL with the default python3 kernel', async () => {
       await engine.start()
 
-      expect(mockKernelClient.connect).toHaveBeenCalledWith('http://localhost:8888')
+      expect(mockKernelClient.connect).toHaveBeenCalledWith('http://localhost:8888', undefined)
+    })
+
+    it('forwards the configured kernelName to connect', async () => {
+      const bashEngine = new ExecutionEngine({
+        pythonEnv: '/path/to/venv',
+        workingDirectory: '/project',
+        kernelName: 'bash',
+      })
+
+      await bashEngine.start()
+
+      expect(mockKernelClient.connect).toHaveBeenCalledWith('http://localhost:8888', 'bash')
+
+      await bashEngine.stop()
+    })
+
+    it('stores the kernelspec language returned by connect', async () => {
+      mockKernelClient.connect.mockResolvedValueOnce('bash')
+      const bashEngine = new ExecutionEngine({
+        pythonEnv: '/path/to/venv',
+        workingDirectory: '/project',
+        kernelName: 'bash',
+      })
+
+      await bashEngine.start()
+
+      expect(bashEngine.kernelLanguageName).toBe('bash')
+
+      await bashEngine.stop()
+    })
+
+    it('leaves the kernel language undefined for the python3 default', async () => {
+      await engine.start()
+
+      expect(engine.kernelLanguageName).toBeUndefined()
+    })
+
+    it('forwards kernelStartupTimeoutMs into the KernelClient', async () => {
+      const timeoutEngine = new ExecutionEngine({
+        pythonEnv: '/path/to/venv',
+        workingDirectory: '/project',
+        kernelStartupTimeoutMs: 90000,
+      })
+
+      await timeoutEngine.start()
+
+      expect(MockKernelClient).toHaveBeenCalledWith(expect.objectContaining({ kernelStartupTimeoutMs: 90000 }))
+
+      await timeoutEngine.stop()
     })
 
     it('stops server if kernel connection fails', async () => {
@@ -1387,5 +1436,261 @@ describe('ExecutionEngine', () => {
         expect(executedCodes).toContain('compute()')
       })
     })
+  })
+})
+
+// ADR-004 Decision point 1 / design-doc Sub-phase 1B: value-add blocks must
+// hard-fail on a non-Python kernel, before any `_dntk` codegen is dispatched.
+describe('ExecutionEngine — non-Python kernel value-add hard-fail (ADR-004)', () => {
+  // Build a parsed DeepnoteFile from an ordered list of (type, content) blocks.
+  // Going through deserializeDeepnoteFile keeps the fixtures schema-valid
+  // without hand-typing the full DeepnoteFile shape.
+  function buildFile(blocks: Array<{ type: string; content: string }>): DeepnoteFile {
+    const blockYaml = blocks
+      .map((b, i) => {
+        // 'a','b','c',... sortingKeys preserve declared order after the engine sorts.
+        const sortingKey = String.fromCharCode(97 + i)
+        const indented = b.content
+          .split('\n')
+          .map(line => `            ${line}`)
+          .join('\n')
+        return [
+          `        - id: block-${i}`,
+          `          blockGroup: group-${i}`,
+          `          sortingKey: ${sortingKey}`,
+          `          type: ${b.type}`,
+          `          content: |-\n${indented}`,
+          `          metadata: {}`,
+        ].join('\n')
+      })
+      .join('\n')
+
+    const yaml = `metadata:
+  createdAt: '2026-01-01T00:00:00.000Z'
+project:
+  id: test-project
+  name: Kernel guard test
+  notebooks:
+    - id: nb-1
+      name: Notebook 1
+      blocks:
+${blockYaml}
+version: '1.0.0'
+`
+    return deserializeDeepnoteFile(yaml)
+  }
+
+  function newBashEngine(): ExecutionEngine {
+    return new ExecutionEngine({
+      pythonEnv: '/path/to/venv',
+      workingDirectory: '/project',
+      kernelName: 'bash',
+    })
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockKernelClient.execute.mockResolvedValue({
+      success: true,
+      outputs: [],
+      executionCount: 1,
+    })
+  })
+
+  it('aborts at the first value-add (sql) block with UnsupportedBlockOnKernelError naming sql and the kernel', async () => {
+    const engine = newBashEngine()
+    const onBlockDone = vi.fn()
+
+    await engine.start()
+    try {
+      const file = buildFile([{ type: 'sql', content: 'SELECT 1' }])
+      await engine.runProject(file, { onBlockDone })
+    } finally {
+      await engine.stop()
+    }
+
+    // The block is reported as failed, carrying the typed error.
+    expect(onBlockDone).toHaveBeenCalledTimes(1)
+    const result = onBlockDone.mock.calls[0][0]
+    expect(result.success).toBe(false)
+    expect(result.blockType).toBe('sql')
+    expect(result.error).toBeInstanceOf(UnsupportedBlockOnKernelError)
+    expect(result.error.blockType).toBe('sql')
+    expect(result.error.kernelName).toBe('bash')
+    expect(result.error.message).toContain('sql')
+    expect(result.error.message).toContain('bash')
+  })
+
+  it('aborts an agent block before the OPENAI_API_KEY check / executeAgentBlock on a non-Python kernel', async () => {
+    const engine = newBashEngine()
+    const onBlockDone = vi.fn()
+
+    // Deliberately leave OPENAI_API_KEY unstubbed: the guard must fire *before*
+    // the agent branch ever reads `process.env.OPENAI_API_KEY` or invokes
+    // `executeAgentBlock`. `agent` is a member of VALUE_ADD_BLOCK_TYPES, so the
+    // value-add guard must hard-fail it the same way it hard-fails sql — the
+    // security guarantee that value-add blocks never silently leak codegen to an
+    // alien kernel.
+    await engine.start()
+    try {
+      const file = buildFile([{ type: 'agent', content: 'Analyze the data' }])
+      await engine.runProject(file, { onBlockDone })
+    } finally {
+      await engine.stop()
+    }
+
+    // The agent block is reported as failed, carrying the typed guard error
+    // naming both the block type `agent` and the kernel `bash`.
+    expect(onBlockDone).toHaveBeenCalledTimes(1)
+    const result = onBlockDone.mock.calls[0][0]
+    expect(result.success).toBe(false)
+    expect(result.blockType).toBe('agent')
+    expect(result.error).toBeInstanceOf(UnsupportedBlockOnKernelError)
+    expect(result.error.blockType).toBe('agent')
+    expect(result.error.kernelName).toBe('bash')
+    expect(result.error.message).toContain('agent')
+    expect(result.error.message).toContain('bash')
+
+    // The load-bearing invariant: the guard fired BEFORE the agent branch — the
+    // agent-codegen path (`executeAgentBlock`) was never reached, so no
+    // API-key check ran and no agent code was generated/dispatched.
+    expect(mockExecuteAgentBlock).not.toHaveBeenCalled()
+    expect(mockKernelClient.execute).not.toHaveBeenCalled()
+    // The failure is the value-add guard, not the downstream OPENAI_API_KEY error.
+    expect(result.error.message).not.toContain('OPENAI_API_KEY')
+  })
+
+  it('never dispatches a _dntk string to the kernel on the abort path', async () => {
+    const engine = newBashEngine()
+
+    await engine.start()
+    try {
+      const file = buildFile([{ type: 'sql', content: 'SELECT 1' }])
+      await engine.runProject(file)
+    } finally {
+      await engine.stop()
+    }
+
+    // The load-bearing invariant: no codegen reached the kernel for the
+    // value-add block — kernel.execute is never called at all here.
+    expect(mockKernelClient.execute).not.toHaveBeenCalled()
+    for (const call of mockKernelClient.execute.mock.calls) {
+      expect(String(call[0])).not.toContain('_dntk')
+    }
+  })
+
+  it('runs a plain code + markdown notebook to completion on a non-Python kernel', async () => {
+    const engine = newBashEngine()
+
+    await engine.start()
+    let summary: Awaited<ReturnType<ExecutionEngine['runProject']>>
+    try {
+      // markdown is non-executable; only the code block dispatches.
+      const file = buildFile([
+        { type: 'markdown', content: '# Title' },
+        { type: 'code', content: 'echo hello' },
+      ])
+      summary = await engine.runProject(file)
+    } finally {
+      await engine.stop()
+    }
+
+    expect(summary.failedBlocks).toBe(0)
+    expect(summary.executedBlocks).toBe(1)
+    expect(mockKernelClient.execute).toHaveBeenCalledTimes(1)
+    const dispatched = String(mockKernelClient.execute.mock.calls[0][0])
+    expect(dispatched).toContain('echo hello')
+  })
+
+  it('does not fire the guard on the python3 default — a value-add block dispatches as today', async () => {
+    const pyEngine = new ExecutionEngine({
+      pythonEnv: '/path/to/venv',
+      workingDirectory: '/project',
+      // no kernelName => python3 default
+    })
+
+    await pyEngine.start()
+    let summary: Awaited<ReturnType<ExecutionEngine['runProject']>>
+    try {
+      const file = buildFile([{ type: 'sql', content: 'SELECT 1' }])
+      summary = await pyEngine.runProject(file)
+    } finally {
+      await pyEngine.stop()
+    }
+
+    // SQL block dispatched normally via createPythonCode (no hard-fail).
+    expect(summary.failedBlocks).toBe(0)
+    expect(summary.executedBlocks).toBe(1)
+    expect(mockKernelClient.execute).toHaveBeenCalledTimes(1)
+  })
+
+  it('CAPSTONE: [markdown, code, sql, code] aborts at sql on bash and runs all four on python3', async () => {
+    const blocks = [
+      { type: 'markdown', content: '# Heading' },
+      { type: 'code', content: 'first_code' },
+      { type: 'sql', content: 'SELECT 1' },
+      { type: 'code', content: 'second_code' },
+    ]
+
+    // --- non-Python (bash): abort at sql, second code never runs ---
+    const bashEngine = newBashEngine()
+    const bashBlockDone = vi.fn()
+    await bashEngine.start()
+    let bashSummary: Awaited<ReturnType<ExecutionEngine['runProject']>>
+    try {
+      bashSummary = await bashEngine.runProject(buildFile(blocks), { onBlockDone: bashBlockDone })
+    } finally {
+      await bashEngine.stop()
+    }
+
+    // Only the first code block dispatched; the sql guard threw before any
+    // further codegen and the loop broke, so second_code never ran.
+    const bashDispatched = mockKernelClient.execute.mock.calls.map(c => String(c[0]))
+    expect(bashDispatched).toHaveLength(1)
+    expect(bashDispatched[0]).toContain('first_code')
+    expect(bashDispatched.some(code => code.includes('second_code'))).toBe(false)
+
+    // The load-bearing R4 invariant: the value-add SQL RPC never reached the
+    // kernel. The sql block — the only value-add block here — threw at the
+    // guard before codegen, so its `_dntk.execute_sql*(...)` string was never
+    // generated or dispatched. (Plain `code` blocks carry a *guarded*
+    // `if '_dntk' in globals()` DataFrame-formatter preamble from
+    // createPythonCode; that guarded preamble is a separate, pre-existing
+    // concern owned by the real-kernel step, not the value-add RPC ADR-004
+    // prohibits. R4 forbids dispatching *value-add Python RPC* such as
+    // `_dntk.execute_sql(...)` to a non-Python kernel.)
+    for (const code of bashDispatched) {
+      expect(code).not.toContain('_dntk.execute_sql')
+    }
+
+    // The abort was the typed error naming sql + bash.
+    const sqlDone = bashBlockDone.mock.calls.map(c => c[0]).find(r => r.blockType === 'sql')
+    expect(sqlDone).toBeDefined()
+    expect(sqlDone.success).toBe(false)
+    expect(sqlDone.error).toBeInstanceOf(UnsupportedBlockOnKernelError)
+    expect(sqlDone.error.blockType).toBe('sql')
+    expect(sqlDone.error.kernelName).toBe('bash')
+    expect(bashSummary.failedBlocks).toBe(1)
+
+    // --- python3: all blocks run, sql dispatched normally ---
+    vi.clearAllMocks()
+    mockKernelClient.execute.mockResolvedValue({ success: true, outputs: [], executionCount: 1 })
+
+    const pyEngine = new ExecutionEngine({ pythonEnv: '/path/to/venv', workingDirectory: '/project' })
+    await pyEngine.start()
+    let pySummary: Awaited<ReturnType<ExecutionEngine['runProject']>>
+    try {
+      pySummary = await pyEngine.runProject(buildFile(blocks))
+    } finally {
+      await pyEngine.stop()
+    }
+
+    // markdown is non-executable, so the 3 executable blocks all dispatch.
+    expect(mockKernelClient.execute).toHaveBeenCalledTimes(3)
+    expect(pySummary.failedBlocks).toBe(0)
+    expect(pySummary.executedBlocks).toBe(3)
+    const pyDispatched = mockKernelClient.execute.mock.calls.map(c => String(c[0]))
+    expect(pyDispatched.some(code => code.includes('first_code'))).toBe(true)
+    expect(pyDispatched.some(code => code.includes('second_code'))).toBe(true)
   })
 })

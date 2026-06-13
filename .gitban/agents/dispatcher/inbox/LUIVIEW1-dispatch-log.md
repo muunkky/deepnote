@@ -108,3 +108,13 @@ Serial spine 2→3→4→5→6, then parallel 7A‖7B‖7C, then 7D, then closeo
 - Next: **batch 7 → 7D `wye1xt`** (unknown-type fallback — now that 7A-C registered all sibling keys, its full-coverage capstone is meaningful).
 
 ## Batch 7: 7D — wye1xt (unknown-type fallback)
+
+- **Executor-1** (`a23925d65123`): commit `0949539`. Real `UnknownBlockRenderer` (own file) replacing the step-5 placeholder — renders "Unsupported block type: <type>" + raw persisted content as an **escaped React text node** in `<pre>` (no dangerouslySetInnerHTML → XSS-inert by construction; never throws). Owns the shared `default` branch. Full-coverage capstone driven off LIVE `BLOCK_RENDERERS` keys (23 non-default) with a ≥20-key vacuous-pass guard + README coverage matrix. 88/88 block tests.
+- Merge: fast-forward (solo, ran after 7A-C). Reconciled at `8d5c045`. Proactive cspell clean (0 issues).
+- Reviewer-1 (`a3fb6a9c0fff`): **APPROVAL** — both gates PASS, capstone genuine + non-circular, fallback safe by construction, isolation 3/3. No follow-ups.
+- Router-1 (`a8bd32c2c9e9`): **APPROVAL**, no planner.
+- Close-out (`a3bb12f8b552`): wye1xt → **done** (37/37, clean).
+- **Batch 7 DONE.** Sprint 9/11 done (all feature/renderer cards complete). Remaining: cd4gxo (step 2b doc), drmgh6 (closeout) + v9apte (planning, closeout-coupled).
+- Next: batch 8 → cd4gxo (step 2b doc), then closeout phase.
+
+## Batch 8: step 2b — cd4gxo (onboarding doc)

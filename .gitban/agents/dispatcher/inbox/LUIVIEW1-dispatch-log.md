@@ -41,4 +41,10 @@ Serial spine 2→3→4→5→6, then parallel 7A‖7B‖7C, then 7D, then closeo
 - **Executor-1** (`a18be8761a61`): commit `eef8296`, tag `LUIVIEW1-j97w5m-done`. Stood up `apps/studio` React 19 + Vite 7 isolated SPA (15 files, +870). Isolation invariant: `tsc -p tsconfig.json --listFilesOnly` = 0 apps/ files. In-worktree verification: `pnpm test` 149 files/2481 tests ✓, `pnpm typecheck` ✓, `vite build` ✓, `pnpm lintAndFormat` ✓.
 - Merge: fast-forward `3307025..eef8296` (serial single-card, no integration delta — merged tree byte-identical to executor's verified HEAD).
 - Surfaced (pre-existing, not this card): cspell 9.2.2 `useGitignore` reports "0 files" inside a worktree when `.git` is a file. Candidate planner follow-up.
-- Next: reviewer-1 on eef8296.
+- Reviewer-1 (`a4091d8858b8`): **APPROVAL** — both gates PASS, all claims live-verified (zero-apps isolation invariant, jsdom smoke, scoped root include, vitest projects restructure, Biome strictness). 3 non-blocking follow-ups L1/L2/L3.
+- Router-1 (`a773e6d8fee9`): **APPROVAL**. Wrote executor close-out + planner inbox.
+- Close-out (`a86492323e89`): j97w5m → **done** (commit eef8296). Flagged gitban tooling edge: `complete_card` auto-block injection loop (stripped, completed clean).
+- Planner-1 (`a40c0922f73a`): L1 → new card `cd4gxo` (step 2b, P2 doc, todo — cold pnpm-install onboarding note); L2 → folded into `5mz1md` (Playwright HMR-timing criterion); L3 → skipped, dup of backlog `vlql29` (madge/dependency-cruiser boundary gate).
+- **Batch 1 DONE.** Sprint now 1/11 done (+ planning v9apte deferred to closeout). cd4gxo (step 2b) added to remaining plan — P2 doc, parallel-safe, will run in the 7-batch or just before closeout.
+
+## Batch 2: step 3 — 5mz1md (spa-foundation app shell + routing)

@@ -128,3 +128,10 @@
 ### Note on validation
 
 This card follows a structured template. Keep its sections, checkboxes, and tables and fill them in rather than removing them — gitban validates card structure when the card is created and when it is completed, and a non-conforming card is held as a draft until it is corrected.
+
+
+## Follow-up: L2 — real timed HMR-edit-loop assertion (Playwright)
+
+**L2 (folded in from j97w5m review 1, per planner routing):** When this card adds its Playwright / e2e harness, include a **real timed HMR-edit-loop assertion** — drive an actual edit to a source file under `apps/studio/src` and assert the rendered DOM updates within an HMR cycle (a measured edit→reflect loop), not a mock or a static snapshot. Step 2 (j97w5m) stood up the Vite dev/HMR scaffold but proved it only structurally; this is the natural home for the live HMR proof because Playwright lands here. Dedup: 5mz1md currently uses DOM-env vitest (no Playwright yet), so there is no existing HMR/e2e criterion this collides with — add it alongside the routing/order e2e coverage.
+
+- [ ] **HMR e2e (follow-up from j97w5m L2):** a Playwright test performs a real source edit under `apps/studio/src` and asserts the rendered output reflects the change within an HMR cycle (timed edit→reflect loop, not mocked).

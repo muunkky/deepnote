@@ -126,8 +126,9 @@ describe('slice-integrity: no frontend framework / apps SPA edge in the serve sl
     expect(sourceFiles.some(f => f.includes(join('runtime-server', 'src')))).toBe(true)
 
     // The scanner genuinely parses workspace imports, so "no framework import" is a real
-    // absence — and crucially the slice *does* legitimately import `@deepnote/reactivity`,
-    // the exact substring the bare grep chokes on.
+    // absence — and crucially the slice *does* legitimately import `@deepnote/*` workspace
+    // packages (e.g. `@deepnote/runtime-core`, `@deepnote/blocks`), the kind of substring the
+    // bare grep chokes on.
     const allSpecifiers = sourceFiles.flatMap(f => collectModuleSpecifiers(readFileSync(f, 'utf8'), f))
     expect(allSpecifiers.some(s => s.startsWith('@deepnote/'))).toBe(true)
   })

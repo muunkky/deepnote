@@ -249,6 +249,26 @@ run only under `pnpm test:integration` in the `integration-kernels` CI job, whic
 `deepnote-toolkit[server]` venv. Without that venv (or with `RUN_INTEGRATION_TESTS` unset) every test
 self-skips cleanly.
 
+## SQL / integration parity (local-first)
+
+A SQL block run through the server resolves its database connection exactly the way `deepnote run`
+does. Before the engine launches, the session resolves the project's integration environment via the
+**shared** `resolveIntegrationEnv` wiring in `@deepnote/runtime-core` — the same
+`parse → collect → inject` sequence `run.ts` uses — so the toolkit server inherits the identical env
+vars `run` injects for the same project + `.deepnote.env.yaml`. The wiring is shared, not
+re-implemented: those helpers (`parseIntegrationsFile`, `collectRequiredIntegrationIds`,
+`injectIntegrationEnvVars`) were **lifted out of `@deepnote/cli` into `@deepnote/runtime-core`** (KD-3)
+so the server reaches `run`'s parity **without importing `@deepnote/cli`** — that would invert the
+ADR-007 §1/§4 one-way arrow. A compiler-API test (`no-cli-import.test.ts`) fails the build if any
+`runtime-server` source ever imports `@deepnote/cli`.
+
+**Local-first guarantee.** Integration resolution is **offline by default**: the server passes no
+fetcher to `resolveIntegrationEnv`, so the resolved set is exactly the project's local integrations
+file and **no outbound network request is ever made**. An API-backed integration fetch is opt-in and
+token-gated — the only way one can fire is an explicit fetcher with a token, which the server does not
+wire in. The mocked `pnpm test` asserts both halves: a SQL block injects the same env vars as `run`
+(parity), and `globalThis.fetch` is never called by default (local-first).
+
 ## Develop
 
 ```bash

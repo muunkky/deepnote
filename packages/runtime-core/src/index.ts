@@ -9,6 +9,38 @@ export {
 } from './agent-handler'
 export type { ExecutionOptions } from './execution-engine'
 export { ExecutionEngine, executableBlockTypeSet, executableBlockTypes } from './execution-engine'
+export {
+  type BaseIntegrationsFile,
+  BUILTIN_INTEGRATIONS,
+  baseIntegrationsFileSchema,
+  collectRequiredIntegrationIds,
+  createEnvVarRef,
+  type DatabaseIntegrationConfig,
+  DEFAULT_INTEGRATIONS_FILE,
+  type DebugLogger,
+  ENV_VAR_REF_PREFIX,
+  EnvVarResolutionError,
+  extractEnvVarName,
+  generateEnvVarName,
+  getDefaultIntegrationsFilePath,
+  type IntegrationFetcher,
+  type IntegrationsFile,
+  type IntegrationsParseResult,
+  injectIntegrationEnvVars,
+  integrationsFileSchema,
+  isEnvVarRef,
+  isErrnoENOENT,
+  isErrnoException,
+  type ParsedEnvVarRef,
+  parseEnvVarRef,
+  parseIntegrationsFile,
+  type ResolveIntegrationEnvParams,
+  type ResolveIntegrationEnvResult,
+  resolveEnvVarRefs,
+  resolveEnvVarRefsFromMap,
+  resolveIntegrationEnv,
+  type ValidationIssue,
+} from './integrations'
 export type { ExecutionCallbacks, ExecutionResult, KernelClientOptions } from './kernel-client'
 export { createJsonWebSocketFactory, KernelClient } from './kernel-client'
 export type { KernelFailureCategory, KernelspecSummary } from './kernel-errors'

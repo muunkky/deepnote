@@ -1,5 +1,9 @@
 {
-  "ignoreRegExpList": ["/\\.\\.\\/assets\\/docs\\/[A-Za-z0-9_.-]+/g"],
+  "ignoreRegExpList": [
+    "/\\.\\.\\/assets\\/docs\\/[A-Za-z0-9_.-]+/g",
+    "/base64,[A-Za-z0-9+/=]+/g",
+    "/iVBORw0KGgo[A-Za-z0-9+/=]*/g"
+  ],
   "ignorePaths": [
     "node_modules/**",
     "pnpm-lock.yaml",

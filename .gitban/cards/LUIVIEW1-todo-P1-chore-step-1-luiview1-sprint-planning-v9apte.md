@@ -29,13 +29,14 @@ Stand up the monorepo's first frontend — an isolated `apps/studio` React 19 + 
 | 7A | feature | P1 | block-renderers SQL renderer | step 6 |
 | 7B | feature | P1 | block-renderers visualization / big-number / image renderers | step 6 |
 | 7C | feature | P1 | block-renderers input / button / separator renderers | step 6 |
-| 7D | feature | P1 | block-renderers unknown-type fallback | step 6 |
+| 7D | feature | P1 | block-renderers unknown-type fallback | step 6 + 7A–7C |
 | 8 | chore | P1 | LUIVIEW1 Sprint Closeout (final) | all |
 
 ### Parallelization Plan
 
 * **Serial spine:** steps 2 → 3 → 4 → 5 → 6 are a strict chain (each phase builds on the prior — scaffold, shell, load, registry, output renderer).
-* **Parallel batch (after step 6):** steps **7A / 7B / 7C / 7D** are independent and run concurrently. Each renderer lives in its own file and registers **additively** into the `BlockRenderer` / MIME registry, so merges are keep-both (no contested registry edit).
+* **Parallel batch (after step 6):** steps **7A / 7B / 7C** are independent and run concurrently. Each renderer lives in its own file and registers **additively** into the `BlockRenderer` / MIME registry, so merges are keep-both (no contested registry edit).
+* **7D runs after 7A–7C land** (not fully concurrent): unlike the additive sibling renderers, the unknown-type fallback wires the shared `BlockRenderer` **`default`** branch, and its full-coverage capstone asserts that every *other* block type now resolves to a real renderer — so the sibling renderers must be present for that coverage assertion to be meaningful. Dispatch 7A/7B/7C concurrently, then 7D.
 * **step 8** (closeout) runs last, after all of 7A–7D land.
 
 ---

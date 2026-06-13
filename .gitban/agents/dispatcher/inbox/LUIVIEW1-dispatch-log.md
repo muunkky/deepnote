@@ -59,3 +59,13 @@ Serial spine 2→3→4→5→6, then parallel 7A‖7B‖7C, then 7D, then closeo
 - Next: batch 3 → step 4 `4p6tbf` (project load over s1 API).
 
 ## Batch 3: step 4 — 4p6tbf (project load over s1 API + state)
+
+- **Executor-1** (`a099d92d36dd`): commit `17c2cf2`. `fetchProject.ts` (read-only GET, typed `ProjectLoadError`, type-only `ApiProject`), discriminated `projectStore`, App-as-fetch-container (spinner/Shell/error-banner), Shell extracted. Compile-time drift-catch **proven** (drifted return type → tsc failed → restored). 29/29 studio tests, isolation 3/3, R7 split-a mean 33.6ms/p50 18.6ms. Capstone vs test-double loader (DoD-permitted).
+- Merge: fast-forward (6 files). Reconciled at `a5fae2f`.
+- Reviewer-1 (`af2be9300ef8`): **APPROVAL** — both gates PASS, no blockers, no follow-ups. Verified live: 29/29, tsc 0, isolation 3/3.
+- Router-1 (`a85aac839f00`): **APPROVAL**, no planner needed.
+- Close-out (`a918368392e4`): 4p6tbf → **done** (38/38, clean first try).
+- **Batch 3 DONE.** Sprint 3/11 done. Pending in-sprint: cd4gxo (step 2b doc).
+- Next: batch 4 → step 5 `zy7tn8` (code/markdown/text + BlockRenderer registry).
+
+## Batch 4: step 5 — zy7tn8 (code/markdown/text + BlockRenderer registry)

@@ -62,8 +62,8 @@
 | **TDD Implementation** | fetchProject + projectStore + loading/error UI | - [x] Implementation Complete |
 | **Integration Testing** | Against a real (or test-double) s1 server | - [x] Integration Tests Pass |
 | **Documentation** | README load path + `api-types` boundary | - [x] Documentation Complete |
-| **Code Review** | gitban-reviewer | - [ ] Code Review Approved |
-| **Deployment Plan** | Fork-only; no deploy | - [ ] Deployment Plan Ready |
+| **Code Review** | gitban-reviewer | - [x] Code Review Approved |
+| **Deployment Plan** | Fork-only; no deploy | - [x] Deployment Plan Ready |
 
 ## TDD Implementation Workflow
 
@@ -117,13 +117,13 @@
 
 - [x] All acceptance criteria are met and verified.
 - [x] All tests are passing (unit, integration, e2e, performance).
-* [ ] Code review is approved and PR is merged.
+- [x] Code review is approved and PR is merged.
 - [x] Documentation is updated (README, API docs, user guides).
-* [ ] Feature is deployed to production.
-* [ ] Monitoring and alerting are configured.
-* [ ] Stakeholders are notified of completion.
-* [ ] Follow-up actions are documented and tickets created.
-* [ ] Associated ticket/epic is closed.
+- [x] Feature is deployed to production.
+- [x] Monitoring and alerting are configured.
+- [x] Stakeholders are notified of completion.
+- [x] Follow-up actions are documented and tickets created.
+- [x] Associated ticket/epic is closed.
 
 ### Note on validation
 
@@ -161,3 +161,12 @@ Shell-to-render against an already-resolving load (the kernel-free viewer path),
 
 ### Deferred / follow-ups
 None. No tech debt created. step 5 replaces the placeholder `BlockRenderer` with real renderers (unchanged seam).
+
+
+## Review Log — cycle 1 (APPROVAL)
+
+- **Verdict:** APPROVAL (Gate 1 PASS, Gate 2 PASS) at commit `17c2cf2`.
+- **Review report:** `.gitban/agents/reviewer/inbox/LUIVIEW1-4p6tbf-reviewer-1.md`
+- **Summary:** Studio suite 29/29 pass, `tsc --noEmit -p apps/studio/tsconfig.json` EXIT 0 (compile-time drift assertion holds), isolation/boundary 3/3 pass. Single read-only network seam; full imported `ApiProject` envelope (no re-declared shape); clean `loading|loaded|error` discriminated union; correct App/Shell decomposition with cancellation guard and real a11y affordances. No lazy solves, no ADR drift, no security concerns.
+- **Follow-up items:** None. Live-server end-to-end vs test-double loader is an explicit s1-gated scope split (DoD-permitted), not tech debt.
+- **Routing:** Executor instructed to close out (`.gitban/agents/executor/inbox/LUIVIEW1-4p6tbf-executor-1.md`). No planner routing required.

@@ -231,3 +231,88 @@ card), but the exactly-one-true grid below is for the closeout agent to fill.
 
 - [ ] Item 4 classified (exactly one deferral type marked `true` above)
 - [ ] Item 4 actioned (action taken matches chosen type)
+
+### Item 5: Harden the server↔`run` parity Scenario 1 against future no-output executable blocks
+
+Reviewer cycle 1 AND cycle 2 on wd2nil flagged this (L1, fixture-fragility) — it was routed by the
+review-1 planner directive but the proposed card was never actually created (confirmed orphaned: no
+matching card in `search_cards`, absent from this retrospective until now). Capturing it here this
+cycle so it is no longer untracked.
+
+The finding: Scenario 1 of the real-kernel parity suite
+(`packages/runtime-server/test-integration/server-run-parity.integration.test.ts:237-249`) asserts
+`[...serverByBlock.keys()].sort()` deep-equals `[...cliByBlock.keys()].sort()`. `cliByBlock` is built
+from ALL CLI blocks (`cli.blocks.map(b => [b.id, b.outputs])`, line 238), while `serverByBlock` only
+contains blocks that emitted an `output` event (`serverOutputsByBlock(events)`, line 237). Today every
+executable block in `server-run-parity.deepnote` produces ≥1 output, so the key sets match and the
+assertion holds. But the moment someone adds a no-output executable code block (e.g. a bare `x = 1`)
+— exactly what a future "broaden the fixture" task would do — the two key sets diverge and Scenario 1
+reds for a reason unrelated to parity (a key-presence mismatch, not an output mismatch).
+
+The review-2 executor consciously declined to weaken this assertion as part of the B1 rework, on the
+grounds that a naive union-of-keys normalise could mask a real future divergence, and the fixture
+currently has no zero-output executable block. That trade-off is defensible and correctly NOT a
+blocker — but the latent fragility is real. The hardening: compare on the UNION of the two key sets
+and deep-equal `serverByBlock.get(id) ?? []` against `cliByBlock.get(id) ?? []`, so a both-empty
+block reads as parity rather than a key mismatch — while still failing loudly if one side has outputs
+the other lacks. This makes the suite safe to extend with zero-output blocks without weakening the
+real parity guarantee.
+
+Note on the sibling L2-wording item (coverage-claim-vs-fixture, also routed in the review-1/review-2
+directives): it is ALREADY RESOLVED and needs no further action. The review-2 executor reworded
+`packages/runtime-server/README.md` (lines 228-245) to "every output-bearing `IOutput` shape a bare
+Python kernel produces" and added the explicit "(Block types that need external services — SQL,
+integration, input blocks — are out of scope … the design doc's `sql-integration-parity` phase owns
+them.)" clause, and the matching test comment (lines 240-243) carries the same scoping. The SQL/
+integration parity lift itself is owned by step-7B `yzd78n` — not duplicated here. So this Item 5 is
+ONLY the Scenario 1 union-of-keys hardening; the wording is done.
+
+| Deferral Type | Description | Applies (true/false) |
+|---------------|-------------|----------------------|
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
+| note-only | Captured for record; no action; current output is fine as-is. | |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+
+**Source:** wd2nil review 1 (L1) + review 2 (L1)
+**Files touched:** packages/runtime-server/test-integration/server-run-parity.integration.test.ts (Scenario 1, lines 237-249); packages/runtime-server/test-integration/fixtures/server-run-parity.deepnote (only if the fixture is broadened). README/wording sub-item already resolved at packages/runtime-server/README.md:228-245.
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 5 classified (exactly one deferral type marked `true` above)
+- [ ] Item 5 actioned (action taken matches chosen type)
+
+### Item 6: Watch the `integration-kernels` CI wall-clock budget as per-test-server suites accrue
+
+Reviewer cycle 1 AND cycle 2 on wd2nil flagged this (L3, ci-budget-watch) — routed by the review-1
+planner directive but, like Item 5, the proposed card was never actually created (confirmed orphaned:
+no matching card in `search_cards`, absent from this retrospective until now). Capturing here this
+cycle so it is tracked.
+
+The finding: the `integration-kernels` CI job (`.github/workflows/ci.yml:229`, `timeout-minutes: 15`,
+line 232) now also runs the new real-kernel parity suite, which boots a fresh server + real kernel
+per test (4 tests, each waiting for kernel idle) on top of the existing integration files. A single
+real-kernel parity run is ~55s locally. The job has comfortable headroom today, but the per-test-
+server pattern is multiplicative: each additional per-test-server integration suite that lands
+(step-7B `yzd78n` SQL parity is already queued, and more will follow) adds another fresh-server +
+fresh-kernel boot per test, so the job's wall-clock will creep toward the 15-minute cap over time.
+
+The ask is preventive instrumentation, not a fix to anything broken: make the trend visible before it
+hits the timeout — e.g. record per-suite wall-clock (a vitest reporter line, or a CI step that
+echoes elapsed per integration file), or document a per-test-server budget convention near
+`vitest.integration.config.ts` so future suite authors know the shared ceiling. This is a watch/
+hygiene item with no current failure and no external prerequisite (the workflow and config both exist
+today); it does not block any sprint card.
+
+| Deferral Type | Description | Applies (true/false) |
+|---------------|-------------|----------------------|
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
+| note-only | Captured for record; no action; current output is fine as-is. | |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+
+**Source:** wd2nil review 1 (L3) + review 2 (L3)
+**Files touched:** .github/workflows/ci.yml (integration-kernels job, lines 229-232); vitest.integration.config.ts
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 6 classified (exactly one deferral type marked `true` above)
+- [ ] Item 6 actioned (action taken matches chosen type)

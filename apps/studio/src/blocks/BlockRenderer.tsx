@@ -18,6 +18,7 @@ import { MarkdownRenderer } from './MarkdownRenderer'
 import { SeparatorRenderer } from './SeparatorRenderer'
 import { SqlRenderer } from './SqlRenderer'
 import { TextRenderer } from './TextRenderer'
+import { UnknownBlockRenderer } from './UnknownBlockRenderer'
 import { VisualizationRenderer } from './VisualizationRenderer'
 
 export interface BlockRendererProps {
@@ -37,15 +38,10 @@ export interface BlockRendererProps {
 // later cards' diffs are keep-both-mergeable additions to the literal, never a rewrite.
 type BlockRendererComponent = FC<BlockRendererProps>
 
-// The unknown-type fallback. Step 7D supplies the real `UnknownBlockRenderer` (a labelled,
-// graceful "unsupported block" card); until then this placeholder keeps the `default`
-// branch structurally present and identifiable in the DOM (`data-block-unknown`).
-const UnknownBlockRenderer: BlockRendererComponent = ({ block }) => (
-  <div className='block__unknown' data-block-unknown='true'>
-    <span className='block__type'>{block.type}</span>
-  </div>
-)
-
+// The `default` branch is the unknown-type fallback — step 7D supplies the real
+// `UnknownBlockRenderer` (its own file: a labelled, graceful "unsupported block type" card
+// that renders the block's raw persisted content alongside the type label and never throws),
+// replacing the step-5 placeholder.
 export const BLOCK_RENDERERS: Partial<Record<BlockVM['type'], BlockRendererComponent>> & {
   default: BlockRendererComponent
 } = {

@@ -164,6 +164,35 @@ pre-execution authoring spec.
   `createMarkdown` image derivation and **sanitizing** the resulting `<img>` markup through DOMPurify
   before injection (an untrusted `javascript:`/`onerror` src cannot reach the DOM live).
 
+## Block-type coverage matrix + unknown-type fallback (`src/blocks/`)
+
+`BlockRenderer` dispatches a persisted block to its registered renderer through a single
+type-keyed registry (`BLOCK_RENDERERS`) plus a `default` branch. Every in-scope block type the
+viewer supports has its own renderer registered into that map; the `default` branch is reserved
+**structurally** for unknown types, so dispatch is exhaustive-by-construction (ADR-006 KDD §6).
+
+| Block type(s)                                                                             | Renderer                                         |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `code`                                                                                    | `CodeRenderer` (highlighted source + outputs)    |
+| `markdown`                                                                                | `MarkdownRenderer` (sanitized prose)             |
+| `sql`                                                                                     | `SqlRenderer`                                    |
+| `text-cell-{p,h1,h2,h3,bullet,todo,callout}`                                              | `TextRenderer`                                   |
+| `visualization`, `big-number`, `image`                                                    | their own renderers (see above)                  |
+| `input-{text,textarea,checkbox,select,slider,date,date-range,file}`                       | read-only input renderers (`src/blocks/inputs/`) |
+| `button`, `separator`                                                                     | `ButtonRenderer`, `SeparatorRenderer`            |
+| _anything else_ (a future block kind, or `agent` / `notebook-function` not special-cased) | `UnknownBlockRenderer` (the `default` branch)    |
+
+**Unknown-type policy (R5).** A block whose `type` is not registered — a future block kind, or one
+the viewer deliberately does not special-case — must **never crash or blank the notebook view**.
+`UnknownBlockRenderer` renders a labelled card: a clear `Unsupported block type: <type>` label plus
+the block's **raw persisted `content`**, so the block stays visible and identifiable rather than
+being silently dropped. The raw content is rendered as an **escaped React text node** (a `<pre>`),
+not via `dangerouslySetInnerHTML`, so an unknown block whose content embeds `<script>` / `onerror=` /
+`javascript:` markup is displayed literally and can never reach the DOM as live markup. The full
+per-block-type coverage is asserted off the **live registry keys** (not a hardcoded list), so every
+registered type is proven to resolve to its real renderer and only a genuinely-unregistered type
+hits the fallback — the assertion stays honest as the registry evolves.
+
 ## Why it is isolated — and how
 
 Introducing a UI framework + browser bundler is a load-bearing, one-way decision

@@ -1,9 +1,21 @@
 import type { FC } from 'react'
 import type { BlockVM } from '../shell/viewModels'
 import { BigNumberRenderer } from './BigNumberRenderer'
+import { ButtonRenderer } from './ButtonRenderer'
 import { CodeRenderer } from './CodeRenderer'
 import { ImageRenderer } from './ImageRenderer'
+import {
+  InputCheckboxRenderer,
+  InputDateRangeRenderer,
+  InputDateRenderer,
+  InputFileRenderer,
+  InputSelectRenderer,
+  InputSliderRenderer,
+  InputTextareaRenderer,
+  InputTextRenderer,
+} from './inputs'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { SeparatorRenderer } from './SeparatorRenderer'
 import { SqlRenderer } from './SqlRenderer'
 import { TextRenderer } from './TextRenderer'
 import { VisualizationRenderer } from './VisualizationRenderer'
@@ -47,9 +59,21 @@ export const BLOCK_RENDERERS: Partial<Record<BlockVM['type'], BlockRendererCompo
   'text-cell-bullet': TextRenderer,
   'text-cell-todo': TextRenderer,
   'text-cell-callout': TextRenderer,
+  // ── step 7A/7B: sql, visualization, big-number, image ──
   visualization: VisualizationRenderer,
   'big-number': BigNumberRenderer,
   image: ImageRenderer,
+  // ── step 7C: read-only input / button / separator renderers (own files) ──
+  'input-text': InputTextRenderer,
+  'input-textarea': InputTextareaRenderer,
+  'input-checkbox': InputCheckboxRenderer,
+  'input-select': InputSelectRenderer,
+  'input-slider': InputSliderRenderer,
+  'input-date': InputDateRenderer,
+  'input-date-range': InputDateRangeRenderer,
+  'input-file': InputFileRenderer,
+  button: ButtonRenderer,
+  separator: SeparatorRenderer,
   default: UnknownBlockRenderer,
 }
 

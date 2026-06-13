@@ -118,3 +118,21 @@ Serial spine 2→3→4→5→6, then parallel 7A‖7B‖7C, then 7D, then closeo
 - Next: batch 8 → cd4gxo (step 2b doc), then closeout phase.
 
 ## Batch 8: step 2b — cd4gxo (onboarding doc)
+
+- **Executor-1** (`a02deb9c51e4`): commit `4fb53fc` — doc-only (apps/studio/README.md + CONTRIBUTING.md) on the cold-checkout footgun (apps/* glob → `pnpm test` skips studio until fresh `pnpm install`). Merge ff. Reconciled `64323a0`.
+- Reviewer-1: **APPROVE** (mechanism verified vs source, CI unaffected) — BUT the reviewer's first pass did NOT persist its report file → Router-1 correctly returned **MISSING_REVIEW** (refused to fabricate a verdict). Recovery: re-dispatched reviewer with explicit write-the-report directive (APPROVE, file persisted), re-dispatched router → **APPROVAL**. Close-out: cd4gxo → **done**.
+- **Batch 8 DONE.** Sprint 11/11 feature+doc cards done.
+
+## Closeout (Phase 5)
+
+- **drmgh6 closeout** (`a0962aa901cc`): 4 retro items all → **blocked backlog cards** (Item1 HMR cdp.ts revision → `uj7zpn`; Item2 coerceMultilineString test → `0afgjv`; Item3 output styling CSS layer → `1jo9mt`; Item4 IOutput load-seam validation → `ftgq2p`). CHANGELOG.md `@deepnote/studio` entry added. Roadmap m3/s2 + spa-foundation + block-renderers → **done**. Upper-checklist cites all resolve to done-cards/fresh-backlog (no deferred-item cites). drmgh6 → **done**.
+- **v9apte planning** (`a7fb84607cee`): → **done** (planning record complete).
+- **Gate 0** (Phase 5 Step 0c): strict → `EXTERNAL_PROBE_ERROR` (gitban 2.0.0a1 ships no CI probe). **SOFT-BYPASS** re-run non-strict → **PASS** (9 cites resolve, 0 failures, 0 in_progress, 0 unflipped roadmap). First-hand evidence justifying bypass: dispatcher directly ran `pnpm test` = 2570/2570 green on milestone/m3-local-ui + merged studio 134; every batch push passed the pre-push gate (last green `babff61`). Audit: `LUIVIEW1-gate0-202606132324.json`.
+- **Archive**: all 12 cards → `archive/sprints/20260613-172431-sprint-luiview1` (SUMMARY.md + manifest). Done-tags swept.
+
+### Sprint metrics (LUIVIEW1)
+- 12 cards (1 planning, 10 feature/doc, 1 closeout) — all done.
+- Net new: `apps/studio` React 19 + Vite 7 isolated read-only viewer SPA; full block-type + Jupyter IOutput coverage; safe unknown-type fallback.
+- 7 follow-ups → backlog (cbina3, fgfnyy, e23yj2, jyapgp, uj7zpn, 0afgjv, 1jo9mt, ftgq2p — all blocked on named prerequisites, zero in-sprint tech debt).
+- Recurring gate friction caught at the dispatcher merge gate (the gate's job): cspell worktree `useGitignore` quirk (3 fixes + durable cspell.json self-exclude + base64/PNG ignore regexes), one biome organizeImports on k61ziu's api-types re-export.
+- The additive BLOCK_RENDERERS design held: 7A/7B/7C concurrent, only one trivial keep-both registry conflict.

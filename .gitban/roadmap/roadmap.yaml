@@ -1508,7 +1508,7 @@ milestones:
           plus Jupyter IOutput — the browser counterpart to the terminal output-renderer.ts.
           No execution, no editing yet: renders the project's persisted state in a
           Cloud-like view. Fork-only showcase."
-        status: todo
+        status: done
         sequence: 2
         depends_on:
           - s1
@@ -1534,7 +1534,7 @@ milestones:
               a project over the s1 API into app state. The toolchain must be
               isolated enough that it does not leak into — or risk — the
               cleanly-sliceable backend package.
-            status: todo
+            status: done
             sequence: 1
             docs_ref: docs/adr/ADR-006-spa-framework-and-bundler.md
             features:
@@ -1582,7 +1582,7 @@ milestones:
               for unknown types. Block-type coverage is the SPA's real surface
               area; rich outputs (HTML tables, images, vega/plotly) are where
               Cloud-likeness lives.
-            status: todo
+            status: done
             sequence: 2
             docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
             features:

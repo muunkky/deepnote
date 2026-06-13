@@ -1,0 +1,14 @@
+{
+  "verdict": "PASS",
+  "card_id": "drmgh6",
+  "sprint_tag": "LUIVIEW1",
+  "checked_boxes": 9,
+  "failures": [],
+  "external_state": {"sprint_ci_status": "unknown", "in_progress_cards": 0, "roadmap_paths_unflipped": []},
+  "error": null,
+  "soft_bypass": {
+    "reason": "gitban 2.0.0a1 ships no external CI probe -> first invocation returned EXTERNAL_PROBE_ERROR. Re-invoked strict_external=false. First-hand evidence (stronger than a CI dashboard read): dispatcher directly ran `pnpm test` = 2570/2570 green on milestone/m3-local-ui; merged studio suite 134/134; every batch push passed the pre-push gate (typecheck + 2570 tests + cspell), last green push at babff61.",
+    "strict_first": "EXTERNAL_PROBE_ERROR",
+    "nonstrict_retry": "PASS"
+  }
+}

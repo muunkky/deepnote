@@ -9,8 +9,8 @@
 * **Cleanup Category:** Sprint planning (goal, inventory, sequencing, parallelization)
 
 **Required Checks:**
-* [ ] Sprint/Release is identified above.
-* [ ] Primary feature work that generated this cleanup is documented.
+- [x] Sprint/Release is identified above.
+- [x] Primary feature work that generated this cleanup is documented.
 
 ### Sprint Goal
 
@@ -45,10 +45,10 @@ Stand up the monorepo's first frontend — an isolated `apps/studio` React 19 + 
 
 First, identify what was deferred or left incomplete during the main feature work. Review commit messages, PR comments, code TODOs, and team discussions for items marked "not in scope" or "do later."
 
-* [ ] Reviewed commit messages for "TODO" and "FIXME" comments added during sprint.
-* [ ] Reviewed PR comments for "out of scope" or "follow-up needed" discussions.
-* [ ] Reviewed code for new TODO/FIXME markers (grep for them).
-* [ ] Checked team chat/standup notes for deferred items.
+- [x] Reviewed commit messages for "TODO" and "FIXME" comments added during sprint.
+- [x] Reviewed PR comments for "out of scope" or "follow-up needed" discussions.
+- [x] Reviewed code for new TODO/FIXME markers (grep for them).
+- [x] Checked team chat/standup notes for deferred items.
 
 | Cleanup Category | Specific Item / Location | Priority | Justification for Cleanup |
 | :--- | :--- | :---: | :--- |
@@ -65,44 +65,44 @@ Planning-only card; the substantive checklist lives on the closeout card (step 8
 
 | Task | Status / Details | Done? |
 | :--- | :--- | :---: |
-| **Sprint plan recorded** | Goal + inventory + sequencing + parallelization captured in this card | - [ ] |
-| **Other:** Design doc grounding | All cards reference `docs/designs/m3-s2-viewer.md` phases + ADR-006/007 | - [ ] |
+| **Sprint plan recorded** | Goal + inventory + sequencing + parallelization captured in this card | - [x] |
+| **Other:** Design doc grounding | All cards reference `docs/designs/m3-s2-viewer.md` phases + ADR-006/007 | - [x] |
 
 ### Testing & Quality (optional)
 
 | Task | Status / Details | Done? |
 | :--- | :--- | :---: |
-| **Other:** N/A (planning card) | No tests authored by the planning card itself | - [ ] |
+| **Other:** N/A (planning card) | No tests authored by the planning card itself | - [x] |
 
 ### Code Quality & Technical  (optional)
 
 | Task | Status / Details | Done? |
 | :--- | :--- | :---: |
-| **Other:** N/A (planning card) | No code authored by the planning card itself | - [ ] |
+| **Other:** N/A (planning card) | No code authored by the planning card itself | - [x] |
 
 ### Dependencies &  (optional)
 
 | Task | Status / Details | Done? |
 | :--- | :--- | :---: |
-| **Other:** N/A (planning card) | No dependency changes by the planning card itself | - [ ] |
+| **Other:** N/A (planning card) | No dependency changes by the planning card itself | - [x] |
 
 ### Configuration & Environment (optional)
 
 | Task | Status / Details | Done? |
 | :--- | :--- | :---: |
-| **Other:** N/A (planning card) | No config changes by the planning card itself | - [ ] |
+| **Other:** N/A (planning card) | No config changes by the planning card itself | - [x] |
 
 ### Build & CI/CD (optional)
 
 | Task | Status / Details | Done? |
 | :--- | :--- | :---: |
-| **Other:** N/A (planning card) | No CI changes by the planning card itself | - [ ] |
+| **Other:** N/A (planning card) | No CI changes by the planning card itself | - [x] |
 
 ### Refactoring & Code Organization (optional)
 
 | Task | Status / Details | Done? |
 | :--- | :--- | :---: |
-| **Other:** N/A (planning card) | No refactoring by the planning card itself | - [ ] |
+| **Other:** N/A (planning card) | No refactoring by the planning card itself | - [x] |
 
 ---
 
@@ -130,10 +130,10 @@ Planning-only card; the substantive checklist lives on the closeout card (step 8
 
 ### Completion Checklist
 
-* [ ] Sprint goal recorded.
-* [ ] Card inventory + sequencing recorded.
-* [ ] Parallelization plan recorded.
-* [ ] All sprint cards created and moved to todo.
+- [x] Sprint goal recorded.
+- [x] Card inventory + sequencing recorded.
+- [x] Parallelization plan recorded.
+- [x] All sprint cards created and moved to todo.
 
 ---
 

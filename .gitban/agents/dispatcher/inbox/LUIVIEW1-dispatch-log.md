@@ -93,3 +93,18 @@ Serial spine 2→3→4→5→6, then parallel 7A‖7B‖7C, then 7D, then closeo
 - Next: **parallel batch 6 → 7A (83gnbp) ‖ 7B (4svfd0) ‖ 7C (mxxsr6)**. SHARED-FILE NOTE: all three add a key to the `BLOCK_RENDERERS` literal in BlockRenderer.tsx — additive/keep-both by design (sprint-architect + reviewer approved); resolve any registry merge conflict keep-both. Then 7D (wye1xt), then cd4gxo + closeout.
 
 ## Batch 6 (parallel): 7A 83gnbp ‖ 7B 4svfd0 ‖ 7C mxxsr6
+
+- **Pre-dispatch push failed twice** (transient flaky gate, then deterministic): isolated to a biome `organizeImports` error in `packages/runtime-server/src/api-types.ts` — k61ziu's type-only IOutput re-export wrote two consecutive `export type … from '@deepnote/runtime-core'`; biome merges them. This was k61ziu code that hadn't hit the pre-push gate (prior push predated its merge); reviewer checked studio app + boundary test, not repo-wide biome. Fixed `1a603ad`, pushed green. (Dispatcher-as-merge-gate caught it.)
+- **Executors (one-per-message, concurrent execution):**
+  - 7A `83gnbp` (`ae65874cf2c0`): commit `e761ad1` — SqlRenderer (highlighted query + persisted result via OutputRenderer), `sql` key. 42/42 block tests.
+  - 7B `4svfd0` (`ae82755fc1a8`): commit `4edb127` — viz/big-number/image renderers (persisted-first, DOMPurify image sanitization, no native vega/plotly added), `visualization`/`big-number`/`image` keys + README. 105/105.
+  - 7C `mxxsr6` (`a1b632e9da6b`): commit `56da693` — input-* ×8 / button / separator (inert read-only, `assertNoMutatingControl` helper), 10 keys + repointed unknown-fallback test off `separator`→`future-block`. 57 block tests.
+- **Merge:** 7A ff; 7B clean (git auto-merged additive registry); 7C conflicted on BLOCK_RENDERERS literal — **resolved keep-both** (union of all imports + all keys), biome-clean, merge commit `4f2bfa4`. The additive design held: only one 3-way textual conflict, trivially keep-both.
+- **Integration check:** merged studio suite **134 tests / 23 files green** — all renderers coexist, fallback repoint works.
+- **Proactive post-merge cspell** caught base64 test-fixture blobs (AAAABBBB/AAAANS image payloads) → added `base64,…` + PNG-signature (`iVBORw0KGgo…`) ignore regexes (`a61525b`) rather than dictionary-polluting gibberish.
+- Reviewers (parallel): 7A **APPROVAL** (+scaffold-dedup), 7B **APPROVAL** (+doc-count-drift, sanitizer-extraction), 7C **APPROVAL** (clean). Routers all **APPROVAL**.
+- Close-outs: 7A/7B/7C all → **done** (7B doc-count corrected 22→15). Planners: scaffold-dedup → blocked backlog `cbina3`; sanitizer-extraction → blocked backlog `fgfnyy`.
+- **Batch 6 DONE.** Sprint 8/11 done. Pending in-sprint: cd4gxo (step 2b doc), wye1xt (7D), drmgh6 (closeout) + v9apte (planning, closeout-coupled).
+- Next: **batch 7 → 7D `wye1xt`** (unknown-type fallback — now that 7A-C registered all sibling keys, its full-coverage capstone is meaningful).
+
+## Batch 7: 7D — wye1xt (unknown-type fallback)

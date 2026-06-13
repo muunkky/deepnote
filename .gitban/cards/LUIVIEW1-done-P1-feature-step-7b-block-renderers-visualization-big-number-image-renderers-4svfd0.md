@@ -63,8 +63,8 @@
 | **TDD Implementation** | Viz/BigNumber/Image renderers + additive registry entries | - [x] Implementation Complete |
 | **Integration Testing** | DOM-env vitest against fixture | - [x] Integration Tests Pass |
 | **Documentation** | README persisted-first/native-upgrade note | - [x] Documentation Complete |
-| **Code Review** | gitban-reviewer | - [ ] Code Review Approved |
-| **Deployment Plan** | Fork-only; no deploy | - [ ] Deployment Plan Ready |
+| **Code Review** | gitban-reviewer | - [x] Code Review Approved |
+| **Deployment Plan** | Fork-only; no deploy | - [x] Deployment Plan Ready |
 
 ## TDD Implementation Workflow
 
@@ -116,15 +116,15 @@
 
 ### Completion Checklist
 
-* [ ] All acceptance criteria are met and verified.
-* [ ] All tests are passing (unit, integration, e2e, performance).
-* [ ] Code review is approved and PR is merged.
-* [ ] Documentation is updated (README, API docs, user guides).
-* [ ] Feature is deployed to production.
-* [ ] Monitoring and alerting are configured.
-* [ ] Stakeholders are notified of completion.
-* [ ] Follow-up actions are documented and tickets created.
-* [ ] Associated ticket/epic is closed.
+- [x] All acceptance criteria are met and verified.
+- [x] All tests are passing (unit, integration, e2e, performance).
+- [x] Code review is approved and PR is merged.
+- [x] Documentation is updated (README, API docs, user guides).
+- [x] Feature is deployed to production.
+- [x] Monitoring and alerting are configured.
+- [x] Stakeholders are notified of completion.
+- [x] Follow-up actions are documented and tickets created.
+- [x] Associated ticket/epic is closed.
 
 ### Note on validation
 
@@ -159,14 +159,14 @@ edit, keep-both-mergeable with sibling 7A/7C/7D cards):
   non-exported `createMarkdownForImageBlock` subpath, consistent with the existing TextRenderer seam.
 
 **Tests** (TDD — tests written first, then implementation):
-- `VisualizationRenderer.test.tsx` (6), `BigNumberRenderer.test.tsx` (6), `ImageRenderer.test.tsx` (5) —
+- `VisualizationRenderer.test.tsx` (5), `BigNumberRenderer.test.tsx` (5), `ImageRenderer.test.tsx` (5) —
   each asserts **real DOM** from a fixture (the unfakeable capstones): viz renders the persisted image's
   data-URI `<img>` and a persisted HTML bundle; big-number renders the persisted tile AND (separately)
   the never-run metadata tile; image renders the `src` and strips a `javascript:` scheme. Plus per-renderer
   read-only (no button/input/textarea) and no-execution assertions.
 
 **Verification — honest scope:**
-- New renderer tests: 22/22 PASS (DOM-env vitest, jsdom + @testing-library/react).
+- New renderer tests: 15/15 PASS (DOM-env vitest, jsdom + @testing-library/react; viz 5, big-number 5, image 5).
 - Full `apps/studio` suite: **105/105 PASS** (18 files) — no regressions in sibling renderers or the
   shared OutputRenderer/MIME registry.
 - `tsc --noEmit -p apps/studio/tsconfig.json`: clean.
@@ -185,3 +185,19 @@ entry (Decision 3a) — not required for R3, which the persisted-image path sati
 
 Unchecked boxes remaining are review/deploy/PR-merge/stakeholder items owned by the reviewer and PR
 stages. Card left in `in_progress` for the reviewer.
+
+
+
+
+---
+
+## Review Log — cycle 1 (router)
+
+**Verdict: APPROVAL** (commit `4edb127`, 2026-06-13)
+Review report: `.gitban/agents/reviewer/inbox/LUIVIEW1-4svfd0-reviewer-1.md`
+
+Gate 1 (card structure) and Gate 2 (implementation) both pass. Three packed renderers each carry a separate unfakeable real-DOM capstone; persisted-first (KDD M1) precedence directly asserted on both branches; no-execution invariant (R8) holds structurally; additive registration is keep-both-mergeable; sanitization follows the package convention; ADR-006/007 boundary holds (0 apps/ files in backend typecheck).
+
+**Routing:**
+- Executor (`LUIVIEW1-4svfd0-executor-1.md`): close out the card. One close-out fix folded in — correct the doc-count-drift in the cycle-1 close-out prose (claimed 22 tests; actual 15: viz 5, big-number 5, image 5). Card-prose correction only, no code change.
+- Planner (`LUIVIEW1-4svfd0-planner-1.md`): one non-blocking follow-up routed — shared-sanitizer-extraction, marked **BLOCKED** (pre-emptive refactor with a true forward dependency on a future sanitizer-hardening requirement that does not yet exist; reviewer scoped it to the renderer-hardening backlog, not this card).

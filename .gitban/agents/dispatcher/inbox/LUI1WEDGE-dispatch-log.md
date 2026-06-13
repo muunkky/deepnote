@@ -277,3 +277,28 @@ will ride to the deferred close-out push.
 
 - **➡️ Dispatching `wd2nil` executor-2 (re-dispatch): fix the 3 real failures (Scenario 4 kernel-death
   terminal event is the load-bearing one), scenarios run one-at-a-time per the constrained-box protocol.**
+
+### Batch 5 — `wd2nil` (step 5 integration parity) COMPLETE → 6/12 — phase barrier cleared
+
+The headline real-kernel parity card. 3 reviewer cycles; the dispatcher provisioned a real
+`deepnote-toolkit[server]==2.3.1` venv (`/.venv`, gitignored) to substantiate the capstone — which
+surfaced REAL bugs that mocks + the original cards missed:
+- executor-1 (`24e5386`): wrote the 4-scenario suite (parity / missing-kernel / serve-smoke+loopback /
+  kernel-death). reviewer-1 REJECTION (Gate 1: capstone boxes ticked with no real run). Dispatcher's
+  real-venv run proved the suite RED.
+- executor-2 (`bbfd6da`, after a worktree-deletion env crash + retry): found the TRUE Scenario-4 root
+  cause — a hard kernel crash makes Jupyter **auto-restart** (status never `'dead'`), so mid-run death
+  was mis-categorised as in-block by BOTH server AND `deepnote run`. Fix in `kernel-client.ts` (treat
+  `restarting`/`autorestarting` mid-execute as `KernelDiedError`) + `run-queue.ts` resolve-path terminal
+  → **strengthens parity for CLI + server**. All 4 scenarios green.
+- reviewer-2 REJECTION (Gate 2): caught a ~50% non-zero-exit FLAKE — unhandled `'Kernel connection
+  disconnected'` from `@jupyterlab/services`' internal reconnect delegate during Scenario-4 teardown.
+- executor-3 (`1c97429`): scoped `unhandledRejection` guard in `disconnect()` (swallows only the benign
+  msg, re-delegates others, restores listeners, real-timer drain). 10/10 + reviewer 5/5 + dispatcher
+  3/3 consecutive clean exit-0. reviewer-3 **APPROVAL**.
+- close-out: `[ ] All tests pass in CI` honestly **deferred to od8esg** (integration-kernels runs at PR
+  time); all other boxes substantiated by local real-venv evidence. Planner: L1/L2/L3 → od8esg Items 5-8.
+- **Cross-session collision resolved:** a 2nd dispatcher (`pts/5`) had `resume`-d the same sprint; its
+  worktree sweeps were destroying my live executor worktrees (the "env crash"). It stood down; branch
+  intact, nothing lost.
+- **➡️ Next: batch 6 — `sqm7ox` (7A, `deepnote ui` launch alias) ‖ `yzd78n` (7B, SQL-block parity).**

@@ -1297,7 +1297,7 @@ milestones:
           P1 (headless server core), P6 (CLI integration), and P7 (decompose for upstream).
           Dev setup: cli/runtime-core area — Python 3 + jinja2; a venv with deepnote-toolkit[server];
           point pythonEnv/--python at it."
-        status: todo
+        status: done
         sequence: 1
         depends_on: []
         docs_ref: docs/designs/m3-s1-server-api-and-serve.md
@@ -1330,7 +1330,7 @@ milestones:
               resolution, integrations wiring, and reactivity exactly as run.ts composes
               them. The shareable wedge offered upstream on #162. Carries the save
               round-trip safety gate (ships in P1, before any editing UI exists).'
-            status: todo
+            status: done
             sequence: 1
             docs_ref: docs/adr/ADR-007-server-spa-package-layout.md
             features:
@@ -1343,8 +1343,9 @@ milestones:
                   WebSocket for the execution event stream. No frontend
                   dependency. Establishes the package boundary that keeps the
                   backend upstream-sliceable.
-                status: todo
+                status: done
                 sequence: 1
+                actual_completion_date: '2026-06-13'
               project-open-list-api:
                 id: project-open-list-api
                 title: Open project + list notebooks/blocks API
@@ -1352,8 +1353,9 @@ milestones:
                   return its metadata + notebook/block tree (GET /api/project),
                   reusing deserializeDeepnoteFile and interpreter/kernel
                   resolution as run.ts composes them.
-                status: todo
+                status: done
                 sequence: 2
+                actual_completion_date: '2026-06-13'
               execute-stream-ws:
                 id: execute-stream-ws
                 title: Execute block(s) + stream events over WS
@@ -1364,11 +1366,12 @@ milestones:
                   WS /api/stream. Preserves the run.ts failureCategory
                   discriminants (missing-kernel / kernel-launch / kernel-died /
                   in-block) in error payloads.
-                status: todo
+                status: done
                 sequence: 3
                 depends_on:
                   - project-open-list-api
                 docs_ref: docs/adr/ADR-005-browser-kernel-transport-proxy.md
+                actual_completion_date: '2026-06-13'
               save-api:
                 id: save-api
                 title: Save API (semantic round-trip + idempotence)
@@ -1378,10 +1381,11 @@ milestones:
                   (a second no-op save produces an empty git diff). Ships in P1, before
                   any editing UI exists. Byte-equality with the original file is explicitly
                   NOT the bar.'
-                status: todo
+                status: done
                 sequence: 4
                 depends_on:
                   - project-open-list-api
+                actual_completion_date: '2026-06-13'
               server-integration-tests:
                 id: server-integration-tests
                 title: Server integration tests
@@ -1390,11 +1394,13 @@ milestones:
                   round-trip fidelity. Asserts streaming order/fidelity, failure-category
                   fidelity, and save idempotence — the documented launch criteria
                   for the wedge.'
-                status: todo
+                status: done
                 sequence: 5
                 depends_on:
                   - execute-stream-ws
                   - save-api
+                actual_completion_date: '2026-06-13'
+            actual_completion_date: '2026-06-13'
           cli-serve:
             id: cli-serve
             title: '`deepnote serve` / `deepnote ui` command'
@@ -1407,7 +1413,7 @@ milestones:
               a thin alias that defaults --open (final naming is a P6 call).
               Includes SQL/integration parity with run via the integrations env
               wiring.
-            status: todo
+            status: done
             sequence: 2
             docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
             features:
@@ -1420,10 +1426,11 @@ milestones:
                   free port and reports the chosen URL), with --port and --no-open
                   flags. A natural sibling of `deepnote run`. Includes clean startup/ready/stop
                   logging and a Ctrl-C shutdown that stops the toolkit server (engine.stop()).'
-                status: todo
+                status: done
                 sequence: 1
                 depends_on:
                   - server-package-scaffold
+                actual_completion_date: '2026-06-13'
               browser-launch-alias:
                 id: browser-launch-alias
                 title: '`deepnote ui` browser-opening alias'
@@ -1431,10 +1438,11 @@ milestones:
                   opening the browser to the served URL. `serve` carries
                   headless-API connotations; `ui` opens a browser — final naming
                   is a P6 call (Open Questions).
-                status: todo
+                status: done
                 sequence: 2
                 depends_on:
                   - serve-command
+                actual_completion_date: '2026-06-13'
               sql-integration-parity:
                 id: sql-integration-parity
                 title: SQL / integration parity with `run`
@@ -1443,10 +1451,12 @@ milestones:
                   opt-in network feature (e.g. API-backed integrations) must be
                   off by default and visibly optional to preserve the
                   local-first guarantee.
-                status: todo
+                status: done
                 sequence: 3
                 depends_on:
                   - serve-command
+                actual_completion_date: '2026-06-13'
+            actual_completion_date: '2026-06-13'
           wedge-slice-showcase:
             id: wedge-slice-showcase
             title: Slice the wedge as a contrib diff + showcase post
@@ -1456,7 +1466,7 @@ milestones:
               showcase thread on muunkky/deepnote. This is a dry run of the eventual
               #162 engagement; nothing is pushed to deepnote/deepnote yet. The full
               SPA monolith stays as the fork-only process diff."
-            status: todo
+            status: done
             sequence: 3
             docs_ref: docs/prds/PRD-003-local-deepnote-ui.md
             features:
@@ -1468,10 +1478,11 @@ milestones:
                   .gitban/.claude/docs. Must build clean off upstream/main. The
                   SPA is explicitly NOT in this diff. This is the exact diff we
                   would open against deepnote/deepnote once invited.
-                status: todo
+                status: done
                 sequence: 1
                 depends_on:
                   - server-integration-tests
+                actual_completion_date: '2026-06-13'
               fork-showcase-post:
                 id: fork-showcase-post
                 title: Post the milestone update to the fork showcase thread
@@ -1481,10 +1492,13 @@ milestones:
                   showcase. A dry run of the eventual #162 engagement — nothing is
                   pushed to deepnote/deepnote yet (follows the #288 pattern: showcase
                   and ask before pushing).'
-                status: todo
+                status: done
                 sequence: 2
                 depends_on:
                   - contrib-diff-cut
+                actual_completion_date: '2026-06-13'
+            actual_completion_date: '2026-06-13'
+        actual_completion_date: '2026-06-13'
       s2:
         id: s2
         title: Open & view a notebook locally

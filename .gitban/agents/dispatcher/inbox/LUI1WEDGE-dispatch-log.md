@@ -319,3 +319,19 @@ surfaced REAL bugs that mocks + the original cards missed:
 - Full mocked suite 2471 green; typecheck green. Per-card "PR merged" governance boxes checked at
   close-out per established convention (all done cards).
 - **➡️ Next: `gwblh2` (step 7C, cli suite-6 cwd decouple) → then `dx99dj` (step 8 contrib slice).**
+
+## Phase 5 — Sprint Closeout (13/13 done)
+
+- All 13 cards done (12 planned + gwblh2 step-7C self-healed in). Step-9 showcase posted to fork
+  Discussion #5 (then rewritten per Cameron: reporter voice, architecture-decisions focus, for the
+  maintaining team) — fork-only, nothing to deepnote/deepnote. sprint-record/LUI1WEDGE process-diff
+  branch cut + pushed.
+- **Closeout card od8esg:** 11 retro items triaged → 9 backlog cards (c5fy0z, vifjw7, a7wizt, q2pgpq,
+  70jusx, yxobgm, nfg0zr, vlql29, snyizv) + 1 note-only; CHANGELOG.md added; roadmap m3/s1 + 3 projects +
+  10 features flipped done; slice-integrity + ADR-007 boundary CI gates confirmed wired.
+- **Gate 0:** strict EXTERNAL_PROBE_ERROR (no CI probe wired in gitban 2.0.0a1; fork runs no Actions on
+  this branch). Re-ran strict_external=false: first FAIL (od8esg line-85 cite retro:item-1 → deferred,
+  the UIPOL7A guard) — corrected the cite to the cleanup-backlog cards → **PASS** (9 cited boxes, 0
+  failures, in_progress 0, roadmap flipped). Soft-bypass of the unwired CI probe documented with
+  first-hand CI-green evidence (pre-push full-CI green every push + local real-kernel runs). Audit JSON:
+  LUI1WEDGE-gate0-20260613-0700.json.

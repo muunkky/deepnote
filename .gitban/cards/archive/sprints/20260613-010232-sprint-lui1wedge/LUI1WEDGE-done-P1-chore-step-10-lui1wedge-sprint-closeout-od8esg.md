@@ -15,15 +15,15 @@ Close out sprint LUI1WEDGE: archive done cards, generate the sprint summary, upd
 * **Cleanup Category:** Sprint closeout (archive + summary + CHANGELOG + roadmap + retrospective)
 
 **Required Checks:**
-* [ ] Sprint/Release is identified above.
-* [ ] Primary feature work that generated this cleanup is documented.
+- [x] Sprint/Release is identified above.
+- [x] Primary feature work that generated this cleanup is documented.
 
 ## Deferred Work Review
 
-* [ ] Reviewed commit messages for "TODO" and "FIXME" comments added during sprint.
-* [ ] Reviewed PR comments for "out of scope" or "follow-up needed" discussions.
-* [ ] Reviewed code for new TODO/FIXME markers (grep for them).
-* [ ] Checked team chat/standup notes for deferred items.
+- [x] Reviewed commit messages for "TODO" and "FIXME" comments added during sprint.
+- [x] Reviewed PR comments for "out of scope" or "follow-up needed" discussions.
+- [x] Reviewed code for new TODO/FIXME markers (grep for them).
+- [x] Checked team chat/standup notes for deferred items.
 
 | Cleanup Category | Specific Item / Location | Priority | Justification for Cleanup |
 | :--- | :--- | :---: | :--- |
@@ -41,14 +41,14 @@ Close out sprint LUI1WEDGE: archive done cards, generate the sprint summary, upd
 
 | Task | Status / Details | Done? |
 | :--- | :--- | :---: |
-| **CHANGELOG** | added entry for runtime-server + serve/ui | - [ ] |
-| **Architecture Docs** | roadmap m3/s1 marked complete | - [ ] |
+| **CHANGELOG** | added `CHANGELOG.md` (root) entry: `@deepnote/runtime-server` (GET /api/project kernel-free, run-over-WS queue, atomic semantic save) + `deepnote serve`/`ui` + SQL/integration env parity | - [x] |
+| **Architecture Docs** | roadmap m3/s1 + all 3 projects (serve-api, cli-serve, wedge-slice-showcase) + all 10 features marked `done` (actual_completion_date 2026-06-13) | - [x] |
 
 ### Build & CI/CD (optional)
 
 | Task | Status / Details | Done? |
 | :--- | :--- | :---: |
-| **CI Pipeline** | slice-integrity + boundary checks confirmed wired | - [ ] |
+| **CI Pipeline** | CONFIRMED WIRED: `slice-integrity.test.ts` (dx99dj), `no-cli-import.test.ts` (yzd78n) + `api-types-no-runtime-import.test.ts` (87ifqe) all match the default vitest `**/*.test.ts` include and are NOT `*.integration.test.ts`, so they run in the always-on `pnpm test` / `test:coverage` CI job (not the gated integration-kernels job). The ADR-007 one-way-dependency + no-`apps/`-edge boundary is enforced on every push. Verified green locally (9/9). | - [x] |
 
 ## Validation & Closeout
 
@@ -74,25 +74,25 @@ Close out sprint LUI1WEDGE: archive done cards, generate the sprint summary, upd
 
 ### Completion Checklist
 
-* [ ] All P0 items are complete and verified.
-* [ ] All P1 items are complete or have follow-up tickets created.
-* [ ] P2 items are complete or explicitly deferred with tickets.
-* [ ] All tests are passing (unit, integration, and regression).
-* [ ] No new linter warnings or errors introduced.
-* [ ] All documentation updates are complete and reviewed.
-* [ ] Code changes (if any) are reviewed and merged.
-* [ ] Follow-up tickets are created and prioritized for next sprint.
-* [ ] Team retrospective includes discussion of cleanup backlog (if significant).
+- [x] All P0 items are complete and verified. <!-- cite: card:hlai4c --> <!-- cite: card:e6e3lt -->
+- [x] All P1 items are complete or have follow-up tickets created. <!-- cite: card:x71bcm --> <!-- cite: card:wd2nil --> <!-- cite: card:zq7q0g --> <!-- cite: card:sqm7ox --> <!-- cite: card:yzd78n --> <!-- cite: card:dx99dj --> <!-- cite: card:k65hcx -->
+- [x] P2 items are complete or explicitly deferred with tickets. <!-- cite: retro:item-6 --> <!-- cite: card:nfg0zr -->
+- [x] All tests are passing (unit, integration, and regression). <!-- cite: card:wd2nil --> <!-- cite: card:dx99dj -->
+- [x] No new linter warnings or errors introduced. <!-- cite: card:dx99dj -->
+- [x] All documentation updates are complete and reviewed. <!-- cite: roadmap:m3/s1 -->
+- [x] Code changes (if any) are reviewed and merged. <!-- cite: card:hlai4c --> <!-- cite: card:dx99dj -->
+- [x] Follow-up tickets are created and prioritized for next sprint. <!-- cite: card:c5fy0z --> <!-- cite: card:vifjw7 --> <!-- cite: card:a7wizt --> <!-- cite: card:q2pgpq --> <!-- cite: card:70jusx --> <!-- cite: card:yxobgm --> <!-- cite: card:nfg0zr --> <!-- cite: card:vlql29 --> <!-- cite: card:snyizv -->
+- [x] Team retrospective includes discussion of cleanup backlog (if significant). <!-- cite: card:nfg0zr --> <!-- cite: card:snyizv -->
 
 ## Acceptance Criteria
 
-- [ ] Every item under `## Sprint Retrospective` has exactly one deferral-type row marked `true` in its inline grid (exactly-one-true constraint)
-- [ ] Every item has its `Action taken:` field filled in matching the chosen deferral type (card id for backlog/sprint, prose for note-only, commit hash for fixed-with-note)
-- [ ] Every item's two per-item checkboxes (`Item {N} classified`, `Item {N} actioned`) are ticked
-- [ ] Sprint summary generated via `generate_archive_summary`
-- [ ] Roadmap updated for any stories this sprint completed
-- [ ] `CHANGELOG.md` updated for any user-visible changes landed this sprint
-- [ ] All sprint cards archived via `archive_cards`
+- [x] Every item under `## Sprint Retrospective` has exactly one deferral-type row marked `true` in its inline grid (exactly-one-true constraint)
+- [x] Every item has its `Action taken:` field filled in matching the chosen deferral type (card id for backlog/sprint, prose for note-only, commit hash for fixed-with-note)
+- [x] Every item's two per-item checkboxes (`Item {N} classified`, `Item {N} actioned`) are ticked
+- [ ] Sprint summary generated via `generate_archive_summary` — deferred to dispatcher Phase 5 Step 2 (runs after this card completes; requires the archived sprint folder name as input)
+- [x] Roadmap updated for any stories this sprint completed
+- [x] `CHANGELOG.md` updated for any user-visible changes landed this sprint
+- [ ] All sprint cards archived via `archive_cards` — deferred to dispatcher Phase 5 Step 2 (the dispatcher owns archiving; the closeout directive forbids the closeout agent from archiving)
 
 
 ## Sprint Retrospective
@@ -119,17 +119,17 @@ exactly-one-true grid below is for the closeout agent to fill.
 
 | Deferral Type | Description | Applies (true/false) |
 |---------------|-------------|----------------------|
-| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
-| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
-| note-only | Captured for record; no action; current output is fine as-is. | |
-| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | true |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | false |
+| note-only | Captured for record; no action; current output is fine as-is. | false |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | false |
 
 **Source:** x71bcm review 1
 **Files touched:** packages/runtime-server/src/session.test.ts (the kernel-free regression lives here; engine spy target arrives via hlai4c / step 4A)
-**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+**Action taken:** card c5fy0z created in loose backlog (type=test, P2). The kernel-free guarantee (KD-6) now has a constructible ExecutionEngine via hlai4c, so the engine-construction-spy negative regression is real future test work needing its own review cycle — not a closeout inline fix.
 
-- [ ] Item 1 classified (exactly one deferral type marked `true` above)
-- [ ] Item 1 actioned (action taken matches chosen type)
+- [x] Item 1 classified (exactly one deferral type marked `true` above)
+- [x] Item 1 actioned (action taken matches chosen type)
 
 ### Item 2: Fix `run-start.totalBlocks` contract lie
 
@@ -155,17 +155,17 @@ is for the closeout agent to fill.
 
 | Deferral Type | Description | Applies (true/false) |
 |---------------|-------------|----------------------|
-| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
-| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
-| note-only | Captured for record; no action; current output is fine as-is. | |
-| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | true |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | false |
+| note-only | Captured for record; no action; current output is fine as-is. | false |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | false |
 
 **Source:** hlai4c review 1
 **Files touched:** packages/runtime-server/src/run-queue.ts, packages/runtime-server/src/api-types.ts, packages/runtime-server/README.md, packages/runtime-server/src/run-queue.test.ts
-**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+**Action taken:** card vifjw7 created in loose backlog (type=feature, P2). This is a behavioral contract change touching run-queue.ts, api-types.ts, the README and run-queue.test.ts (drop the field or plumb a real count) — explicitly NOT a closeout inline fix per the directive; it needs its own review cycle.
 
-- [ ] Item 2 classified (exactly one deferral type marked `true` above)
-- [ ] Item 2 actioned (action taken matches chosen type)
+- [x] Item 2 classified (exactly one deferral type marked `true` above)
+- [x] Item 2 actioned (action taken matches chosen type)
 
 ### Item 3: Reset dead engine after mid-run kernel death (session lifecycle)
 
@@ -190,17 +190,17 @@ make), but the exactly-one-true grid below is for the closeout agent to fill.
 
 | Deferral Type | Description | Applies (true/false) |
 |---------------|-------------|----------------------|
-| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
-| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
-| note-only | Captured for record; no action; current output is fine as-is. | |
-| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | true |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | false |
+| note-only | Captured for record; no action; current output is fine as-is. | false |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | false |
 
 **Source:** hlai4c review 1
 **Files touched:** packages/runtime-server/src/session.ts, packages/runtime-server/src/run-queue.ts (terminal-failure path), session/run-queue tests
-**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+**Action taken:** card a7wizt created in loose backlog (type=feature, P2). A real P3-scoped behavioral session-lifecycle fix (reset dead engine vs surface fatal state, plus the second-run-after-death test) — the directive names this an example of backlog, not a closeout inline fix.
 
-- [ ] Item 3 classified (exactly one deferral type marked `true` above)
-- [ ] Item 3 actioned (action taken matches chosen type)
+- [x] Item 3 classified (exactly one deferral type marked `true` above)
+- [x] Item 3 actioned (action taken matches chosen type)
 
 ### Item 4: Thread `wsLowWaterMark`/`drainPollMs` through `createServer`
 
@@ -220,17 +220,17 @@ card), but the exactly-one-true grid below is for the closeout agent to fill.
 
 | Deferral Type | Description | Applies (true/false) |
 |---------------|-------------|----------------------|
-| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
-| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
-| note-only | Captured for record; no action; current output is fine as-is. | |
-| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | true |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | false |
+| note-only | Captured for record; no action; current output is fine as-is. | false |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | false |
 
 **Source:** hlai4c review 1
 **Files touched:** packages/runtime-server/src/server.ts, packages/runtime-server/src/run-queue.ts (RunQueueOptions surface), packages/runtime-server/src/server-run.test.ts
-**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+**Action taken:** card q2pgpq created in loose backlog (type=feature, P2). Config-surface change to runtime-server's createServer (thread wsLowWaterMark/drainPollMs + a test) — the directive explicitly classes config threading as backlog, not a closeout inline fix.
 
-- [ ] Item 4 classified (exactly one deferral type marked `true` above)
-- [ ] Item 4 actioned (action taken matches chosen type)
+- [x] Item 4 classified (exactly one deferral type marked `true` above)
+- [x] Item 4 actioned (action taken matches chosen type)
 
 ### Item 5: Harden the server↔`run` parity Scenario 1 against future no-output executable blocks
 
@@ -269,17 +269,17 @@ ONLY the Scenario 1 union-of-keys hardening; the wording is done.
 
 | Deferral Type | Description | Applies (true/false) |
 |---------------|-------------|----------------------|
-| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
-| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
-| note-only | Captured for record; no action; current output is fine as-is. | |
-| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | true |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | false |
+| note-only | Captured for record; no action; current output is fine as-is. | false |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | false |
 
 **Source:** wd2nil review 1 (L1) + review 2 (L1)
 **Files touched:** packages/runtime-server/test-integration/server-run-parity.integration.test.ts (Scenario 1, lines 237-249); packages/runtime-server/test-integration/fixtures/server-run-parity.deepnote (only if the fixture is broadened). README/wording sub-item already resolved at packages/runtime-server/README.md:228-245.
-**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+**Action taken:** card 70jusx created in loose backlog (type=test, P2) for the Scenario 1 union-of-keys hardening — a real parity-test change needing its own review cycle (integration suite). The sibling L2-wording sub-item is already resolved (README:228-245, done during wd2nil review 2) and needs no further action — noted here, not actioned.
 
-- [ ] Item 5 classified (exactly one deferral type marked `true` above)
-- [ ] Item 5 actioned (action taken matches chosen type)
+- [x] Item 5 classified (exactly one deferral type marked `true` above)
+- [x] Item 5 actioned (action taken matches chosen type)
 
 ### Item 6: Watch the `integration-kernels` CI wall-clock budget as per-test-server suites accrue
 
@@ -305,17 +305,17 @@ today); it does not block any sprint card.
 
 | Deferral Type | Description | Applies (true/false) |
 |---------------|-------------|----------------------|
-| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
-| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
-| note-only | Captured for record; no action; current output is fine as-is. | |
-| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | false |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | false |
+| note-only | Captured for record; no action; current output is fine as-is. | true |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | false |
 
 **Source:** wd2nil review 1 (L3) + review 2 (L3)
 **Files touched:** .github/workflows/ci.yml (integration-kernels job, lines 229-232); vitest.integration.config.ts
-**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+**Action taken:** noted, no action. This is a preventive watch/hygiene item — there is no current failure (the integration-kernels job has comfortable headroom under its 15-min cap today) and no concrete prerequisite. The wall-clock trend only matters as more per-test-server suites accrue; recorded here so a future suite author (e.g. the SQL-parity follow-on) re-evaluates per-suite budget before the cap is approached. No card filed.
 
-- [ ] Item 6 classified (exactly one deferral type marked `true` above)
-- [ ] Item 6 actioned (action taken matches chosen type)
+- [x] Item 6 classified (exactly one deferral type marked `true` above)
+- [x] Item 6 actioned (action taken matches chosen type)
 
 ### Item 7: Make the dead-kernel disconnect rejection guard re-entrant before multi-session
 
@@ -349,17 +349,17 @@ for the closeout agent to fill.
 
 | Deferral Type | Description | Applies (true/false) |
 |---------------|-------------|----------------------|
-| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
-| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
-| note-only | Captured for record; no action; current output is fine as-is. | |
-| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | true |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | false |
+| note-only | Captured for record; no action; current output is fine as-is. | false |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | false |
 
 **Source:** wd2nil review 3 (L1)
 **Files touched:** packages/runtime-core/src/kernel-client.ts (`disconnect()` / `#withDeadKernelRejectionGuard` teardown path), packages/runtime-core/src/kernel-client.test.ts
-**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+**Action taken:** card yxobgm created in loose backlog (type=refactor, P2). Grouped with Item 8 (same disconnect() teardown path, same commit 1c97429): the re-entrancy guard is a prerequisite before multi-session and is real behavioral hardening on kernel-client.ts — backlog, not a closeout inline fix.
 
-- [ ] Item 7 classified (exactly one deferral type marked `true` above)
-- [ ] Item 7 actioned (action taken matches chosen type)
+- [x] Item 7 classified (exactly one deferral type marked `true` above)
+- [x] Item 7 actioned (action taken matches chosen type)
 
 ### Item 8: Gate the teardown-drain magic count against the next `@jupyterlab/services` bump
 
@@ -393,17 +393,17 @@ to fill.
 
 | Deferral Type | Description | Applies (true/false) |
 |---------------|-------------|----------------------|
-| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
-| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
-| note-only | Captured for record; no action; current output is fine as-is. | |
-| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | true |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | false |
+| note-only | Captured for record; no action; current output is fine as-is. | false |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | false |
 
 **Source:** wd2nil review 3 (L2)
 **Files touched:** packages/runtime-core/src/kernel-client.ts (`disconnect()` drain count), packages/runtime-core/src/kernel-client.test.ts, packages/runtime-server/test-integration/server-run-parity.integration.test.ts (real-venv determinism gate)
-**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+**Action taken:** card yxobgm created in loose backlog (type=refactor, P2) — grouped with Item 7 (same disconnect() teardown machinery, same commit 1c97429). Covers the @jupyterlab/services-bump regression gate plus the optional self-tuning drain. Backlog (own review cycle), not a closeout inline fix.
 
-- [ ] Item 8 classified (exactly one deferral type marked `true` above)
-- [ ] Item 8 actioned (action taken matches chosen type)
+- [x] Item 8 classified (exactly one deferral type marked `true` above)
+- [x] Item 8 actioned (action taken matches chosen type)
 
 ### Item 9: Single-source the lifted integration helpers across the cli ↔ runtime-core boundary (close the KD-3 DRY gap)
 
@@ -457,17 +457,17 @@ since they share the single-source-of-truth capstone.
 
 | Deferral Type | Description | Applies (true/false) |
 |---------------|-------------|----------------------|
-| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
-| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
-| note-only | Captured for record; no action; current output is fine as-is. | |
-| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | true |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | false |
+| note-only | Captured for record; no action; current output is fine as-is. | false |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | false |
 
 **Source:** yzd78n review 1 (L1 + L2 + L3)
 **Files touched:** packages/cli/src/constants.ts, packages/runtime-core/src/integrations/constants.ts, packages/cli/src/utils/file-resolver.ts, packages/runtime-core/src/integrations/errno.ts, packages/cli/src/commands/run.ts, packages/runtime-core/src/integrations/resolve-integration-env.ts (or wherever `resolveIntegrationEnv` lives)
-**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+**Action taken:** card nfg0zr created in loose backlog (type=refactor, P2). The KD-3 DRY trio (L1 constants, L2 errno, L3 orchestration) is filed as ONE card per the directive's grouping rule — they share the single-source-of-truth capstone. Real DRY tech debt with a concrete drift->parity-divergence failure mode and a behavior-preserving L3 consume; needs its own review cycle, not a closeout inline fix.
 
-- [ ] Item 9 classified (exactly one deferral type marked `true` above)
-- [ ] Item 9 actioned (action taken matches chosen type)
+- [x] Item 9 classified (exactly one deferral type marked `true` above)
+- [x] Item 9 actioned (action taken matches chosen type)
 
 ### Item 10: Widen slice-integrity boundary enforcement to the full contrib closure (runtime-core + blocks), or land the deferred madge/depcruise no-edge gate
 
@@ -505,17 +505,17 @@ wants to invest in madge/depcruise as the standing boundary tool.
 
 | Deferral Type | Description | Applies (true/false) |
 |---------------|-------------|----------------------|
-| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
-| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
-| note-only | Captured for record; no action; current output is fine as-is. | |
-| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | true |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | false |
+| note-only | Captured for record; no action; current output is fine as-is. | false |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | false |
 
 **Source:** dx99dj review 1 (L2)
 **Files touched:** packages/runtime-server/src/slice-integrity.test.ts (widen the AST scan to the full closure), or a new madge/dependency-cruiser config under packages/ + a CI step wiring the `packages/ → apps/` no-edge check
-**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+**Action taken:** card vlql29 created in loose backlog (type=feature, P2). Widening the ADR-007 boundary gate to the full contrib closure (runtime-core + blocks) — a real load-bearing CI-gate change needing a review cycle. Prefer the AST-widening option (no new tooling); option (b) madge/depcruise is the alternative. Not a closeout inline fix.
 
-- [ ] Item 10 classified (exactly one deferral type marked `true` above)
-- [ ] Item 10 actioned (action taken matches chosen type)
+- [x] Item 10 classified (exactly one deferral type marked `true` above)
+- [x] Item 10 actioned (action taken matches chosen type)
 
 ### Item 11: Harden the cli diff/dag/lint suites against the process.exit-mock / timeout isolation flakes
 
@@ -548,14 +548,15 @@ below is for the closeout agent to fill.
 
 | Deferral Type | Description | Applies (true/false) |
 |---------------|-------------|----------------------|
-| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
-| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
-| note-only | Captured for record; no action; current output is fine as-is. | |
-| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | true |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | false |
+| note-only | Captured for record; no action; current output is fine as-is. | false |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | false |
 
 **Source:** dx99dj review 1 (L3)
 **Files touched:** packages/cli/src/commands/diff.test.ts, packages/cli/src/commands/dag.test.ts, packages/cli/src/commands/lint.test.ts
-**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+**Action taken:** card snyizv created in loose backlog (type=bug, P2). Real recurring test-isolation/timeout flake debt (forced a --no-verify workaround during dx99dj) across three cli suites — needs the mock-isolation fix and its own review cycle. Filed as backlog rather than a closeout inline fix; the files are byte-identical to upstream/main so the change is recorded conservatively.
 
-- [ ] Item 11 classified (exactly one deferral type marked `true` above)
-- [ ] Item 11 actioned (action taken matches chosen type)
+- [x] Item 11 classified (exactly one deferral type marked `true` above)
+- [x] Item 11 actioned (action taken matches chosen type)
+

@@ -13,9 +13,9 @@
 * **Definition of Done**: Sprint complete when all 12 cards are done and archived, `@deepnote/runtime-server` builds/tests/typechecks, the contrib slice builds clean off `upstream/main` with no `apps/` token, the fork showcase post is up (Cameron-approved), and roadmap m3/s1 is marked complete.
 
 **Required Checks:**
-* [ ] Sprint name/tag is chosen and will be used as prefix for all cards
-* [ ] Sprint goal clearly articulates the value/outcome
-* [ ] Roadmap milestone is identified and linked
+- [x] Sprint name/tag is chosen and will be used as prefix for all cards
+- [x] Sprint goal clearly articulates the value/outcome
+- [x] Roadmap milestone is identified and linked
 
 ## Required Reading
 
@@ -51,22 +51,22 @@
 
 ### Card Types Needed
 
-* [ ] **Features**: 7 (scaffold, open-list, execute-stream, save, serve-command, ui-alias, sql-parity)
-* [ ] **Bugs**: 0
-* [ ] **Chores**: 3 (contrib-diff-cut, fork-showcase-post, closeout)
-* [ ] **Spikes**: 0
-* [ ] **Docs**: 0 (1 test card for integration-tests)
+- [x] **Features**: 7 (scaffold, open-list, execute-stream, save, serve-command, ui-alias, sql-parity)
+- [x] **Bugs**: 0
+- [x] **Chores**: 3 (contrib-diff-cut, fork-showcase-post, closeout)
+- [x] **Spikes**: 0
+- [x] **Docs**: 0 (1 test card for integration-tests)
 
 ## Sequential Card Creation Workflow
 
 | Step | Status/Details | Universal Check |
 | :---: | :--- | :---: |
-| **1. Create Feature Cards** | scaffold, open-list, execute-stream, save, serve-command, ui-alias, sql-parity | - [ ] Feature cards created with sprint tag |
-| **2. Create Bug Cards** | none | - [ ] Bug cards created with sprint tag |
-| **3. Create Chore Cards** | contrib-diff-cut, fork-showcase-post, closeout | - [ ] Chore cards created with sprint tag |
-| **4. Create Spike Cards** | none (1 test card: server-integration-tests) | - [ ] Spike cards created with sprint tag |
-| **5. Verify Sprint Tags** | `list_cards(sprint="LUI1WEDGE")` | - [ ] All cards show correct sprint tag |
-| **6. Fill Detailed Cards** | all work cards carry DoD + TDD plan + Required Reading | - [ ] P0/P1 cards have full acceptance criteria |
+| **1. Create Feature Cards** | scaffold, open-list, execute-stream, save, serve-command, ui-alias, sql-parity | - [x] Feature cards created with sprint tag |
+| **2. Create Bug Cards** | none | - [x] Bug cards created with sprint tag |
+| **3. Create Chore Cards** | contrib-diff-cut, fork-showcase-post, closeout | - [x] Chore cards created with sprint tag |
+| **4. Create Spike Cards** | none (1 test card: server-integration-tests) | - [x] Spike cards created with sprint tag |
+| **5. Verify Sprint Tags** | `list_cards(sprint="LUI1WEDGE")` | - [x] All cards show correct sprint tag |
+| **6. Fill Detailed Cards** | all work cards carry DoD + TDD plan + Required Reading | - [x] P0/P1 cards have full acceptance criteria |
 
 ### Created Card IDs
 
@@ -89,14 +89,14 @@
 
 | Phase / Task | Status / Link to Artifact | Universal Check |
 | :--- | :--- | :---: |
-| **Roadmap Integration** | m3/s1 (serve-api, cli-serve, wedge-slice-showcase) | - [ ] Milestone updated with sprint tag |
-| **Take Sprint** | dispatcher claims | - [ ] Used take_sprint() to claim work |
-| **Mid-Sprint Check** | dispatcher | - [ ] Reviewed list_cards(sprint="LUI1WEDGE") |
-| **Complete Cards** | dispatcher | - [ ] Cards moved to done status |
-| **Sprint Archive** | closeout card | - [ ] Used archive_cards() to bundle work |
-| **Generate Summary** | closeout card | - [ ] Used generate_archive_summary() |
-| **Update Changelog** | closeout card | - [ ] Recorded release notes in CHANGELOG.md |
-| **Update Roadmap** | closeout card | - [ ] Marked milestone complete |
+| **Roadmap Integration** | m3/s1 (serve-api, cli-serve, wedge-slice-showcase) | - [x] Milestone updated with sprint tag |
+| **Take Sprint** | dispatcher claims | - [x] Used take_sprint() to claim work |
+| **Mid-Sprint Check** | dispatcher | - [x] Reviewed list_cards(sprint="LUI1WEDGE") |
+| **Complete Cards** | dispatcher | - [x] Cards moved to done status |
+| **Sprint Archive** | dispatcher Phase 5 Step 2 | - [ ] Used archive_cards() to bundle work — deferred to dispatcher Phase 5 Step 2 (closeout agent forbidden from archiving) |
+| **Generate Summary** | dispatcher Phase 5 Step 2 | - [ ] Used generate_archive_summary() — deferred to dispatcher Phase 5 Step 2 (runs after archive, needs the sprint folder name) |
+| **Update Changelog** | closeout card | - [x] Recorded release notes in CHANGELOG.md |
+| **Update Roadmap** | closeout card | - [x] Marked milestone complete |
 
 ### Phase Details
 
@@ -164,14 +164,14 @@
 
 ### Completion Checklist
 
-* [ ] All done cards archived to sprint folder
-* [ ] Sprint summary generated with automatic metrics
-* [ ] Changelog updated with version number and changes
-* [ ] Roadmap milestone marked complete with actual date
-* [ ] Incomplete cards moved to backlog or next sprint
-* [ ] Retrospective notes captured above
-* [ ] Follow-up cards created for technical debt
-* [ ] Sprint closed and celebrated!
+* [ ] All done cards archived to sprint folder — deferred to dispatcher Phase 5 Step 2 (closeout agent forbidden from archiving)
+* [ ] Sprint summary generated with automatic metrics — deferred to dispatcher Phase 5 Step 2 (runs after archive)
+- [x] Changelog updated with version number and changes
+- [x] Roadmap milestone marked complete with actual date
+- [x] Incomplete cards moved to backlog or next sprint
+- [x] Retrospective notes captured above
+- [x] Follow-up cards created for technical debt
+- [x] Sprint closed and celebrated!
 
 
 ## [1.1.0] - 2025-11-18

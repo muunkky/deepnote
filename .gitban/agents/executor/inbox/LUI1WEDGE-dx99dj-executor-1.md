@@ -1,67 +1,14 @@
-# Executor directive — LUI1WEDGE / dx99dj (executor-1, step 8: contrib-diff cut + slice-integrity CI grep)
+Use `.venv/Scripts/python.exe` to run Python commands.
 
-## ⚠️ BRANCH OVERRIDE
-This sprint runs on **`milestone/m3-local-ui`**, NOT `sprint/LUI1WEDGE`. Wherever the card's recipe says
-`git checkout sprint/LUI1WEDGE -- <paths>`, substitute **`milestone/m3-local-ui`**.
-- Your isolated worktree forks from `milestone/m3-local-ui`. Base check:
-  `git merge-base --is-ancestor milestone/m3-local-ui HEAD && echo "base ok" || echo "WRONG BASE"`.
-- Merge-back target `milestone/m3-local-ui`; completion tag `LUI1WEDGE-dx99dj-done`. Commit **code only**.
+The code for the gitban card with id dx99dj has been approved as of commit 127f0a6. Please use the gitban tools to update the gitban card and begin the tasks required to properly complete it.
 
-This card has **two deliverables** — read both. `read_card(dx99dj)` for the full DoD + the L1
-slice-integrity-grep-precision section (load-bearing).
+## Card Close-out tasks:
+- Use gitban's checkbox tools to ensure all checkboxes on the card are checked off for completed work if not already.
+- Do not mark any work as deferred. This card will be closed and archived and likely never seen again.
+- Use gitban's complete card tool to submit and validate if not already completed.
+- Close-out items:
+  - **L1 (doc-accuracy nit, test-comment)** — In `packages/runtime-server/src/slice-integrity.test.ts`, the non-vacuity block's comment (around lines ~129–131) currently states the slice "does legitimately import `@deepnote/reactivity`." That overstates the truth: in the gate's actual scan scope (`runtime-server/src` non-test + cli serve delta), `@deepnote/reactivity` appears only as a comment/enum value and in the planted test corpus — it is NOT an actual import specifier in shipped slice source. The real `@deepnote/` specifiers that satisfy the assertion are `@deepnote/runtime-core`, `@deepnote/blocks`, and `@deepnote/runtime-server/types`. The assertion that runs (the `some(s => s.startsWith('@deepnote/'))` line) is correct and the gate stays non-vacuous regardless — only the prose is slightly wrong. Tighten the comment to say the slice "imports `@deepnote/*` workspace packages" (or equivalent) so a future reader isn't misled into thinking a `reactivity` import is load-bearing for the test. Comment-only change; do not alter test behavior. After editing, re-run `vitest run src/slice-integrity.test.ts` to confirm the 5 tests still pass and `pnpm exec biome check --write` on the file is clean.
 
-## Deliverable A (mergeable to milestone) — the tightened slice-integrity CI grep gate
+This card is in a sprint, so do not push a feature branch or open a PR — the dispatcher owns sprint lifecycle.
 
-Implement the slice-integrity / boundary gate as an **always-on `pnpm test` test** (the reviewable,
-mergeable core — this card "owns the slice-integrity CI grep"). Per the card's **L1 precision** AC, the
-gate must use **import-form / word-boundary matching**, NOT the bare `-iE 'react|vite|apps/'` substring
-regex, because that false-positives on the legitimate `@deepnote/reactivity` dep and the `vitest` runner.
-
-- Add a test (e.g. `packages/runtime-server/src/slice-integrity.test.ts`, mirror the `87ifqe`
-  `api-types-no-runtime-import.test.ts` style) that scans the serve-slice paths (`packages/runtime-server/**`
-  + `packages/cli/src/commands/serve.ts` + `packages/cli/src/cli.ts` + `packages/cli/package.json`) and FAILS
-  on a real framework import or an `apps/` import edge, matching forms like `from ['"](react|react-dom|vite)['"]`,
-  `\breact\b`/`\bvite\b`, `@vitejs`, `from ['"]\.\.?/.*apps/` — while NOT matching `reactivity`/`vitest`.
-- Include the **regression assertion** the card mandates: prove the tightened gate returns nothing on the
-  real slice even though the slice legitimately contains `reactivity` and/or `vitest`, AND that it DOES
-  catch a planted `import 'react'` / `from '../apps/...'` line (non-vacuity).
-- Also assert the boundary: no `packages/ → apps/` import edge in the slice; `api-types.ts` runtime-import-free
-  (reuse/extend the existing no-runtime-import test if cleaner).
-
-This is normal code work — commit it to your worktree branch; the dispatcher merges it to milestone.
-
-## Deliverable B (fork artifact) — cut + verify + push `contrib/m3-serve`
-
-Produce the clean upstream-ready slice as a separate branch off `upstream/main` (code-only: NO
-`.gitban`/`.claude`/`docs`/`apps`). **Do this WITHOUT disturbing the parent repo's `milestone/m3-local-ui`
-checkout** — use a dedicated worktree OUTSIDE `.claude/worktrees/` (so the dispatcher's worktree sweeps
-never touch it). `upstream/main` is already fetched locally. Recipe (run with `PARENT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"`):
-
-```bash
-git -C "$PARENT" fetch upstream
-CONTRIB_WT="$PARENT/../deepnote-contrib-m3-serve"
-git -C "$PARENT" worktree add -b contrib/m3-serve "$CONTRIB_WT" upstream/main
-# slice ONLY the code paths from the milestone branch into the contrib worktree:
-git -C "$CONTRIB_WT" checkout milestone/m3-local-ui -- packages/runtime-server packages/cli/src/commands/serve.ts packages/cli/src/cli.ts packages/cli/package.json
-#   (+ any other genuine serve-delta code paths you identify by diffing milestone vs upstream/main —
-#    e.g. the runtime-core integration-helper lift if the slice needs it to build; include the MINIMAL
-#    closure that builds standalone. NEVER include .gitban/.claude/docs/apps or the SPA.)
-git -C "$CONTRIB_WT" add -A && git -C "$CONTRIB_WT" commit -m "feat(runtime-server): local serve API + deepnote serve/ui (m3/s1 wedge slice)"
-```
-
-Then **verify the slice builds standalone in `$CONTRIB_WT`**: `pnpm install --frozen-lockfile && pnpm build
-&& pnpm typecheck && pnpm test` all green with **NO `apps/` directory present**, and the tightened
-slice-integrity grep returns nothing over the slice. If the minimal closure doesn't build (a missing
-dependency path), expand the sliced paths to the minimal set that builds — but never add SPA/board/docs.
-**Push** the verified branch: `git -C "$CONTRIB_WT" push -u origin contrib/m3-serve`. Then remove the temp
-worktree: `git -C "$PARENT" worktree remove --force "$CONTRIB_WT"`.
-
-**If the standalone build genuinely cannot be made green** (e.g. an unavoidable cross-package dep that
-can't ride the slice without pulling the SPA), STOP and document precisely in your close-out what blocks a
-clean slice — do NOT force it or pull in forbidden paths. That is a real finding, not a failure to hide.
-
-## Gates before returning (for deliverable A, on your worktree)
-`pnpm test` (mocked, green incl. your new slice-integrity test), `pnpm typecheck` (both halves),
-`pnpm exec biome check --write`, `pnpm spell-check` (from parent; add terms to `docs-dictionary.txt`).
-Be honest in close-out about deliverable B's outcome (branch pushed + standalone-green, or the blocker).
-Do not open a PR — the dispatcher owns PR lifecycle.
+Note: You are closing out this card only. The dispatcher owns sprint lifecycle — do not close, archive, or finalize the sprint itself.

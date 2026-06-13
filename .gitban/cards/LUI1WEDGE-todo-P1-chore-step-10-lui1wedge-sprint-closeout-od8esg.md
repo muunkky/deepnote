@@ -468,3 +468,94 @@ since they share the single-source-of-truth capstone.
 
 - [ ] Item 9 classified (exactly one deferral type marked `true` above)
 - [ ] Item 9 actioned (action taken matches chosen type)
+
+### Item 10: Widen slice-integrity boundary enforcement to the full contrib closure (runtime-core + blocks), or land the deferred madge/depcruise no-edge gate
+
+Reviewer cycle 1 on dx99dj (contrib-diff cut + slice-integrity CI gate, APPROVED) flagged this as a
+non-blocking ci-gate-scope-gap (L2). The always-on slice-integrity gate
+(`packages/runtime-server/src/slice-integrity.test.ts`) currently scans only `runtime-server/src` plus
+the three CLI serve-delta files (`commands/serve.ts`, `cli.ts`, `package.json`) for the
+framework/`apps/` import edge. But dx99dj's own closure finding proved the buildable contrib closure is
+wider — `blocks` + the full `runtime-core` + `runtime-server` + the cli serve delta. A frontend /
+`apps/` import planted in `runtime-core` or `blocks` would NOT be caught by this gate; it would only be
+caught by the existing one-way-dependency convention, which is review-asserted, not enforced (ADR-007
+Validation bullet 3 — the M1 madge/dependency-cruiser check that "has not landed").
+
+The decision/fix: either (a) widen the standing CI gate to scan the WHOLE slice closure
+(`runtime-server/src` + `runtime-core` + `blocks` + the cli serve delta) for the framework/`apps/` edge,
+OR (b) land the deferred madge/dependency-cruiser boundary check as the enforced home for the
+`packages/ → apps/` no-edge invariant — this is the ADR-007 §6 / M2 boundary becoming a real CI gate
+rather than a review-asserted convention. Note an in-repo path exists with no external dependency: the
+current gate is implemented via the resolved TypeScript AST precisely because madge/dependency-cruiser
+are not installed, so widening the AST scan (option a) needs no new tooling, while option (b) would
+require adding the madge/depcruise dev dependency.
+
+Captured here (not filed as a sprint card now) because it routes to closeout-append under the three-way
+taxonomy: (1) it does not block any downstream LUI1WEDGE card — the contrib slice is already cut, pushed,
+and verified (dx99dj done); the current gate already covers the serve-delta files where a leak is most
+plausible (the reviewer's explicit reason for non-blocking); the remaining cards (k65hcx showcase,
+od8esg closeout) do not depend on a wider gate. (2) There is no hard external prerequisite — the
+AST-widening path (option a) is executable in-repo today with zero new tooling, so this is NOT impossible
+until something resolves. Neither (a) nor (b) of the decision questions holds, so it is (c)
+closeout-append. The closeout agent revisits with full sprint context: this is a real load-bearing
+gap (the boundary should be enforced across the whole closure, not just the serve delta), so it likely
+reads as a `sprint` card (current or next — AST-widening is mechanical) — but the exactly-one-true grid
+below is for the closeout agent to fill. If promoted, prefer the AST-widening option unless the team
+wants to invest in madge/depcruise as the standing boundary tool.
+
+| Deferral Type | Description | Applies (true/false) |
+|---------------|-------------|----------------------|
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
+| note-only | Captured for record; no action; current output is fine as-is. | |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+
+**Source:** dx99dj review 1 (L2)
+**Files touched:** packages/runtime-server/src/slice-integrity.test.ts (widen the AST scan to the full closure), or a new madge/dependency-cruiser config under packages/ + a CI step wiring the `packages/ → apps/` no-edge check
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 10 classified (exactly one deferral type marked `true` above)
+- [ ] Item 10 actioned (action taken matches chosen type)
+
+### Item 11: Harden the cli diff/dag/lint suites against the process.exit-mock / timeout isolation flakes
+
+Reviewer cycle 1 on dx99dj flagged this as a non-blocking pre-existing-flake debt (L3). The cli
+`diff.test.ts`, `dag.test.ts`, and `lint.test.ts` suites flake on constrained machines due to a
+`process.exit`-mock / test-isolation + 5s-timeout artifact: the same failures reproduce on the milestone
+worktree under isolated `vitest run <file>`, while the full suite of 2476 passes. These three files are
+byte-identical between `upstream/main` and `contrib/m3-serve`, so the flakes are pre-existing
+upstream-shaped artifacts, NOT introduced by this sprint or the serve slice. But they are real and
+recurring — they forced the `--no-verify` push workaround during dx99dj because the full hook suite
+could not run cleanly on the constrained box (compounded by the parallel `tsc` OOM, a separate resource
+kill). The hardening: fix the `process.exit`-mock leakage / per-test isolation, and/or raise+justify the
+5s timeout, so future contrib-slice pushes can run the full hook suite without flake noise.
+
+Classification note: the reviewer suggested a backlog card, and the inbox explicitly left the in-sprint
+vs backlog call to the planner. Applying the three-way taxonomy: (1) does it block a downstream
+LUI1WEDGE card? No — the contrib slice is already pushed (dx99dj done), and the remaining cards (k65hcx
+showcase, od8esg closeout) do not run these suites as a gate. (2) Is it impossible until an external
+prerequisite resolves? No — the fix is in-repo test hardening (mock isolation / timeout tuning) with no
+missing infrastructure, no upstream decision, and no next-milestone feature required; "constrained
+machine" is an environment condition, not a concrete unresolved prerequisite that blocks the work. So
+neither the sprint-card question nor the backlog-card question is satisfied, which means the reviewer's
+"backlog card" suggestion does not fit the taxonomy (backlog requires a concrete external prerequisite,
+which is absent here). It therefore routes to (c) closeout-append, the correct default for a
+non-blocking, non-prerequisite finding. The closeout agent revisits with full sprint context: because
+these are pre-existing upstream-shaped flakes that are nonetheless real recurring debt, it likely reads
+as either a `sprint` card (test-isolation hardening is mechanical) or `note-only` if the team prefers to
+leave upstream-identical files untouched in a fork-contribution context — the exactly-one-true grid
+below is for the closeout agent to fill.
+
+| Deferral Type | Description | Applies (true/false) |
+|---------------|-------------|----------------------|
+| backlog | Genuinely future work; external prerequisite or belongs to a different milestone; can't be done in upcoming work without a shape-change. | |
+| sprint | Blocks or enables sprint-scoped work (current or next); needs its own card with a sprint tag. | |
+| note-only | Captured for record; no action; current output is fine as-is. | |
+| fixed-with-note | Trivial enough for the closeout agent to fix inline during closeout, with a note of what was done (typo, lint fix, stale comment). | |
+
+**Source:** dx99dj review 1 (L3)
+**Files touched:** packages/cli/src/commands/diff.test.ts, packages/cli/src/commands/dag.test.ts, packages/cli/src/commands/lint.test.ts
+**Action taken:** {closeout fills prose — card {id} created in sprint {tag} / card {id} created in loose backlog / noted, no action / fixed in commit {hash}}
+
+- [ ] Item 11 classified (exactly one deferral type marked `true` above)
+- [ ] Item 11 actioned (action taken matches chosen type)

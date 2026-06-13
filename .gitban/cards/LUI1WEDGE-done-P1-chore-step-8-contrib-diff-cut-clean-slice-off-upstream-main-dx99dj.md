@@ -157,3 +157,14 @@ Cut in a dedicated worktree OUTSIDE `.claude/worktrees/` (`/home/cameron/project
 **Closure finding (the directive's anticipated risk — surfaced honestly, not hidden):** a *minimal* runtime-core closure (just the self-contained `kernel-errors.ts` + its index export) does NOT build — the serve slice's `session.ts` is transitively coupled to the milestone runtime-core surface: kernel-name selection (`selectKernelName`/`isNonPythonKernel`/`selectPythonSpec`), the integrations env lift (`resolveIntegrationEnv`/`injectIntegrationEnvVars`/`DEFAULT_INTEGRATIONS_FILE`/…), and `RuntimeConfig.kernelName`. Those in turn need the `@deepnote/blocks` delta (`isValueAddBlockType`, `UnsupportedBlockOnKernelError`). So the buildable closure is `blocks` + full `runtime-core` + `runtime-server` + the cli serve delta (+ the `bash-image.deepnote` fixture the save round-trip test pins). This is a real coupling signal: the serve wedge is NOT independently sliceable from the kernel-name / integrations work it co-evolved with. NO SPA/board/docs were ever pulled in; the closure is `packages/` libraries + one test fixture only.
 
 Did NOT open a PR — dispatcher owns PR lifecycle. Profiling log written to `.gitban/agents/executor/logs/LUI1WEDGE-dx99dj-executor-1.jsonl` (gitignored in-worktree; not committed per the no-`.gitban`-from-worktree rule).
+
+
+
+
+## Router log (LUI1WEDGE / dx99dj, review 1)
+
+**Verdict: APPROVAL** (commit `127f0a6`). Review report: `.gitban/agents/reviewer/inbox/LUI1WEDGE-dx99dj-reviewer-1.md`.
+
+Routed:
+- **Executor** (`.gitban/agents/executor/inbox/LUI1WEDGE-dx99dj-executor-1.md`): close out the card + L1 close-out item (comment-only doc-accuracy fix in `slice-integrity.test.ts` — tighten the "legitimately import `@deepnote/reactivity`" prose to "imports `@deepnote/*` workspace packages").
+- **Planner** (`.gitban/agents/planner/inbox/LUI1WEDGE-dx99dj-planner-1.md`): 2 cards into LUI1WEDGE — (1) **L2** widen slice-integrity boundary enforcement to the full contrib closure (runtime-core + blocks) or land the deferred madge/depcruise `packages/ → apps/` no-edge gate; (2) **L3** harden cli diff/dag/lint suites against the `process.exit`-mock / timeout isolation flakes that forced the `--no-verify` push.

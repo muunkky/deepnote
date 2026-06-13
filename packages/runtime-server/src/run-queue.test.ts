@@ -285,6 +285,43 @@ describe('RunQueue — kernel-death terminal (KD-5)', () => {
     // Typed-instance discriminant: a plain Error is NOT kernel-died.
     expect(terminal).toMatchObject({ type: 'run-failed', failureCategory: 'in-block' })
   })
+
+  it('a mid-run KernelDiedError that the engine CATCHES and RESOLVES (failedBlocks>0) still elevates the terminal to run-failed {kernel-died}, NOT run-done', async () => {
+    // The REAL toolkit engine does NOT reject on mid-run kernel death: `execution-engine.ts`
+    // catches the typed `KernelDiedError` at the block level, reports it via `onBlockDone`,
+    // BREAKs, and RESOLVES `runProject` with `failedBlocks>0` (it only rejects on LAUNCH-time
+    // death). The reject test above models the assumption hlai4c's mock encoded; THIS test models
+    // what the real engine actually does (verified against the integration suite, Scenario 4) and
+    // is the unit-level guard for that production gap. The contract (design-doc m3-s1 §kernel-died:
+    // "mid-run death ⇒ terminal run-failed {kernel-died}") binds regardless of resolve-vs-reject,
+    // so the queue must elevate the terminal off the typed block-done signal, not off the reject.
+    const sink = new RecordingSink()
+    const runProject: RunProjectFn = async (_req: RunRequest, cb: RunCallbacks) => {
+      await cb.onBlockStart(block('b1'), 0, 1)
+      await cb.onBlockDone({
+        blockId: 'b1',
+        blockType: 'code',
+        success: false,
+        outputs: [],
+        executionCount: null,
+        durationMs: 1,
+        error: new KernelDiedError('kernel died mid-run'), // typed instance reaches the seam
+      })
+      // The engine catches, breaks, and RESOLVES — it does NOT throw.
+      return summary({ totalBlocks: 1, executedBlocks: 1, failedBlocks: 1 })
+    }
+    const queue = q(runProject, sink)
+    queue.enqueue({})
+    for (let i = 0; i < 5; i++) await tick()
+
+    const terminal = sink.events[sink.events.length - 1]
+    expect(terminal).toMatchObject({ type: 'run-failed', failureCategory: 'kernel-died' })
+    // Exactly one terminal: the resolve path must NOT also emit run-done.
+    expect(sink.events.some(e => e.type === 'run-done')).toBe(false)
+    // The block-done for the dead block still reports kernel-died (KD-5, unchanged).
+    const blockDone = sink.events.find(e => e.type === 'block-done')
+    expect(blockDone).toMatchObject({ success: false, failureCategory: 'kernel-died' })
+  })
 })
 
 describe('RunQueue — failure-category fidelity (KD-5, mix)', () => {

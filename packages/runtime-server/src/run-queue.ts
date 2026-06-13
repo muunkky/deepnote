@@ -15,12 +15,15 @@
  * secondary; the design doc is explicit that ordering alone "proves little" because it is
  * structurally guaranteed.
  *
- * **Guaranteed terminal event (B1).** When `runProject` *resolves*, `drain` unconditionally
- * emits `run-done` carrying `failedBlocks` — this is the common in-block-failure terminal too
- * (the engine `break`s on the first failed block and resolves with `failedBlocks > 0`;
- * `execution-engine.ts:426-429/431-446`). `run-failed` is reserved **only** for the
- * kernel-death reject (a `KernelDiedError` thrown out of `runProject`). Exactly one terminal
- * event ends every run.
+ * **Guaranteed terminal event (B1).** When `runProject` *resolves*, `drain` emits `run-done`
+ * carrying `failedBlocks` — the common in-block-failure terminal too (the engine `break`s on the
+ * first failed block and resolves with `failedBlocks > 0`; `execution-engine.ts:426-429/431-446`).
+ * The one exception: a **mid-run kernel death** is always the terminal `run-failed {kernel-died}`,
+ * even though the real engine *resolves* on it (it catches the typed `KernelDiedError`, reports it
+ * via `onBlockDone`, and breaks — it only *rejects* on launch-time death). The adapter latches that
+ * typed signal and `#runTask` elevates the resolve-path terminal. So `run-failed {kernel-died}`
+ * covers both the reject (launch-time) and the resolve-after-mid-run-death paths; every other
+ * resolve is `run-done`. Exactly one terminal event ends every run.
  *
  * **Back-pressure (S1, two regimes).** Cross-block: the engine awaits `onBlockDone`, so the
  * adapter does not resolve it until the socket's `bufferedAmount` drains — a genuine pause of
@@ -62,9 +65,11 @@ export interface RunCallbacks {
  * The single object the queue is allowed to drive runs through. Modeled on {@link Session}
  * (which implements it), but injected as an interface so the queue stays the **sole** caller of
  * `.runProject` (the M2 invariant — `run-queue-invariant.test.ts` asserts no other source file
- * references `.runProject`) and is unit-testable with a mock. `runProject` rejects with a
- * {@link KernelDiedError} on mid-run kernel death and resolves with `failedBlocks > 0` on an
- * in-block break (B1).
+ * references `.runProject`) and is unit-testable with a mock. The real engine *resolves* with
+ * `failedBlocks > 0` on both an in-block break and a mid-run kernel death (it catches the typed
+ * {@link KernelDiedError}, surfaces it through `onBlockDone`, and breaks); it only *rejects* with a
+ * {@link KernelDiedError} on launch-time death. Either kernel-death path is terminal
+ * `run-failed {kernel-died}` (B1).
  */
 export interface RunProjectTarget {
   runProject(request: RunRequest, callbacks: RunCallbacks): Promise<ExecutionSummary>
@@ -221,8 +226,10 @@ export class RunQueue {
   /**
    * Run one task: emit `run-start`, drive the engine via the adapter, and emit the guaranteed
    * terminal event. `run-done` on resolve (B1 — incl. an in-block break, `failedBlocks > 0`);
-   * `run-failed { failureCategory }` **only** when `runProject` rejects with a typed
-   * {@link KernelDiedError} (KD-5, the discriminant read from the instance, never a string).
+   * `run-failed { failureCategory:'kernel-died' }` whenever the run dies on the kernel — whether
+   * `runProject` *rejects* with a typed {@link KernelDiedError} (launch-time death) OR *resolves*
+   * after the engine caught the mid-run death and reported it through `onBlockDone` (KD-5, the
+   * discriminant read from the typed instance, never a string).
    */
   async #runTask(task: RunTask): Promise<void> {
     const { runId, request } = task
@@ -233,6 +240,24 @@ export class RunQueue {
     try {
       // The SOLE `.runProject` call site in the package (M2). No route runs the engine directly.
       const summary = await this.#target.runProject(request, adapter.callbacks)
+      // Mid-run kernel death is terminal `run-failed {kernel-died}` even on the RESOLVE path.
+      // The real toolkit engine (`execution-engine.ts`) does NOT re-throw on mid-run death: it
+      // catches the typed `KernelDiedError` at the block level, reports it via `onBlockDone`,
+      // BREAKs, and resolves with `failedBlocks > 0` (it only *rejects* for launch-time death,
+      // the catch path below). The CLI elevates the same signal off the resolved block result
+      // (`run.ts:1196-1200`); the design-doc contract (m3-s1 §kernel-died: "mid-run death ⇒
+      // terminal run-failed {kernel-died}") binds regardless of resolve-vs-reject. So when the
+      // adapter saw a `KernelDiedError` in a block-done, the terminal is `run-failed`, never the
+      // run-done it would otherwise be. (Verified by the integration suite, Scenario 4.)
+      if (adapter.didKernelDie()) {
+        this.#sink.send({
+          type: 'run-failed',
+          runId,
+          failureCategory: 'kernel-died',
+          message: 'Kernel died during execution',
+        })
+        return
+      }
       // B1: GUARANTEED terminal on resolve — including an in-block break (failedBlocks > 0).
       this.#sink.send({
         type: 'run-done',
@@ -255,16 +280,21 @@ export class RunQueue {
    * with `runId`; `onBlockStart`/`onBlockDone` return promises (the engine awaits them) so the
    * cross-block drain wait gates production; `onOutput` enforces the within-block bound.
    */
-  #createAdapter(runId: RunId): { callbacks: RunCallbacks } {
+  #createAdapter(runId: RunId): { callbacks: RunCallbacks; didKernelDie: () => boolean } {
     // Per-block running total of forwarded `stream` bytes, for the within-block bound. Reset on
     // each `block-start`; once the bound is crossed, a single `{ truncated: true }` marker is
     // emitted and further `stream` text for that block is dropped (lifecycle/result kept).
     let streamBytesThisBlock = 0
     let truncatedThisBlock = false
+    // Per-run latch: set once the engine reports a typed `KernelDiedError` through `onBlockDone`,
+    // read by `#runTask` to elevate the RESOLVE-path terminal to `run-failed {kernel-died}` (the
+    // real engine resolves on mid-run death rather than rejecting — see `#runTask`).
+    let kernelDied = false
 
     const send = (event: WsServerEvent): void => this.#sink.send(event)
 
     return {
+      didKernelDie: (): boolean => kernelDied,
       callbacks: {
         onBlockStart: async (block, index, total): Promise<void> => {
           streamBytesThisBlock = 0
@@ -294,20 +324,21 @@ export class RunQueue {
           send({ type: 'output', runId, blockId, output })
         },
         onBlockDone: async (result): Promise<void> => {
+          // KD-5: read the in-block-vs-kernel-died discriminant from the typed `result.error`,
+          // before it flattens to `.message`. A failed block with no typed kernel error is
+          // an in-block user exception.
+          const blockKernelDied = !result.success && result.error instanceof KernelDiedError
+          // Latch a mid-run kernel death so the RESOLVE-path terminal elevates to `run-failed`.
+          if (blockKernelDied) {
+            kernelDied = true
+          }
           send({
             type: 'block-done',
             runId,
             blockId: result.blockId,
             success: result.success,
             durationMs: result.durationMs,
-            // KD-5: read the in-block-vs-kernel-died discriminant from the typed `result.error`,
-            // before it flattens to `.message`. A failed block with no typed kernel error is
-            // an in-block user exception.
-            failureCategory: result.success
-              ? undefined
-              : result.error instanceof KernelDiedError
-                ? 'kernel-died'
-                : 'in-block',
+            failureCategory: result.success ? undefined : blockKernelDied ? 'kernel-died' : 'in-block',
           })
           // Cross-block back-pressure (regime 1): gate the next block on the socket draining.
           await this.#awaitDrain()

@@ -39,9 +39,10 @@ describe('BlockRenderer registry', () => {
   })
 
   it('falls back to the default (unknown) renderer for an unregistered type', () => {
-    // `separator` is a real persisted type with no renderer registered until a later step;
-    // the `default` branch must catch it rather than crash.
-    const { container } = render(<BlockRenderer block={makeBlock('u', 'separator')} />)
+    // A synthetic, never-registered type must hit the `default` branch rather than crash.
+    // (`separator` was the placeholder here until step 7C registered it; use a type with no
+    // renderer in any step so the fallback invariant stays honest.)
+    const { container } = render(<BlockRenderer block={makeBlock('u', 'future-block' as BlockVM['type'])} />)
     expect(container.querySelector('[data-block-unknown="true"]')).not.toBeNull()
   })
 

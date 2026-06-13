@@ -231,8 +231,12 @@ The server's headline promise — _it runs your project exactly the way `deepnot
 **proven against a real kernel, not asserted**. The real-kernel integration suite
 (`test-integration/server-run-parity.integration.test.ts`) boots this server over a fixture, drives
 `GET /api/project` + run-all over `/api/stream`, collects the streamed `IOutput`s, and asserts they
-**deep-equal** the `IOutput`s `deepnote run --output json` produces for the same file (100% of the
-fixture's executable block types). The same suite proves three more end-to-end guarantees:
+**deep-equal** the `IOutput`s `deepnote run --output json` produces for the same file. The parity
+fixture covers every output-bearing `IOutput` shape a bare Python kernel produces — `stream` stdout,
+`stream` stderr, `execute_result`, `display_data`, and multi-write ordering — plus a non-executable
+markdown block both paths skip identically. (Block types that need external services — SQL, integration,
+input blocks — are out of scope for this kernel-only parity step; the design doc's `sql-integration-parity`
+phase owns them.) The same suite proves three more end-to-end guarantees:
 
 - a deliberately-missing kernel surfaces the typed `missing-kernel` discriminant (never an opaque 500),
 - a mid-run kernel death is terminal — `run-failed { failureCategory: 'kernel-died' }` with no further

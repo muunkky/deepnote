@@ -237,7 +237,10 @@ describeIntegration('server ↔ `deepnote run` parity (real kernel)', () => {
     const serverByBlock = serverOutputsByBlock(events)
     const cliByBlock = new Map(cli.blocks.map(b => [b.id, b.outputs]))
 
-    // 100% of executable block types on the fixture are represented in both maps (same block set).
+    // Every output-bearing block on the fixture is represented in BOTH maps (same block set) —
+    // i.e. the parity claim covers all the executable block shapes the fixture exercises (stream
+    // stdout/stderr, execute_result, display_data, multi-write), not just a subset. Block types
+    // needing external services (SQL/integration/input) are out of scope for this kernel-only step.
     expect([...serverByBlock.keys()].sort()).toEqual([...cliByBlock.keys()].sort())
     // The fixture's executable blocks all produce at least one output, so neither map is empty.
     expect(serverByBlock.size).toBeGreaterThan(0)

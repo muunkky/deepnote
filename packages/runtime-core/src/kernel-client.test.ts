@@ -580,6 +580,48 @@ describe('KernelClient', () => {
       expect(error).not.toBeInstanceOf(KernelDiedError)
       expect(error.message).toBe('transient glitch')
     })
+
+    // A hard crash (`os._exit(1)`) makes the Jupyter server AUTO-RESTART the kernel rather than
+    // leaving it `'dead'`: the status goes `busy → autorestarting → … → idle`. From the in-flight
+    // execution's view that is still a death — the request is abandoned and can never complete.
+    // Without detecting these statuses the cancelled future surfaces as a plain in-block error
+    // (card wd2nil — the real toolkit auto-restarts, so `'dead'` is never observed mid-run).
+    it.each(['autorestarting', 'restarting'])(
+      'rejects with a typed KernelDiedError when the kernel %s mid-execution (server auto-restart, never `dead`)',
+      async status => {
+        const future = createPendingFuture()
+        mockRequestExecute.mockReturnValue(future)
+
+        const resultPromise = client.execute('import os; os._exit(1)')
+        const errorPromise = resultPromise.catch(e => e)
+
+        // The server initiates an auto-restart; the status never becomes `'dead'`.
+        mockKernel.status = status
+        emitStatusChange(status)
+
+        const error = await errorPromise
+        expect(error).toBeInstanceOf(KernelDiedError)
+        expect(error.category).toBe('kernel-died')
+        expect(mockStatusChangedDisconnect).toHaveBeenCalled()
+        expect(future.dispose).toHaveBeenCalled()
+      }
+    )
+
+    it('surfaces a KernelDiedError when the future is cancelled while the kernel is auto-restarting', async () => {
+      const future = createPendingFuture()
+      mockRequestExecute.mockReturnValue(future)
+
+      const resultPromise = client.execute('import os; os._exit(1)')
+      const errorPromise = resultPromise.catch(e => e)
+
+      // The real toolkit rejects the in-flight future ("Canceled future for execute_request
+      // message before replies were done") while the kernel status is `autorestarting`.
+      mockKernel.status = 'autorestarting'
+      future.rejectDone(new Error('Canceled future for execute_request message before replies were done'))
+
+      const error = await errorPromise
+      expect(error).toBeInstanceOf(KernelDiedError)
+    })
   })
 
   describe('disconnect', () => {

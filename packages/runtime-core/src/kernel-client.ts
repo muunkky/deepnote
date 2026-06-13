@@ -240,8 +240,20 @@ export class KernelClient {
       // Detect mid-run kernel death so it surfaces as a typed KernelDiedError
       // (not a bare Error or a silent hang). The typed instance must reach the
       // CLI boundary to stay distinct from an in-block user error (card qajbsg).
+      //
+      // A hard crash (e.g. `os._exit(1)`) does NOT always leave the kernel in the
+      // terminal `'dead'` status: the Jupyter server auto-restarts a crashed kernel,
+      // so the status transitions `busy → autorestarting → restarting → starting →
+      // idle` and `'dead'` is never observed. From the perspective of the in-flight
+      // execution, though, a server-initiated (auto)restart IS a death — the running
+      // request is abandoned ("Canceled future … before replies were done") and can
+      // never complete. Treat `'restarting'`/`'autorestarting'` during an active
+      // execute as a kernel death too (`Status` union, @jupyterlab/services), so both
+      // the CLI and the server report `kernel-died` instead of mis-categorizing the
+      // cancelled future as an in-block user error (card wd2nil — verified against the
+      // real toolkit, which auto-restarts rather than going `'dead'`).
       const onStatusChanged = (_sender: unknown, status: string) => {
-        if (status === 'dead' && !settled) {
+        if ((status === 'dead' || status === 'restarting' || status === 'autorestarting') && !settled) {
           settled = true
           kernel.statusChanged.disconnect(onStatusChanged)
           future.dispose()
@@ -284,9 +296,15 @@ export class KernelClient {
         .catch(error => {
           if (settled) return
           settled = true
-          // A rejected future while the kernel is dead is a kernel death, not a
-          // generic failure — surface the typed error.
-          reject(kernel.status === 'dead' ? new KernelDiedError() : error)
+          // A rejected future while the kernel is dead OR (auto)restarting is a kernel
+          // death, not a generic failure — surface the typed error. The status-signal
+          // handler above usually wins this race, but a crashed kernel can also reject
+          // the future directly ("Canceled future for execute_request message before
+          // replies were done") before the status settles, so we guard the catch path
+          // on the same death/restart predicate (card wd2nil).
+          const status = kernel.status
+          const kernelDied = status === 'dead' || status === 'restarting' || status === 'autorestarting'
+          reject(kernelDied ? new KernelDiedError() : error)
         })
         .finally(() => {
           cleanup()

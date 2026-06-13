@@ -391,3 +391,4 @@ Turborepo
 unfakeable
 macrotask
 lossily
+affordances

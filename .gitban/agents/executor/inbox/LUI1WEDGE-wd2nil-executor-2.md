@@ -102,3 +102,40 @@ Only tick the **Capstone**, **"All tests pass locally"**, **"All tests pass in C
   completion failure.
 
 This card is in sprint **LUI1WEDGE** — do not push a branch or open a PR; the dispatcher owns lifecycle.
+
+---
+
+## 🔁 RE-DISPATCH (retry 1) — the prior executor-2 environment-crashed but left a FULL diagnosis
+
+The previous executor-2's worktree was deleted mid-session (harness worktree churn) before it could
+commit. It produced a complete root-cause diagnosis + the exact patch in
+**`.gitban/agents/executor/inbox/LUI1WEDGE-wd2nil-executor-2-ERROR.md` — READ IT FIRST.** Use that
+diagnosis; do not re-derive it.
+
+**Two things from the ERROR file are load-bearing:**
+
+1. **BUILD THE CLI INTO YOUR WORKTREE BEFORE RUNNING THE INTEGRATION SUITE** — otherwise the suite
+   self-skips (Scenarios 1 & 2 gate on `existsSync(packages/cli/dist/bin.js)`, which only the parent
+   has). In your fresh worktree:
+   ```bash
+   pnpm install --frozen-lockfile
+   pnpm -F @deepnote/cli build
+   pnpm -F @deepnote/runtime-server build
+   ```
+   Then run scenarios ONE AT A TIME with `RUN_INTEGRATION_TESTS=true
+   DEEPNOTE_INTEGRATION_VENV=/home/cameron/projects/deepnote/.venv VITEST_TEST_TIMEOUT=120000`.
+
+2. **Scenario 4 is a confirmed REAL bug in `packages/runtime-server/src/run-queue.ts`** with an exact
+   patch in the ERROR file (§THE FIX): the run-queue emits `run-failed{kernel-died}` only on the
+   `runProject` *reject* path, but the real engine *resolves* with `failedBlocks>0` after catching the
+   mid-run `KernelDiedError` in `onBlockDone`. Lift the kernel-died discriminant from `onBlockDone` (the
+   adapter already computes it at `run-queue.ts:303-311`) and promote the terminal to
+   `run-failed{kernel-died}` on the resolve path, mirroring the CLI (`run.ts:1196-1200`). **Do NOT change
+   the engine or CLI** (preserves the parity capstone). Add the TDD unit test the ERROR file specifies
+   (resolve-after-onBlockDone-KernelDiedError → terminal `run-failed{kernel-died}`, not `run-done`).
+
+This is a real production fix to `run-queue.ts` (hlai4c's WS terminal contract) — it lands under this
+card because the integration suite surfaced it. Verify Scenario 4 goes GREEN against the real venv after
+the patch. Apply planner L1 to Scenario 1 (`execution_count` divergence on block c6). Be honest in the
+close-out about which scenarios pass green in isolation vs need CI. Tick the capstone/CI boxes only with
+real evidence.

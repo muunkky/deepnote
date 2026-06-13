@@ -205,6 +205,15 @@ export class Session implements ServerSession {
   #engine: ExecutionEngine | null = null
 
   /**
+   * In-flight latch for {@link Session.startEngine}. The `#engine` null-check alone does not guard
+   * against two concurrent first-runs (HTTP + WS, or two quick Run clicks) both seeing `#engine ===
+   * null` and each launching a kernel — the second overwrites `#engine`, orphaning the first toolkit
+   * server + kernel (a leaked subprocess) and double-injecting the integration env. Concurrent
+   * callers await this single promise instead.
+   */
+  #startEnginePromise: Promise<void> | null = null
+
+  /**
    * Whether the integration env has been resolved + injected for this session (Phase 8). Set on
    * the first {@link Session.resolveIntegrationEnvForRun}; gates re-injection so a repeated run
    * does not re-parse/re-inject. Mirrors the one-engine-per-session lifecycle of `#engine`.
@@ -277,6 +286,21 @@ export class Session implements ServerSession {
     if (this.#engine) {
       return
     }
+    // Serialize concurrent first-runs onto a single launch (see `#startEnginePromise`): without
+    // this latch two callers both pass the null-check above and each launch a kernel. Cleared on
+    // settle so a failed start can be retried.
+    if (this.#startEnginePromise) {
+      return this.#startEnginePromise
+    }
+    this.#startEnginePromise = this.#doStartEngine()
+    try {
+      await this.#startEnginePromise
+    } finally {
+      this.#startEnginePromise = null
+    }
+  }
+
+  async #doStartEngine(): Promise<void> {
     // Phase 8: integration env parity with `run`. Inject before the engine/kernel starts so the
     // toolkit server inherits the same integration env vars (local-first; no outbound request).
     if (!this.#integrationEnvInjected) {

@@ -553,6 +553,24 @@ describe('KernelClient', () => {
       expect(future.dispose).toHaveBeenCalled()
     })
 
+    it('rejects with a typed KernelDiedError when the kernel is terminated mid-execution', async () => {
+      // A kernel shut down out from under an in-flight run (`'terminating'`) is as fatal as a
+      // crash; without latching it the execute future never settles and the run hangs.
+      const future = createPendingFuture()
+      mockRequestExecute.mockReturnValue(future)
+
+      const resultPromise = client.execute('while True: pass')
+      const errorPromise = resultPromise.catch(e => e)
+
+      mockKernel.status = 'terminating'
+      emitStatusChange('terminating')
+
+      const error = await errorPromise
+      expect(error).toBeInstanceOf(KernelDiedError)
+      expect(error.category).toBe('kernel-died')
+      expect(future.dispose).toHaveBeenCalled()
+    })
+
     it('surfaces a KernelDiedError when the future rejects and the kernel is dead', async () => {
       const future = createPendingFuture()
       mockRequestExecute.mockReturnValue(future)

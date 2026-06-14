@@ -1,0 +1,201 @@
+{
+  "validation_template": "refactor",
+  "card_id": "ds9vlj",
+  "validation_timestamp": "2026-06-14T00:18:56.991414+00:00",
+  "validation_errors": {
+    "missing_sections": [
+      {
+        "section_name": "Refactoring Overview & Motivation",
+        "message": "Required section '## Refactoring Overview & Motivation' not found"
+      },
+      {
+        "section_name": "Pre-Refactoring Context Review",
+        "message": "Required section '## Pre-Refactoring Context Review' not found"
+      },
+      {
+        "section_name": "Refactoring Strategy & Risk Assessment",
+        "message": "Required section '## Refactoring Strategy & Risk Assessment' not found"
+      },
+      {
+        "section_name": "Refactoring Phases",
+        "message": "Required section '## Refactoring Phases' not found"
+      },
+      {
+        "section_name": "Safe Refactoring Workflow",
+        "message": "Required section '## Safe Refactoring Workflow' not found"
+      },
+      {
+        "section_name": "Refactoring Validation & Completion",
+        "message": "Required section '## Refactoring Validation & Completion' not found"
+      }
+    ],
+    "missing_checkboxes_count": 11,
+    "missing_checkboxes": [
+      {
+        "text": "**Refactoring motivation** clearly explains why this change is needed.",
+        "section": "Refactoring Overview & Motivation",
+        "optional": false,
+        "line_number": 41
+      },
+      {
+        "text": "**Scope** is specific and bounded (not open-ended \"improve everything\").",
+        "section": "Refactoring Overview & Motivation",
+        "optional": false,
+        "line_number": 42
+      },
+      {
+        "text": "**Risk level** is assessed based on code criticality and usage.",
+        "section": "Refactoring Overview & Motivation",
+        "optional": false,
+        "line_number": 43
+      },
+      {
+        "text": "Existing code reviewed and behavior fully understood.",
+        "section": "Pre-Refactoring Context Review",
+        "optional": false,
+        "line_number": 51
+      },
+      {
+        "text": "Test coverage reviewed - current test suite provides safety net.",
+        "section": "Pre-Refactoring Context Review",
+        "optional": false,
+        "line_number": 52
+      },
+      {
+        "text": "Documentation reviewed (README, docstrings, inline comments).",
+        "section": "Pre-Refactoring Context Review",
+        "optional": false,
+        "line_number": 53
+      },
+      {
+        "text": "Style guide and coding standards reviewed for compliance.",
+        "section": "Pre-Refactoring Context Review",
+        "optional": false,
+        "line_number": 54
+      },
+      {
+        "text": "Dependencies reviewed (internal modules, external libraries).",
+        "section": "Pre-Refactoring Context Review",
+        "optional": false,
+        "line_number": 55
+      },
+      {
+        "text": "Usage patterns reviewed (who calls this code, how it's used).",
+        "section": "Pre-Refactoring Context Review",
+        "optional": false,
+        "line_number": 56
+      },
+      {
+        "text": "Previous refactoring attempts reviewed (if any - learn from history).",
+        "section": "Pre-Refactoring Context Review",
+        "optional": false,
+        "line_number": 57
+      },
+      {
+        "text": "Comprehensive tests exist before refactoring (95%+ coverage target).",
+        "section": "# Completion Checklist",
+        "optional": false,
+        "line_number": 227
+      },
+      {
+        "text": "All tests pass before refactoring begins (baseline established).",
+        "section": "# Completion Checklist",
+        "optional": false,
+        "line_number": 228
+      },
+      {
+        "text": "Baseline metrics captured (complexity, coverage, performance).",
+        "section": "# Completion Checklist",
+        "optional": false,
+        "line_number": 229
+      },
+      {
+        "text": "Refactoring implemented incrementally (small, safe steps).",
+        "section": "# Completion Checklist",
+        "optional": false,
+        "line_number": 230
+      },
+      {
+        "text": "All tests pass after each refactoring step (continuous validation).",
+        "section": "# Completion Checklist",
+        "optional": false,
+        "line_number": 231
+      },
+      {
+        "text": "Documentation updated (docstrings, README, inline comments, architecture docs).",
+        "section": "# Completion Checklist",
+        "optional": false,
+        "line_number": 232
+      },
+      {
+        "text": "Code passes style guide validation (linting, type checking).",
+        "section": "# Completion Checklist",
+        "optional": false,
+        "line_number": 233
+      },
+      {
+        "text": "Code reviewed by at least 2 team members.",
+        "section": "# Completion Checklist",
+        "optional": false,
+        "line_number": 234
+      },
+      {
+        "text": "No performance regression (ideally improvement).",
+        "section": "# Completion Checklist",
+        "optional": false,
+        "line_number": 235
+      },
+      {
+        "text": "Refactored code validated in staging environment.",
+        "section": "# Completion Checklist",
+        "optional": false,
+        "line_number": 236
+      },
+      {
+        "text": "Production deployment successful with monitoring.",
+        "section": "# Completion Checklist",
+        "optional": false,
+        "line_number": 237
+      },
+      {
+        "text": "Code quality metrics improved (complexity, coverage, maintainability).",
+        "section": "# Completion Checklist",
+        "optional": false,
+        "line_number": 238
+      },
+      {
+        "text": "Rollback plan documented and tested (if high-risk refactor).",
+        "section": "# Completion Checklist",
+        "optional": false,
+        "line_number": 239
+      }
+    ],
+    "missing_tables": [
+      "Review Source|Link / Location|Key Findings / Constraints",
+      "Phase / Task|Status / Link to Artifact or Card|Universal Check",
+      "Step|Status/Details|Universal Check",
+      "Task|Detail/Link",
+      "Topic|Status / Action Required"
+    ],
+    "placeholder_title": {
+      "message": "Title is still the placeholder 'studio viewer residual review-hardening (defense-in-depth + display robustness)'. Please change it to your actual title."
+    }
+  },
+  "suggestions": [
+    "append_card('ds9vlj', '* [ ] **Refactoring motivation** clearly explains why this change is needed.', heading='Refactoring Overview & Motivation')",
+    "append_card('ds9vlj', '* [ ] **Scope** is specific and bounded (not open-ended \"improve everything\").', heading='Refactoring Overview & Motivation')",
+    "append_card('ds9vlj', '* [ ] **Risk level** is assessed based on code criticality and usage.', heading='Refactoring Overview & Motivation')",
+    "append_card('ds9vlj', '* [ ] Existing code reviewed and behavior fully understood.', heading='Pre-Refactoring Context Review')",
+    "append_card('ds9vlj', '* [ ] Test coverage reviewed - current test suite provides safety net.', heading='Pre-Refactoring Context Review')",
+    "append_card('ds9vlj', '## Refactoring Overview & Motivation\\n\\n[Add content here]')",
+    "append_card('ds9vlj', '## Pre-Refactoring Context Review\\n\\n[Add content here]')",
+    "append_card('ds9vlj', '## Refactoring Strategy & Risk Assessment\\n\\n[Add content here]')"
+  ],
+  "formatted_message": "[VALIDATION ERROR] Card validation failed\n\nTemplate: refactor\nCard ID: ds9vlj\nTotal Issues: 34\n\n======================================================================\n\n=== MISSING CHECKBOXES (23) ===\n\nMissing checkbox #1:\n  Expected text: **Refactoring motivation** clearly explains why this change is needed.\n  Expected location: Under '## Refactoring Overview & Motivation' section\n\n  FIX: Use append_card() to add:\n  * [ ] **Refactoring motivation** clearly explains why this change is needed.\n\nMissing checkbox #2:\n  Expected text: **Scope** is specific and bounded (not open-ended \"improve everything\").\n  Expected location: Under '## Refactoring Overview & Motivation' section\n\n  FIX: Use append_card() to add:\n  * [ ] **Scope** is specific and bounded (not open-ended \"improve everything\").\n\nMissing checkbox #3:\n  Expected text: **Risk level** is assessed based on code criticality and usage.\n  Expected location: Under '## Refactoring Overview & Motivation' section\n\n  FIX: Use append_card() to add:\n  * [ ] **Risk level** is assessed based on code criticality and usage.\n\nMissing checkbox #4:\n  Expected text: Existing code reviewed and behavior fully understood.\n  Expected location: Under '## Pre-Refactoring Context Review' section\n\n  FIX: Use append_card() to add:\n  * [ ] Existing code reviewed and behavior fully understood.\n\nMissing checkbox #5:\n  Expected text: Test coverage reviewed - current test suite provides safety net.\n  Expected location: Under '## Pre-Refactoring Context Review' section\n\n  FIX: Use append_card() to add:\n  * [ ] Test coverage reviewed - current test suite provides safety net.\n\nMissing checkbox #6:\n  Expected text: Documentation reviewed (README, docstrings, inline comments).\n  Expected location: Under '## Pre-Refactoring Context Review' section\n\n  FIX: Use append_card() to add:\n  * [ ] Documentation reviewed (README, docstrings, inline comments).\n\nMissing checkbox #7:\n  Expected text: Style guide and coding standards reviewed for compliance.\n  Expected location: Under '## Pre-Refactoring Context Review' section\n\n  FIX: Use append_card() to add:\n  * [ ] Style guide and coding standards reviewed for compliance.\n\nMissing checkbox #8:\n  Expected text: Dependencies reviewed (internal modules, external libraries).\n  Expected location: Under '## Pre-Refactoring Context Review' section\n\n  FIX: Use append_card() to add:\n  * [ ] Dependencies reviewed (internal modules, external libraries).\n\nMissing checkbox #9:\n  Expected text: Usage patterns reviewed (who calls this code, how it's used).\n  Expected location: Under '## Pre-Refactoring Context Review' section\n\n  FIX: Use append_card() to add:\n  * [ ] Usage patterns reviewed (who calls this code, how it's used).\n\nMissing checkbox #10:\n  Expected text: Previous refactoring attempts reviewed (if any - learn from history).\n  Expected location: Under '## Pre-Refactoring Context Review' section\n\n  FIX: Use append_card() to add:\n  * [ ] Previous refactoring attempts reviewed (if any - learn from history).\n\nMissing checkbox #11:\n  Expected text: Comprehensive tests exist before refactoring (95%+ coverage target).\n  Expected location: Under '## # Completion Checklist' section\n\n  FIX: Use append_card() to add:\n  * [ ] Comprehensive tests exist before refactoring (95%+ coverage target).\n\nMissing checkbox #12:\n  Expected text: All tests pass before refactoring begins (baseline established).\n  Expected location: Under '## # Completion Checklist' section\n\n  FIX: Use append_card() to add:\n  * [ ] All tests pass before refactoring begins (baseline established).\n\nMissing checkbox #13:\n  Expected text: Baseline metrics captured (complexity, coverage, performance).\n  Expected location: Under '## # Completion Checklist' section\n\n  FIX: Use append_card() to add:\n  * [ ] Baseline metrics captured (complexity, coverage, performance).\n\nMissing checkbox #14:\n  Expected text: Refactoring implemented incrementally (small, safe steps).\n  Expected location: Under '## # Completion Checklist' section\n\n  FIX: Use append_card() to add:\n  * [ ] Refactoring implemented incrementally (small, safe steps).\n\nMissing checkbox #15:\n  Expected text: All tests pass after each refactoring step (continuous validation).\n  Expected location: Under '## # Completion Checklist' section\n\n  FIX: Use append_card() to add:\n  * [ ] All tests pass after each refactoring step (continuous validation).\n\nMissing checkbox #16:\n  Expected text: Documentation updated (docstrings, README, inline comments, architecture docs).\n  Expected location: Under '## # Completion Checklist' section\n\n  FIX: Use append_card() to add:\n  * [ ] Documentation updated (docstrings, README, inline comments, architecture docs).\n\nMissing checkbox #17:\n  Expected text: Code passes style guide validation (linting, type checking).\n  Expected location: Under '## # Completion Checklist' section\n\n  FIX: Use append_card() to add:\n  * [ ] Code passes style guide validation (linting, type checking).\n\nMissing checkbox #18:\n  Expected text: Code reviewed by at least 2 team members.\n  Expected location: Under '## # Completion Checklist' section\n\n  FIX: Use append_card() to add:\n  * [ ] Code reviewed by at least 2 team members.\n\nMissing checkbox #19:\n  Expected text: No performance regression (ideally improvement).\n  Expected location: Under '## # Completion Checklist' section\n\n  FIX: Use append_card() to add:\n  * [ ] No performance regression (ideally improvement).\n\nMissing checkbox #20:\n  Expected text: Refactored code validated in staging environment.\n  Expected location: Under '## # Completion Checklist' section\n\n  FIX: Use append_card() to add:\n  * [ ] Refactored code validated in staging environment.\n\nMissing checkbox #21:\n  Expected text: Production deployment successful with monitoring.\n  Expected location: Under '## # Completion Checklist' section\n\n  FIX: Use append_card() to add:\n  * [ ] Production deployment successful with monitoring.\n\nMissing checkbox #22:\n  Expected text: Code quality metrics improved (complexity, coverage, maintainability).\n  Expected location: Under '## # Completion Checklist' section\n\n  FIX: Use append_card() to add:\n  * [ ] Code quality metrics improved (complexity, coverage, maintainability).\n\nMissing checkbox #23:\n  Expected text: Rollback plan documented and tested (if high-risk refactor).\n  Expected location: Under '## # Completion Checklist' section\n\n  FIX: Use append_card() to add:\n  * [ ] Rollback plan documented and tested (if high-risk refactor).\n\n======================================================================\n\n=== MISSING SECTIONS (6) ===\n\nMissing section #1:\n  Expected heading: ## Refactoring Overview & Motivation\n\n  FIX: Use append_card() to add:\n  ## Refactoring Overview & Motivation\n\nMissing section #2:\n  Expected heading: ## Pre-Refactoring Context Review\n\n  FIX: Use append_card() to add:\n  ## Pre-Refactoring Context Review\n\nMissing section #3:\n  Expected heading: ## Refactoring Strategy & Risk Assessment\n\n  FIX: Use append_card() to add:\n  ## Refactoring Strategy & Risk Assessment\n\nMissing section #4:\n  Expected heading: ## Refactoring Phases\n\n  FIX: Use append_card() to add:\n  ## Refactoring Phases\n\nMissing section #5:\n  Expected heading: ## Safe Refactoring Workflow\n\n  FIX: Use append_card() to add:\n  ## Safe Refactoring Workflow\n\nMissing section #6:\n  Expected heading: ## Refactoring Validation & Completion\n\n  FIX: Use append_card() to add:\n  ## Refactoring Validation & Completion\n\n======================================================================\n\n=== MISSING TABLES (5) ===\n\nMissing table #1:\n  Expected headers: Review Source|Link / Location|Key Findings / Constraints\n\nMissing table #2:\n  Expected headers: Phase / Task|Status / Link to Artifact or Card|Universal Check\n\nMissing table #3:\n  Expected headers: Step|Status/Details|Universal Check\n\nMissing table #4:\n  Expected headers: Task|Detail/Link\n\nMissing table #5:\n  Expected headers: Topic|Status / Action Required\n\n======================================================================\n\nACTION REQUIRED:\n1. Read current content: read_card('ds9vlj')\n2. Add missing checkboxes:\n   append_card('ds9vlj', '* [ ] **Refactoring motivation** clearly explains why this change is needed.', heading='Refactoring Overview & Motivation')\n   append_card('ds9vlj', '* [ ] **Scope** is specific and bounded (not open-ended \"improve everything\").', heading='Refactoring Overview & Motivation')\n   append_card('ds9vlj', '* [ ] **Risk level** is assessed based on code criticality and usage.', heading='Refactoring Overview & Motivation')\n   ... and 20 more\n3. Add missing sections using append_card('ds9vlj', '## Section Name')\n4. Retry promotion: move_to_todo('ds9vlj')\n",
+  "next_steps": [
+    "1. Read validation errors above",
+    "2. Read current content: read_card('ds9vlj')",
+    "3. Fix content using suggested commands",
+    "4. Retry promotion: move_to_todo('ds9vlj')"
+  ]
+}

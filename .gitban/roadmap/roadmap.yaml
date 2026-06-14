@@ -1673,7 +1673,7 @@ milestones:
               (proxy vs direct), so measured early, not asserted.
             status: todo
             sequence: 1
-            docs_ref: docs/adr/ADR-005-browser-kernel-transport-proxy.md
+            docs_ref: docs/designs/m3-s3-live-execution.md
             features:
               run-controls:
                 id: run-controls

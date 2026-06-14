@@ -1,4 +1,5 @@
 import type { FC } from 'react'
+import type { BlockRun } from '../execution/blockRun'
 import type { BlockVM } from '../shell/viewModels'
 import { BigNumberRenderer } from './BigNumberRenderer'
 import { ButtonRenderer } from './ButtonRenderer'
@@ -23,6 +24,12 @@ import { VisualizationRenderer } from './VisualizationRenderer'
 
 export interface BlockRendererProps {
   block: BlockVM
+  /**
+   * Optional per-block run descriptor (design Phase 3). Forwarded ONLY to the executable renderers
+   * (`code` / `sql`); every other renderer ignores it and keeps its read-only behaviour. Absent →
+   * the whole notebook renders exactly as the s2 viewer did (no run affordance anywhere).
+   */
+  run?: BlockRun
 }
 
 // The type-keyed renderer registry (design Phase 4 / Interface ~341-350). A
@@ -78,7 +85,10 @@ export const BLOCK_RENDERERS: Partial<Record<BlockVM['type'], BlockRendererCompo
 // asserts against (persisted `blocks[]` order == rendered DOM order, design Phase 2). The
 // wrapper is renderer-agnostic, so the order invariant holds no matter which concrete
 // renderer fires.
-export function BlockRenderer({ block }: BlockRendererProps) {
+/** The block kinds the run affordance applies to (executable; KD-4 allowlist crossing). */
+const RUNNABLE_TYPES = new Set<BlockVM['type']>(['code', 'sql'])
+
+export function BlockRenderer({ block, run }: BlockRendererProps) {
   // `Object.hasOwn`, not a bare `registry[type] ?? default`: the persisted `block.type` is
   // untrusted at runtime (fetchProject casts the wire JSON; no schema validation), so a
   // block whose `type` names an inherited Object.prototype member ("constructor", "toString",
@@ -89,9 +99,12 @@ export function BlockRenderer({ block }: BlockRendererProps) {
   const Renderer = Object.hasOwn(BLOCK_RENDERERS, block.type)
     ? (BLOCK_RENDERERS[block.type] ?? BLOCK_RENDERERS.default)
     : BLOCK_RENDERERS.default
+  // Forward the run descriptor only to the executable renderers — every other renderer's props are
+  // `{ block }` and must stay read-only (KD-4). `code`/`sql` declare the optional `run` prop.
+  const runForBlock = run !== undefined && RUNNABLE_TYPES.has(block.type) ? run : undefined
   return (
     <div className='block' data-block-id={block.id} data-block-type={block.type}>
-      <Renderer block={block} />
+      <Renderer block={block} run={runForBlock} />
     </div>
   )
 }

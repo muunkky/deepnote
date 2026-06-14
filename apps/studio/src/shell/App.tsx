@@ -57,5 +57,7 @@ export function App({ loader, baseUrl = '' }: AppProps) {
     )
   }
 
-  return <Shell project={state.project} />
+  // Hand the kernel capability down so the Shell can gate the run affordances (KD-6). The Shell
+  // constructs its own same-origin `ExecutionClient` (no client injected here in production).
+  return <Shell project={state.project} kernelLanguage={state.capabilities.kernelLanguage} />
 }

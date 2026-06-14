@@ -1,5 +1,7 @@
 import type { IOutput } from '@deepnote/runtime-server/types'
 import hljs from 'highlight.js/lib/common'
+import { type BlockRun, hasSessionRun } from '../execution/blockRun'
+import { RunControl } from '../execution/RunControl'
 import { OutputRenderer } from '../outputs/OutputRenderer'
 import type { BlockVM } from '../shell/viewModels'
 
@@ -19,6 +21,8 @@ import type { BlockVM } from '../shell/viewModels'
 // precedence renders the HTML table, and the MIME registry sanitizes HTML at its own seam.
 export interface SqlRendererProps {
   block: BlockVM
+  /** Run state + trigger; absent → the s2 read-only behaviour (no control, persisted outputs). */
+  run?: BlockRun
 }
 
 function highlightSql(source: string): string {
@@ -30,16 +34,23 @@ function highlightSql(source: string): string {
   return hljs.highlightAuto(source).value
 }
 
-export function SqlRenderer({ block }: SqlRendererProps) {
+export function SqlRenderer({ block, run }: SqlRendererProps) {
   const source = block.content ?? ''
   const highlighted = highlightSql(source)
   // `outputs` exists only on executable block kinds; read it defensively off the union. The
   // persisted shape is the Jupyter `IOutput` the runtime produces (the schema types it as
   // `any[]`), so we narrow to `IOutput[]` for the renderer, which dispatches per `output_type`.
-  const outputs = ('outputs' in block && Array.isArray(block.outputs) ? block.outputs : []) as IOutput[]
+  const persisted = ('outputs' in block && Array.isArray(block.outputs) ? block.outputs : []) as IOutput[]
+  // Live session outputs replace persisted while a session run owns this block (KD-3).
+  const outputs = run !== undefined && hasSessionRun(run) ? run.outputs : persisted
 
   return (
     <div className='sql-renderer'>
+      {run !== undefined ? (
+        <div className='sql-renderer__toolbar'>
+          <RunControl status={run.status} canRun={run.canRun} onRun={run.onRun} />
+        </div>
+      ) : null}
       <pre className='sql-renderer__source'>
         {/* highlight.js emits sanitized token markup from escaped source. */}
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: highlight.js output is its own escaped token spans. */}

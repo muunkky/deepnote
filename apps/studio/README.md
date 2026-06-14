@@ -209,10 +209,49 @@ through). `text/plain` and stream/traceback text reach the DOM as escaped React 
 text rather than leaking raw escape bytes — matching the terminal's traceback handling without
 reaching for a `node:` builtin.
 
-This is the read-only viewer: it renders persisted state only — no execution, no run
-affordance. It consumes `IOutput` **type-only** from the `@deepnote/runtime-server/types`
-contract subpath (re-exported there from `@deepnote/runtime-core`), so the SPA never takes a
-runtime edge on `runtime-core` and the isolation invariant holds.
+`OutputRenderer` itself renders persisted state only — no execution, no run affordance. It
+consumes `IOutput` **type-only** from the `@deepnote/runtime-server/types` contract subpath
+(re-exported there from `@deepnote/runtime-core`), so the SPA never takes a runtime edge on
+`runtime-core` and the isolation invariant holds. The **same** renderer also renders the LIVE
+session outputs the run loop streams (R2 — there is no second output renderer); see _Running blocks_
+below.
+
+## Running blocks (`src/execution/RunControl.tsx`, the `run` prop)
+
+The s2 viewer is read-only (R8). The s3 run loop adds **exactly one** new mutating affordance — a
+Run control on each executable block plus a project-level **Run all** — and renders the resulting
+live outputs **in place through the existing `OutputRenderer`** (design `m3-s3-live-execution.md`
+Phase 3, KD-3/KD-4/KD-6). Everything else stays inert.
+
+- **`RunControl`** (`src/execution/RunControl.tsx`) — a Run `<button>` plus a status pill reflecting
+  the block's `BlockRunStatus` (`idle | queued | running | done | failed`). It is inert in itself: it
+  dispatches the caller's `onRun`; it runs nothing. It is **disabled** when the block cannot run (the
+  KD-6 no-kernel gate). It carries `data-run-control` / `data-run-status` so the read-only-invariant
+  allowlist can tell the run affordance apart from every other (inert) control.
+- **The optional `run` prop** (`src/execution/blockRun.ts → BlockRun`) — `CodeRenderer` and
+  `SqlRenderer` accept an OPTIONAL `run?: BlockRun` (status + live `outputs` + `executionCount` +
+  `canRun` + `onRun`). It is **additive**: with no `run` a renderer keeps its s2 behaviour (no
+  control, persisted outputs only) — which is what keeps the s2 renderer tests green and the viewer
+  unchanged for an opened-but-not-run project. With it, the renderer shows its Run control and
+  selects **LIVE vs PERSISTED** outputs.
+- **Live-vs-persisted selection (KD-3).** A block's live outputs replace its persisted `block.outputs`
+  once a session run **owns** the block — keyed on `status !== 'idle'` (`hasSessionRun`), **not** on
+  `outputs.length`. The distinction is load-bearing: `block-start` clears the live outputs to `[]`
+  before fresh frames stream, so a running block legitimately has empty live outputs and must not fall
+  back to the stale persisted output. A re-run therefore **replaces** the prior output rather than
+  appending (Jupyter cell semantics).
+- **Wiring (`Shell.tsx` / `NotebookView.tsx`).** The `Shell` owns the single `ExecutionClient` +
+  `useExecution` per loaded project (KD-1) and hosts the Run-all control; it builds a per-block
+  `BlockRun` and plumbs it through `NotebookView → BlockRenderer`, which forwards the descriptor
+  **only** to the executable renderers (`code`/`sql`). The client is injectable for tests; production
+  constructs the same-origin `createExecutionClient()`. `App` passes
+  `capabilities.kernelLanguage` down so the whole loop is capability-gated (KD-6: `null` → every run
+  affordance renders disabled, never removed).
+- **The read-only allowlist (KD-4).** `src/shell/readOnlyInvariant.test.tsx` renders the assembled
+  Shell and asserts every interactive control is on the allowlist — a run affordance
+  (`data-run-control` / `data-run-all`) or a pure navigation button (the notebook switcher, view
+  state only) — and that no editable text/select/textarea control became mutable. The run loop is the
+  single deliberate crossing of s2's R8 posture; this test fails if any other control turns mutable.
 
 ### Live HMR proof (`e2e/`)
 

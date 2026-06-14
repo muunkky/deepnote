@@ -25,6 +25,16 @@ afterEach(() => {
 })
 
 describe('OutputRenderer dispatch', () => {
+  it('renders a stream output with absent/nullish text as empty without crashing (regression: stripAnsi on undefined)', () => {
+    // A malformed/older persisted stream output can omit `text` (typed string|string[] but
+    // untrusted at runtime). stripAnsi previously received `undefined` → TypeError → blanked
+    // the view. It must coerce to '' and render an empty stream pre.
+    const malformed = { output_type: 'stream', name: 'stdout' } as ReturnType<typeof streamOutput>
+    expect(() => render(<OutputRenderer outputs={[malformed]} />)).not.toThrow()
+    const { container } = render(<OutputRenderer outputs={[malformed]} />)
+    expect(container.querySelector('.output-stream')?.textContent).toBe('')
+  })
+
   it('renders a stream output (stdout) as DOM text', () => {
     const { container } = render(<OutputRenderer outputs={[streamOutput('stdout', 'hello stdout\n')]} />)
     expect(container.querySelector('.output-stream')?.textContent).toContain('hello stdout')

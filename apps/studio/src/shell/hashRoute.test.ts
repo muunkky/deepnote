@@ -16,6 +16,15 @@ describe('parseNotebookHash', () => {
     expect(parseNotebookHash('#/other/x')).toBeUndefined()
     expect(parseNotebookHash('#/notebook/')).toBeUndefined()
   })
+
+  it('does not throw on a malformed percent-encoded hash (regression: URIError blanked the viewer)', () => {
+    // A hand-edited URL like `#/notebook/%` makes decodeURIComponent throw URIError; since this
+    // runs in the shell render path, an uncaught throw blanked the whole viewer. It must instead
+    // fall back to the raw slice (a route that matches no notebook → default notebook).
+    expect(() => parseNotebookHash('#/notebook/%')).not.toThrow()
+    expect(parseNotebookHash('#/notebook/%')).toBe('%')
+    expect(() => parseNotebookHash('#/notebook/%E0%A4')).not.toThrow()
+  })
 })
 
 describe('formatNotebookHash', () => {

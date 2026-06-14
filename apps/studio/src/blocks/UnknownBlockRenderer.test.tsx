@@ -129,4 +129,21 @@ describe('registry full-coverage (R3 capstone)', () => {
   it('the `default` branch is wired to the real UnknownBlockRenderer (own file)', () => {
     expect(BLOCK_RENDERERS.default).toBe(UnknownBlockRenderer)
   })
+
+  it('routes inherited-prototype type names to the fallback without crashing (regression: registry[type] ?? default bypass)', () => {
+    // The persisted `block.type` is untrusted at runtime (no schema validation). A block whose
+    // type names an Object.prototype member used to resolve to that prototype function via a bare
+    // `registry[type] ?? default` lookup — truthy, so the fallback was skipped and React rendered
+    // `<Object>` and threw, blanking the whole notebook. Each of these must hit the fallback.
+    for (const proto of ['constructor', 'toString', 'hasOwnProperty', 'valueOf', '__proto__']) {
+      const { container, unmount } = render(
+        <BlockRenderer block={makeBlock(`proto-${proto}`, proto as BlockVM['type'], 'x')} />
+      )
+      expect(
+        container.querySelector('[data-block-unknown="true"]'),
+        `prototype-named type "${proto}" must hit the unknown fallback, not crash`
+      ).not.toBeNull()
+      unmount()
+    }
+  })
 })

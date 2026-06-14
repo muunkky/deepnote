@@ -8,7 +8,12 @@ import { stripAnsi } from './ansi'
 // escapes are stripped so colour codes don't leak as raw bytes. Text reaches the DOM as a
 // React text node (escaped) — no injection surface.
 export function StreamRenderer({ output }: { output: IStream }) {
-  const text = Array.isArray(output.text) ? output.text.join('') : output.text
+  // `output.text` is typed `string | string[]`, but the wire JSON is untrusted at runtime
+  // (no schema validation between fetch and render): a malformed/older persisted stream output
+  // can carry `text: null`/absent. Coerce a non-array, nullish value to '' so `stripAnsi` never
+  // receives `undefined` (which would `.replace` on undefined → TypeError and blank the view).
+  const raw = output.text
+  const text = Array.isArray(raw) ? raw.join('') : (raw ?? '')
   const isStderr = output.name === 'stderr'
   return (
     <pre

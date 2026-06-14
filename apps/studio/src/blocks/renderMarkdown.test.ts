@@ -37,4 +37,13 @@ describe('renderMarkdownToSafeHtml', () => {
   it('returns an empty string for empty input', () => {
     expect(renderMarkdownToSafeHtml('')).toBe('')
   })
+
+  it('strips target from anchors so links cannot open a new tab with window.opener access', () => {
+    // Reverse-tabnabbing defense: DOMPurify's default config drops `target` entirely, so a
+    // persisted `<a target="_blank">` cannot open a new browsing context that inherits
+    // window.opener. (Verified here rather than adding a redundant rel-injection hook.)
+    const html = renderMarkdownToSafeHtml('<a href="https://evil.test" target="_blank">x</a>')
+    expect(html).toContain('href="https://evil.test"')
+    expect(html).not.toContain('target=')
+  })
 })

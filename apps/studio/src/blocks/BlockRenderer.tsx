@@ -79,7 +79,16 @@ export const BLOCK_RENDERERS: Partial<Record<BlockVM['type'], BlockRendererCompo
 // wrapper is renderer-agnostic, so the order invariant holds no matter which concrete
 // renderer fires.
 export function BlockRenderer({ block }: BlockRendererProps) {
-  const Renderer = BLOCK_RENDERERS[block.type] ?? BLOCK_RENDERERS.default
+  // `Object.hasOwn`, not a bare `registry[type] ?? default`: the persisted `block.type` is
+  // untrusted at runtime (fetchProject casts the wire JSON; no schema validation), so a
+  // block whose `type` names an inherited Object.prototype member ("constructor", "toString",
+  // "hasOwnProperty", …) would otherwise resolve to that prototype function — truthy, so the
+  // `?? default` fallback never fires and React tries to render `<Object>` and throws, blanking
+  // the whole notebook. Own-key lookup keeps the "an unknown type can never crash the viewer"
+  // invariant honest for every string, not just non-prototype ones.
+  const Renderer = Object.hasOwn(BLOCK_RENDERERS, block.type)
+    ? (BLOCK_RENDERERS[block.type] ?? BLOCK_RENDERERS.default)
+    : BLOCK_RENDERERS.default
   return (
     <div className='block' data-block-id={block.id} data-block-type={block.type}>
       <Renderer block={block} />

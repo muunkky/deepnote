@@ -12,7 +12,7 @@ export interface BlockRun {
   status: BlockRunStatus
   /** The live, session-run outputs (replaces persisted while a session run exists — KD-3). */
   outputs: IOutput[]
-  /** Successful runs this session (reserved for the exec-count affordance). */
+  /** Successful runs this session; rendered as the RunControl `[N]` exec-count badge once > 0. */
   executionCount: number
   /** Whether the block can run now (false → no kernel; the Run control is disabled, KD-6). */
   canRun: boolean

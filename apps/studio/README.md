@@ -227,7 +227,9 @@ Phase 3, KD-3/KD-4/KD-6). Everything else stays inert.
   the block's `BlockRunStatus` (`idle | queued | running | done | failed`). It is inert in itself: it
   dispatches the caller's `onRun`; it runs nothing. It is **disabled** when the block cannot run (the
   KD-6 no-kernel gate). It carries `data-run-control` / `data-run-status` so the read-only-invariant
-  allowlist can tell the run affordance apart from every other (inert) control.
+  allowlist can tell the run affordance apart from every other (inert) control. Once a run has
+  succeeded this session the pill also shows a display-only `[N]` exec-count badge
+  (`data-run-count`, mirroring Jupyter's `In [N]`); it is omitted while `executionCount` is `0`.
 - **The optional `run` prop** (`src/execution/blockRun.ts → BlockRun`) — `CodeRenderer` and
   `SqlRenderer` accept an OPTIONAL `run?: BlockRun` (status + live `outputs` + `executionCount` +
   `canRun` + `onRun`). It is **additive**: with no `run` a renderer keeps its s2 behaviour (no

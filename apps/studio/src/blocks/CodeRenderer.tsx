@@ -37,7 +37,7 @@ export function CodeRenderer({ block, run }: CodeRendererProps) {
     <div className='code-renderer'>
       {run !== undefined ? (
         <div className='code-renderer__toolbar'>
-          <RunControl status={run.status} canRun={run.canRun} onRun={run.onRun} />
+          <RunControl status={run.status} canRun={run.canRun} onRun={run.onRun} executionCount={run.executionCount} />
         </div>
       ) : null}
       <pre className='code-renderer__source'>

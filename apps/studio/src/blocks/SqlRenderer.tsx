@@ -48,7 +48,7 @@ export function SqlRenderer({ block, run }: SqlRendererProps) {
     <div className='sql-renderer'>
       {run !== undefined ? (
         <div className='sql-renderer__toolbar'>
-          <RunControl status={run.status} canRun={run.canRun} onRun={run.onRun} />
+          <RunControl status={run.status} canRun={run.canRun} onRun={run.onRun} executionCount={run.executionCount} />
         </div>
       ) : null}
       <pre className='sql-renderer__source'>

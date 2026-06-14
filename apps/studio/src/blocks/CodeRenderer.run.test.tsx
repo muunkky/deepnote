@@ -60,6 +60,19 @@ describe('CodeRenderer — run affordance (optional `run` prop)', () => {
     expect(region?.textContent).toContain('persisted-line')
   })
 
+  it('surfaces the execution count from the run prop once a block has succeeded (Jupyter In [N])', () => {
+    const block = makeBlock('r6', 'code', 'print("hi")')
+    const { container } = render(
+      <CodeRenderer
+        block={block}
+        run={{ status: 'done', outputs: [stream('live-line\n')], executionCount: 2, canRun: true, onRun: vi.fn() }}
+      />
+    )
+    const badge = container.querySelector('[data-run-count]')
+    expect(badge).not.toBeNull()
+    expect(badge?.getAttribute('data-run-count')).toBe('2')
+  })
+
   it('clears output while a fresh run is in flight (block-start replaced outputs with [])', () => {
     // KD-3: block-start sets the session outputs to [] before new frames stream. A running block
     // with empty live outputs must NOT fall back to the stale persisted output.

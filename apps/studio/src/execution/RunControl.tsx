@@ -6,6 +6,11 @@ import type { BlockRunStatus } from '../state/runStore'
 // nothing), and it is DISABLED when the block cannot run (the KD-6 no-kernel gate). It carries the
 // `data-run-control` / `data-run-status` hooks the read-only-invariant allowlist test asserts
 // against, so the run affordance is structurally distinguishable from every other (inert) control.
+//
+// The status pill also surfaces the execution count as a `[N]` badge (mirroring Jupyter's `In [N]`)
+// once at least one run has succeeded this session — the other half of the Phase-3 renderer
+// affordance. It is purely display-only (no event handlers, no mutating control), so it does not
+// touch the KD-4 read-only allowlist.
 
 export interface RunControlProps {
   /** The block's current run lifecycle, surfaced as the status pill. */
@@ -14,6 +19,8 @@ export interface RunControlProps {
   canRun: boolean
   /** Dispatched on click — the caller triggers the actual run (KD-2 HTTP trigger). */
   onRun: () => void
+  /** Successful runs this session; rendered as a `[N]` badge once > 0 (display-only). */
+  executionCount: number
 }
 
 /** Queued and running are the in-flight states that show a busy spinner. */
@@ -30,7 +37,7 @@ const STATUS_LABEL: Record<BlockRunStatus, string> = {
   failed: 'Failed',
 }
 
-export function RunControl({ status, canRun, onRun }: RunControlProps) {
+export function RunControl({ status, canRun, onRun, executionCount }: RunControlProps) {
   const busy = isBusy(status)
   return (
     <div className='run-control' data-run-control='true' data-run-status={status}>
@@ -49,6 +56,15 @@ export function RunControl({ status, canRun, onRun }: RunControlProps) {
       <span className='run-control__status' aria-live='polite'>
         {busy ? <span className='run-control__spinner' data-run-busy='true' aria-hidden='true' /> : null}
         <span className='run-control__status-label'>{STATUS_LABEL[status]}</span>
+        {executionCount > 0 ? (
+          <span
+            className='run-control__count'
+            data-run-count={executionCount}
+            title={`Executed ${executionCount} time${executionCount === 1 ? '' : 's'} this session`}
+          >
+            [{executionCount}]
+          </span>
+        ) : null}
       </span>
     </div>
   )

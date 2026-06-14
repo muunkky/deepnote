@@ -25,12 +25,13 @@ Make the m3/s2 viewer **runnable**: a Run affordance per code/sql block (and Run
 | 3 | feature | P1 | runStore reducer + useExecution hook (exec state, runId↔block) | step 2 |
 | 4 | feature | P1 | Run / Run-all affordances + live output rendering | step 3 |
 | 5 | feature | P1 | failure-category banners + in-place tracebacks | step 4 |
-| 6 | feature | P1 | gated < 2 s live-loop measurement (real kernel capstone) | step 5 |
+| 6 | feature | P1 | gated < 2 s live-loop measurement (real kernel capstone) | step 4 (‖ step 5) |
 | 7 | chore | P1 | LUIRUN1 Sprint Closeout (final) | all |
 
 ### Parallelization Plan
 
-* **Serial spine:** steps 2 → 3 → 4 → 5 → 6 are a strict chain (transport → state → run+render → failure surfacing → end-to-end measurement). Each builds on the prior.
+* **Serial spine:** steps 2 → 3 → 4 are a strict chain (transport → state → run+render). Each builds on the prior.
+* **Parallel batch (after step 4):** step 5 (failure surfacing) ‖ step 6 (gated <2s measurement) are independent — both consume the step-4 live loop; 6 does NOT consume 5's failure surfaces, and they touch disjoint files (KernelBanner/renderer-failure-mapping vs. the e2e harness/gated config). Run concurrently (sprint-reviewer finding).
 * **step 7** (closeout) runs last.
 
 ---

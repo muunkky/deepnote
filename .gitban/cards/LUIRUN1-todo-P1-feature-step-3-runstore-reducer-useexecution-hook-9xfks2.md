@@ -46,8 +46,10 @@
 
 * [ ] `applyEvent` handles every `WsServerEvent` variant per the contract; pure (no side effects).
 * [ ] `useExecution` binds `runId→blockId(s)` from the HTTP-trigger resolution, for single-block and run-all.
+* [ ] **(L1)** The same runId that the HTTP trigger resolves is the one that, carried on a subsequent WS frame, updates the originating block — asserted in a single bound test (trigger→stream, one runId across both), not two tests with separate hardcoded runIds. This is the runStore's job; the step-2 ExecutionClient is deliberately subscribe-only and does not own this map.
 * [ ] `executionCount` increments per-block on `block-done` success (not once per `run-done`); block count comes from `block-start.total`.
 * [ ] Reconnect (socket close) marks non-terminal owned blocks `idle`.
+* [ ] **(L2)** A terminal event (`block-done`/`run-done`/`run-failed`) lost across a reconnect (the broadcast WS has no per-client replay) does not strand the block — reconnect resets the in-flight block to `idle` so it cannot remain `running`/`queued` forever.
 
 ## Feature Work Phases
 
@@ -65,7 +67,7 @@
 
 | Step | Status/Details | Universal Check |
 | :---: | :--- | :---: |
-| **1. Write Failing Tests** | reducer driven by a scripted event sequence (single-block + run-all): queued→running→done, executionCount per-block on block-done, replace-on-block-start, truncated flag, run-failed/run-cancelled, total from block-start; hook: runBlock/runAll bind runId→block, selectors return right state, reconnect resets idle | - [ ] Failing tests committed |
+| **1. Write Failing Tests** | reducer driven by a scripted event sequence (single-block + run-all): queued→running→done, executionCount per-block on block-done, replace-on-block-start, truncated flag, run-failed/run-cancelled, total from block-start; hook: runBlock/runAll bind runId→block, selectors return right state, reconnect resets idle. **Two MUST-have hook tests from review (do not collapse into reducer-only tests): (L1) single-runId binding — runBlock resolves the HTTP trigger to runId `R`, store binds `R→block`, a subsequent WS frame carrying that SAME `R` updates that block (one runId across HTTP and WS, not two hardcoded ids); (L2) reconnect-strand — a block is running under `R`, the socket closes before its terminal frame arrives (no replay), and reconnect resets that non-terminal block to idle so it isn't stranded.** | - [ ] Failing tests committed |
 | **2. Implement Feature Code** | applyEvent + useExecution | - [ ] Feature implementation complete |
 | **3. Run Passing Tests** | studio vitest green | - [ ] Originally failing tests pass |
 | **4. Refactor** | Tidy selector/binding plumbing | - [ ] Code refactored |
@@ -85,8 +87,9 @@
 **Observable outcomes (unfakeable):**
 
 * [ ] **Capstone:** feeding the reducer a real `WsServerEvent` sequence for a run-all over blocks [b1,b2] — `run-start`, `block-start(b1)`, `output(b1)`, `block-done(b1,success)`, `block-start(b2)`, `output(b2)`, `block-done(b2,success)`, `run-done` — yields `byBlock` where b1 and b2 each have `status:'done'`, their streamed `outputs`, and `executionCount:1`; a re-run of b1 clears b1's prior outputs on its `block-start` and bumps its count to 2 — proving the full lifecycle + replace-on-start + per-block counting end to end.
-* [ ] `useExecution.runBlock('b2')` binds the HTTP-returned `runId` to `b2` so b2's subsequent events update b2's state (correlation, single-block).
-* [ ] A `run-failed` after `block-start` marks the in-flight block `failed` and sets `kernelBanner`; a socket close marks non-terminal owned blocks `idle`.
+* [ ] **Correlation capstone (single-runId binding, L1):** in ONE test, `useExecution.runBlock('b2')` resolves the HTTP trigger to a runId `R`, the store binds `R→b2`, and a subsequent WS frame carrying that SAME runId `R` updates b2's state — proving the trigger→stream binding explicitly with one runId flowing across both the HTTP return and the WS frame. The runId is NOT hardcoded or assumed; it is the value the trigger resolved, threaded unchanged into the inbound frame. (This pins the binding the ExecutionClient layer deliberately does not own — see design Phase 2, doc lines 59/72 — so the seam between step 2's subscribe-only client and step 3's correlation map is verified, not split across two tests with mismatched hardcoded runIds.)
+* [ ] **Reconnect-strand capstone (missed-terminal-event, L2):** in ONE test, a block is `running` under runId `R`, the socket closes BEFORE that block's terminal (`block-done`/`run-done`/`run-failed`) frame is delivered (the broadcast WS provides no per-client replay, so the terminal event is genuinely lost), and the store's reconnect handling marks the non-terminal owned block `idle` — proving a terminal event missed across a reconnect does NOT strand the block `running`/`queued` forever.
+* [ ] A `run-failed` after `block-start` marks the in-flight block `failed` and sets `kernelBanner`.
 * [ ] Reducer is pure (same input → same output, no side effects); studio suite + isolation green.
 
 ## Validation & Closeout

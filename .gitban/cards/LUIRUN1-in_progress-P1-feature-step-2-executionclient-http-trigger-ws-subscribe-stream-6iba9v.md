@@ -9,16 +9,16 @@
 * **Target Release/Milestone:** m3 (fork-only showcase)
 
 **Required Checks:**
-* [ ] **Associated Ticket/Epic** link is included above.
-* [ ] **Feature Area/Component** is identified.
-* [ ] **Target Release/Milestone** is confirmed.
+- [x] **Associated Ticket/Epic** link is included above.
+- [x] **Feature Area/Component** is identified.
+- [x] **Target Release/Milestone** is confirmed.
 
 ## Documentation & Prior Art Review
 
-* [ ] `README.md` or project documentation reviewed.
-* [ ] Existing architecture documentation or ADRs reviewed.
-* [ ] Related feature implementations or similar code reviewed.
-* [ ] API documentation or interface specs reviewed [if applicable].
+- [x] `README.md` or project documentation reviewed.
+- [x] Existing architecture documentation or ADRs reviewed.
+- [x] Related feature implementations or similar code reviewed.
+- [x] API documentation or interface specs reviewed [if applicable].
 
 | Document Type | Link / Location | Key Findings / Action Required |
 | :--- | :--- | :--- |
@@ -46,33 +46,33 @@
 
 ### Acceptance Criteria
 
-* [ ] `runBlock`/`runAll` POST to the s1 run routes and resolve the server `runId` (202), or reject a typed error on 429/500.
-* [ ] `subscribe` delivers parsed `WsServerEvent`s in arrival order; a malformed frame is dropped without throwing.
-* [ ] `cancel(runId)` serializes the exact `{type:'cancel',runId}` WS message.
-* [ ] The SPA imports the WS/HTTP shapes **type-only** from `@deepnote/runtime-server/types`; boundary check + isolation test pass (zero `apps/` files in root tsc).
+- [x] `runBlock`/`runAll` POST to the s1 run routes and resolve the server `runId` (202), or reject a typed error on 429/500.
+- [x] `subscribe` delivers parsed `WsServerEvent`s in arrival order; a malformed frame is dropped without throwing.
+- [x] `cancel(runId)` serializes the exact `{type:'cancel',runId}` WS message.
+- [x] The SPA imports the WS/HTTP shapes **type-only** from `@deepnote/runtime-server/types`; boundary check + isolation test pass (zero `apps/` files in root tsc).
 
 ## Feature Work Phases
 
 | Phase / Task | Status / Link to Artifact or Card | Universal Check |
 | :--- | :--- | :---: |
-| **Design & Architecture** | Design Phase 1 | - [ ] Design Complete |
-| **Test Plan Creation** | fetch-stub trigger tests + WS-stub stream tests + boundary test | - [ ] Test Plan Approved |
-| **TDD Implementation** | ExecutionClient (runBlock/runAll/subscribe/cancel/connect/close) | - [ ] Implementation Complete |
-| **Integration Testing** | Against a stubbed fetch + WebSocket | - [ ] Integration Tests Pass |
-| **Documentation** | README "Execution transport" section | - [ ] Documentation Complete |
+| **Design & Architecture** | Design Phase 1 | - [x] Design Complete |
+| **Test Plan Creation** | fetch-stub trigger tests + WS-stub stream tests + boundary test | - [x] Test Plan Approved |
+| **TDD Implementation** | ExecutionClient (runBlock/runAll/subscribe/cancel/connect/close) | - [x] Implementation Complete |
+| **Integration Testing** | Against a stubbed fetch + WebSocket | - [x] Integration Tests Pass |
+| **Documentation** | README "Execution transport" section | - [x] Documentation Complete |
 | **Code Review** | gitban-reviewer | - [ ] Code Review Approved |
-| **Deployment Plan** | Fork-only; no deploy | - [ ] Deployment Plan Ready |
+| **Deployment Plan** | Fork-only; no deploy | - [x] Deployment Plan Ready |
 
 ## TDD Implementation Workflow
 
 | Step | Status/Details | Universal Check |
 | :---: | :--- | :---: |
-| **1. Write Failing Tests** | stub `fetch` → 202{runId}/429/500; `runBlock`/`runAll` resolve runId or reject typed; fake `WebSocket` → subscribe gets parsed events, malformed frame dropped, cancel serializes; boundary (no backend runtime import) | - [ ] Failing tests committed |
-| **2. Implement Feature Code** | ExecutionClient + ws-URL derivation + RunTriggerError | - [ ] Feature implementation complete |
-| **3. Run Passing Tests** | studio vitest green; type-only assertion compiles | - [ ] Originally failing tests pass |
-| **4. Refactor** | Tidy connect/reconnect plumbing | - [ ] Code refactored |
-| **5. Full Regression Suite** | `pnpm test` + `pnpm typecheck` + isolation/boundary green | - [ ] All tests pass |
-| **6. Performance Testing** | N/A (transport seam; <2s measured in step 6) | - [ ] N/A |
+| **1. Write Failing Tests** | stub `fetch` → 202{runId}/429/500; `runBlock`/`runAll` resolve runId or reject typed; fake `WebSocket` → subscribe gets parsed events, malformed frame dropped, cancel serializes; boundary (no backend runtime import) | - [x] Failing tests committed |
+| **2. Implement Feature Code** | ExecutionClient + ws-URL derivation + RunTriggerError | - [x] Feature implementation complete |
+| **3. Run Passing Tests** | studio vitest green; type-only assertion compiles | - [x] Originally failing tests pass |
+| **4. Refactor** | Tidy connect/reconnect plumbing | - [x] Code refactored |
+| **5. Full Regression Suite** | `pnpm test` + `pnpm typecheck` + isolation/boundary green | - [x] All tests pass |
+| **6. Performance Testing** | N/A (transport seam; <2s measured in step 6) | - [x] N/A |
 
 ### Implementation Notes
 
@@ -86,10 +86,10 @@
 
 **Observable outcomes (unfakeable):**
 
-* [ ] **Capstone:** against a stubbed `fetch` + `WebSocket`, `runBlock('b1','nb')` POSTs to `/api/notebooks/nb/blocks/b1/run`, resolves the server `runId` from the `202`, and a subsequent inbound `{type:'block-start',runId,…}` frame is delivered to a `subscribe` callback as a parsed `WsServerEvent` — proving trigger→stream correlation by the HTTP-returned `runId`; a `429` rejects a typed `RunTriggerError('queue-full')`.
-* [ ] `cancel(runId)` serializes exactly `{type:'cancel',runId}` over the WS.
-* [ ] A malformed inbound frame is dropped (no throw); reconnect-with-backoff fires on socket close.
-* [ ] The only `@deepnote/runtime-server` import is types from the Node-free entry; no backend runtime value, no `node:` import (boundary test + isolation test green; root `tsc --listFilesOnly` names 0 `apps/` files).
+- [x] **Capstone:** against a stubbed `fetch` + `WebSocket`, `runBlock('b1','nb')` POSTs to `/api/notebooks/nb/blocks/b1/run`, resolves the server `runId` from the `202`, and a subsequent inbound `{type:'block-start',runId,…}` frame is delivered to a `subscribe` callback as a parsed `WsServerEvent` — proving trigger→stream correlation by the HTTP-returned `runId`; a `429` rejects a typed `RunTriggerError('queue-full')`.
+- [x] `cancel(runId)` serializes exactly `{type:'cancel',runId}` over the WS.
+- [x] A malformed inbound frame is dropped (no throw); reconnect-with-backoff fires on socket close.
+- [x] The only `@deepnote/runtime-server` import is types from the Node-free entry; no backend runtime value, no `node:` import (boundary test + isolation test green; root `tsc --listFilesOnly` names 0 `apps/` files).
 
 ## Validation & Closeout
 
@@ -125,3 +125,29 @@
 ### Note on validation
 
 This card follows a structured template. Keep its sections, checkboxes, and tables and fill them in rather than removing them — gitban validates card structure when the card is created and when it is completed, and a non-conforming card is held as a draft until it is corrected.
+
+
+## Close-out — LUIRUN1 step 2 (executor cycle 1)
+
+**Shipped** — `apps/studio/src/execution/ExecutionClient.ts` (the transport seam) + `ExecutionClient.test.ts` (15 tests, written first/TDD), the isolation test extended with an ExecutionClient-specific boundary case, the README "Execution transport" section, and a `backoff`/`LUIRUN` cspell addition.
+
+**What the code does (per KD-2 / the interface in the design doc):**
+- `createExecutionClient(baseUrl)` returns an `ExecutionClient`. **Trigger over HTTP:** `runBlock(blockId, notebookName)` POSTs `/api/notebooks/{nb}/blocks/{id}/run` (URL-encoding both segments); `runAll()` POSTs `/api/project/run`. Both resolve the server `runId` from the `202 { runId }`. A `429` rejects `RunTriggerError` with `reason:'queue-full'`; a `500 { error, failureCategory }` rejects `reason:'engine-start'` carrying the typed `KernelFailureCategory` + the s1 `{ error }` message; a pre-response failure rejects `reason:'network'` (no status).
+- **Stream + cancel over the WS:** `connect()` opens the single `WS /api/stream` (subscribe-only), resolving once OPEN; `subscribe(onEvent)` delivers parsed `WsServerEvent`s in arrival order and returns an unsubscribe; a malformed frame (`JSON.parse` throw) is dropped, not fatal; `cancel(runId)` serializes exactly `{type:'cancel',runId}`; `close()` stops reconnection. The socket reconnects with a capped exponential backoff (500ms→5s) on close.
+- `streamUrl(baseUrl)` derives `ws(s)://host/api/stream` from the http(s) base URL, resolving an empty base against the page origin.
+
+**Isolation (ADR-006/007, load-bearing):** the WS/HTTP shapes (`WsClientMessage`, `WsServerEvent`, `RunId`, `KernelFailureCategory`) are `import type` from `@deepnote/runtime-server/types`; the transport is the browser `fetch` + `WebSocket` globals — no backend runtime value, no `node:` builtin. The new isolation case asserts every `@deepnote/runtime-server` import is `import type` from the `/types` subpath, forbids `node:`/runtime-core value imports, and positively asserts the file reaches for `new WebSocket(`/`fetch(` (a guard against a silent refactor to a Node client).
+
+**Tests actually run (not deferred to CI):**
+- `apps/studio/src/execution/ExecutionClient.test.ts` — **15 passed** (jsdom). Fetch-stub trigger paths (202 resolves runId, URL-encoding, 429→queue-full, 500→engine-start+failureCategory, network→no status) + fake-`WebSocket` stream paths (connect→OPEN, ws/wss/origin URL derivation, ordered delivery, malformed-frame drop, unsubscribe, exact cancel serialization, capped-backoff reconnect on close, close() suppresses reconnect).
+- `test-helpers/apps-studio-isolation.test.ts` — **4 passed** (node backend suite), including the capstone `tsc -p tsconfig.json --listFilesOnly` naming **zero** `apps/` files and the new ExecutionClient boundary case.
+- `apps/studio` full suite — **162 passed** (no s2 regression).
+- Gates: `apps/studio` `tsc --noEmit` clean; root backend `tsc --noEmit -p tsconfig.json` clean (gate not reddened); Biome clean on the new/changed TS; Prettier clean on README + cspell.json; cspell clean on all changed files (run via `--no-gitignore` to defeat the worktree useGitignore quirk).
+
+**Deferred:** none. Phases 2–4 (runStore/useExecution, Run affordances + live rendering, failure surfacing + the gated real-kernel <2s measurement) are separate steps of this sprint, out of scope for step 2.
+
+**Note on scope:** this is a transport seam verified against stubbed `fetch`/`WebSocket` only — no real kernel was exercised (that is the Phase-4 gated integration measurement). The trigger→stream correlation is proven structurally (HTTP-returned `runId` + a subsequent inbound frame reaching `subscribe`), not against a live `deepnote serve`.
+
+**Profiling log:** `agent_log_*` events were emitted, but `.gitban/agents/executor/logs/` is gitignored in this worktree so the `.jsonl` could not be committed from here — it lives in the parent store and the dispatcher reconciles `.gitban/` state on merge-back.
+
+**Commit:** `b146370` (worktree branch). Remaining unchecked boxes are reviewer/dispatcher-owned (code review, PR merge, deploy/monitoring/stakeholder/epic-close — several N/A for the fork-only showcase). Card left `in_progress` for the reviewer.

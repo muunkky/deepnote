@@ -111,4 +111,38 @@ describe('apps/studio isolation invariant (ADR-006 / ADR-007)', () => {
 
     expect(offenders, `apps/studio must stay Node-free;\n${offenders.join('\n')}`).toEqual([])
   })
+
+  it('ExecutionClient imports the WS/HTTP contract type-only and uses only browser globals (LUIRUN1 step 2)', () => {
+    // The execution transport seam is the FIRST runtime (non-type) backend interaction the SPA
+    // has (design m3-s3 Phase 1, KD-2/R6). Its boundary is load-bearing: the WS/HTTP SHAPES must
+    // be `import type` from the Node-free `/types` entry, and the TRANSPORT must be the browser
+    // `fetch`/`WebSocket` globals — never a backend runtime value, never a `node:` builtin.
+    const clientPath = path.join(repoRoot, 'apps', 'studio', 'src', 'execution', 'ExecutionClient.ts')
+    const source = readFileSync(clientPath, 'utf8')
+    const offenders: string[] = []
+
+    // Every `@deepnote/runtime-server` import in this file must be a TYPE import (`import type …`),
+    // and it must come from the `/types` subpath, never the bare runtime entry.
+    const importRe = /import\s+(type\s+)?(?:[^'"]*?\s+from\s+)?['"](@deepnote\/runtime-server[^'"]*)['"]/g
+    for (const match of source.matchAll(importRe)) {
+      const isType = match[1] !== undefined
+      const specifier = match[2]
+      if (!isType) offenders.push(`value import of '${specifier}' (must be \`import type\`)`)
+      if (specifier !== '@deepnote/runtime-server/types') {
+        offenders.push(`import from '${specifier}' (only the /types subpath is allowed)`)
+      }
+    }
+    // No node: builtin, and no runtime-core runtime value (its types ride the /types re-export).
+    if (/from\s+['"]node:/.test(source)) offenders.push('imports a node: builtin')
+    if (/import\s+(?!type\s)[^;]*from\s+['"]@deepnote\/runtime-core['"]/.test(source)) {
+      offenders.push('value import of @deepnote/runtime-core')
+    }
+    // The transport must be the browser globals — the file must actually reach for them (a guard
+    // against an accidental refactor to a Node http/ws client that would still pass the negative
+    // checks above).
+    if (!/\bnew WebSocket\(/.test(source)) offenders.push('does not use the browser WebSocket global')
+    if (!/\bfetch\(/.test(source)) offenders.push('does not use the browser fetch global')
+
+    expect(offenders, `ExecutionClient.ts must stay type-only + browser-native;\n${offenders.join('\n')}`).toEqual([])
+  })
 })

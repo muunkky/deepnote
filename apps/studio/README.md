@@ -70,6 +70,43 @@ capabilities; activeNotebookId } | { status: 'error'; error }` discriminated sta
 > into the SPA, keeping the one-way boundary intact (enforced by
 > `test-helpers/apps-studio-isolation.test.ts`).
 
+## Execution transport (`src/execution/ExecutionClient.ts`)
+
+The viewer's project load is read-only. **Running** a block adds the first runtime (non-type)
+backend interaction the SPA has — a browser `WebSocket` to the local `deepnote serve` process and
+`fetch` POSTs to its run routes. `ExecutionClient` is that seam ([ADR-005] proxy transport, design
+`docs/designs/m3-s3-live-execution.md` Phase 1). It deliberately speaks **two** protocols:
+
+- **Trigger over HTTP (KD-2).** `runBlock(blockId, notebookName)` POSTs
+  `/api/notebooks/{nb}/blocks/{id}/run` and `runAll()` POSTs `/api/project/run`. Both return
+  `202 { runId }` **synchronously**, so the SPA binds `runId → block(s)` at request time —
+  deterministic, multi-tab-safe correlation, with no fragile "the next un-bound `run-start` event
+  is mine" inference. A `429 { error:'queue-full' }` rejects a typed `RunTriggerError` with
+  `reason:'queue-full'`; a `500 { error, failureCategory }` (kernel/engine start failure) rejects
+  with `reason:'engine-start'` carrying the typed `KernelFailureCategory` for the actionable banner
+  (KD-5); a pre-response network failure rejects with `reason:'network'`.
+- **Stream + cancel over the WebSocket.** `WS /api/stream` is **subscribe-only**: `subscribe(onEvent)`
+  delivers the ordered `runId`-tagged `WsServerEvent` broadcast (each caller filters to the `runId`s
+  it owns) and returns an unsubscribe. A malformed inbound frame (a `JSON.parse` throw) is **dropped,
+  not fatal**. `cancel(runId)` serializes exactly `{ type:'cancel', runId }`. The socket reconnects
+  with a capped backoff on close (`connect()`/`close()`/`status` own the lifecycle); because the
+  broadcast has no per-client replay, the owning store (step 3) resets in-flight blocks to `idle` on
+  a reconnect so a missed terminal event never leaves a block pending forever.
+
+The base-URL → WS-URL derivation (`streamUrl`) maps `http(s)://host` → `ws(s)://host/api/stream`,
+resolving an empty base URL against the page origin (same-origin `deepnote serve`).
+
+> **Boundary (load-bearing, [ADR-006]/[ADR-007]).** The WS/HTTP **shapes** (`WsClientMessage`,
+> `WsServerEvent`, `RunId`, `KernelFailureCategory`) are `import type` from the Node-free
+> `@deepnote/runtime-server/types` entry; the **transport** is the browser-native `fetch` +
+> `WebSocket` globals. No backend runtime value, no `node:` builtin — asserted behaviourally by the
+> `ExecutionClient`-specific case in `test-helpers/apps-studio-isolation.test.ts`, and by the
+> capstone `tsc -p tsconfig.json --listFilesOnly` naming zero `apps/` files.
+
+[ADR-005]: ../../docs/adr/ADR-005-browser-kernel-transport-proxy.md
+[ADR-006]: ../../docs/adr/ADR-006-spa-framework-and-bundler.md
+[ADR-007]: ../../docs/adr/ADR-007-server-spa-package-layout.md
+
 ## Shell + routing model
 
 The loaded view is driven entirely by an `ApiProject['project']` (the `GET /api/project` envelope's

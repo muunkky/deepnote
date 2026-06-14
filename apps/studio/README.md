@@ -107,6 +107,44 @@ resolving an empty base URL against the page origin (same-origin `deepnote serve
 [ADR-006]: ../../docs/adr/ADR-006-spa-framework-and-bundler.md
 [ADR-007]: ../../docs/adr/ADR-007-server-spa-package-layout.md
 
+## Execution state (`src/state/runStore.ts`, `src/execution/useExecution.ts`)
+
+The transport above streams a flat `WsServerEvent` broadcast; the **execution state** is what turns
+that stream into per-block run status the UI renders (design `m3-s3-live-execution.md` Phase 2).
+Two pieces:
+
+- **`runStore.ts` — a pure reducer.** `applyEvent(state, event, ctx)` folds one `WsServerEvent` into
+  the `RunState` and returns a new state (no mutation, no socket — so it is unit-tested against
+  scripted event sequences with zero I/O). `RunState` holds `byBlock` (each block's
+  `BlockRunState`: `status` `idle | queued | running | done | failed`, live `outputs: IOutput[]`,
+  `executionCount`, `truncated`, optional `failureCategory`), a `runs` map keyed by `runId`, and a
+  server-level `kernelBanner`. The event → state contract, with its four review-pinned corrections:
+  - `run-queued` → the run and its owned block(s) `queued` (the P1/idle path emits no `run-queued`,
+    so a fast run goes straight to `running` with no `queued` flash — by design).
+  - `run-start` → the run `running`. The reducer **does not read `run-start.totalBlocks`** — the
+    backend emits it as a stub `0`; the real per-block `total` arrives on each `block-start` (**S1**).
+  - `block-start` → that block `running` and its **outputs cleared** — a re-run replaces the prior
+    output rather than appending (Jupyter cell semantics, **KD-3**).
+  - `output` → append the `IOutput`; an `output` carrying `truncated: true` sets the back-pressure
+    flag and appends nothing (R5).
+  - `block-done` → that block `done`/`failed` by `success`, recording `failureCategory`; on success
+    it bumps **that block's** `executionCount` — per-block, on `block-done`, **not** once per
+    `run-done` (a run-all completes many blocks under one `run-done`, **M3**).
+  - `run-done` → finalize the run. `run-failed` → set the `kernelBanner` and mark in-flight owned
+    blocks `failed`. `run-cancelled` → return still-queued/running owned blocks to `idle`.
+  - **Reconnect** (`applyReconnect`, a socket-close signal — not a `WsServerEvent`) resets every
+    non-terminal block to `idle`: the broadcast has **no per-client replay**, so a terminal event
+    lost across a drop must not strand a block `running`/`queued` forever (**S2**).
+- **`useExecution.ts` — the React wire.** One client + one store per loaded project (the backend has
+  one queue/kernel, KD-1). It holds the `RunState`, exposes `runBlock(blockId, nb)` / `runAll()` /
+  `cancel(runId)` and a `blockState(blockId)` selector, and owns the **`runId → blockId(s)`
+  correlation**. Per **KD-2** that binding is recorded at the moment the HTTP trigger resolves — the
+  `runId` the `runBlock`/`runAll` promise returns is bound to the block(s) it ran **before** any
+  event arrives — then handed to the reducer as `ctx.runIdToBlocks`, so a streamed frame carrying
+  that `runId` updates exactly the originating block(s). The correlation is never inferred from the
+  multi-producer broadcast. The hook also subscribes to the transport's reconnect signal and applies
+  `applyReconnect` on a drop.
+
 ## Shell + routing model
 
 The loaded view is driven entirely by an `ApiProject['project']` (the `GET /api/project` envelope's

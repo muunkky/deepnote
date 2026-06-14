@@ -74,6 +74,14 @@ export interface ExecutionClient {
    * The caller filters to the `runId`s it owns.
    */
   subscribe(onEvent: (event: WsServerEvent) => void): () => void
+  /**
+   * Subscribe to the socket-close / reconnect signal; returns an unsubscribe. Fired each time the
+   * live socket drops (before the capped-backoff reconnect). The broadcast WS has no per-client
+   * replay, so any terminal event in flight at close is genuinely lost — the owning store uses this
+   * to reset its non-terminal owned blocks to `idle` so a missed terminal does not strand a block
+   * `running`/`queued` forever (design S2 / L2).
+   */
+  onReconnect(onReconnect: () => void): () => void
   /** Connection state for the UI. */
   readonly status: ExecutionClientStatus
   /** Tear down the socket and stop reconnecting. */
@@ -121,6 +129,7 @@ export function createExecutionClient(baseUrl = ''): ExecutionClient {
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined
   let backoffMs = BASE_BACKOFF_MS
   const subscribers = new Set<(event: WsServerEvent) => void>()
+  const reconnectSubscribers = new Set<() => void>()
 
   function flushOpenResolvers(): void {
     const resolvers = openResolvers
@@ -152,8 +161,10 @@ export function createExecutionClient(baseUrl = ''): ExecutionClient {
   function handleClose(): void {
     if (disposed) return
     // The broadcast WS has no per-client replay; the owning store resets in-flight blocks to
-    // idle (design S2). Here we just keep the socket alive with a capped backoff.
+    // idle (design S2). Notify reconnect subscribers so the store can clear stranded blocks, then
+    // keep the socket alive with a capped backoff.
     status = 'connecting'
+    for (const subscriber of [...reconnectSubscribers]) subscriber()
     scheduleReconnect()
   }
 
@@ -236,6 +247,13 @@ export function createExecutionClient(baseUrl = ''): ExecutionClient {
       subscribers.add(onEvent)
       return () => {
         subscribers.delete(onEvent)
+      }
+    },
+
+    onReconnect(onReconnect: () => void): () => void {
+      reconnectSubscribers.add(onReconnect)
+      return () => {
+        reconnectSubscribers.delete(onReconnect)
       }
     },
 

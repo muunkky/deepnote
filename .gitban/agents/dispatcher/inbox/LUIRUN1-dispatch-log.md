@@ -31,4 +31,19 @@ KD-2: runs triggered via HTTP `POST …/run` (deterministic runId); WS subscribe
 
 ---
 
-## Batch 1: step 2 — 6iba9v (ExecutionClient)
+## Batch 1: step 2 — 6iba9v (ExecutionClient) — DONE
+
+- Executor → reviewer → router: APPROVED. Code at `b146370` (apps/studio/src/execution/ExecutionClient.ts + 15 tests).
+- HTTP-trigger (fetch POST → 202 {runId}), WS subscribe-only, `RunTriggerError` typed, capped exponential backoff reconnect.
+- Planner folded two capstones into 9xfks2 (step 3): **Correlation** (single-runId binding) + **Reconnect-strand** (missed terminal → idle).
+- Reconciled `79ff84d`; b1 closeout `881a70f`.
+
+## Batch 2: step 3 — 9xfks2 (runStore reducer + useExecution hook)
+
+- 9xfks2 → in_progress `58bb85d`.
+- **Push-gate triage (3 root causes, all fixed):**
+  1. `cspell.json` had a biome format drift (from proactive vocab edits) → `biome check --write cspell.json`, committed `ed8718e`.
+  2. `pnpm -r exec tsc --noEmit` SIGKILL'd (OOM) under parallel recursive typecheck on the constrained box — different package each run (reactivity, runtime-core), confirming memory pressure not a type error. Root + reactivity verified clean standalone.
+  3. Fix: export `npm_config_workspace_concurrency=1` on the push so the husky hook's recursive typecheck runs **serially**. **Standing rule for every LUIRUN1 push.**
+- Push GREEN: `a7e30c4..ed8718e` (cspell 0 issues, serial typecheck, full suite).
+- Dispatching 9xfks2 executor (worktree forks from milestone HEAD; BRANCH OVERRIDE — no sprint/LUIRUN1).
